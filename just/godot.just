@@ -2,7 +2,7 @@
 PROJECT_ROOT := "project"
 
 # Engine
-GODOT := env("GODOT", "godot4")
+GODOT := env("GODOT", "godot_last")
 
 # Run
 run:
