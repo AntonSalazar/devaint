@@ -1,0 +1,14 @@
+# Godot 4+ specific ignores
+.godot/
+
+# Build folder
+builds/
+
+# TexturePacker ignores
+*.tpsheet
+*.tpsheet.import
+*.depren
+
+# Other
+*.DS_Store
+
