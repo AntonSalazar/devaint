@@ -42,7 +42,7 @@ var order_counter: int = 0
 
 ## Статичная функция подписки метода [param method]
 ## на тип сообщений [param message_t] по приоритету [param priority] (выше - позже).
-static func subscribe(message_t: GDScript, method: Callable, priority: int) -> void:
+static func subscribe(message_t: GDScript, method: Callable, priority: int = 0) -> void:
 	# Проверяем тип.
 	if not _is_message_type(message_t):
 		push_error(

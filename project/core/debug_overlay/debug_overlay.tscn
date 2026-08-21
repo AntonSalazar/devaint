@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://jn0jcq7evma0"]
+
+[ext_resource type="Script" uid="uid://kci0gvf6qt56" path="res://core/debug_overlay/debug_overlay.gd" id="1_lbu3r"]
+
+[node name="DebugOverlay" type="CanvasLayer" unique_id=2113123335]
+script = ExtResource("1_lbu3r")
+
+[node name="Output" type="RichTextLabel" parent="." unique_id=1634268121]
+anchors_preset = 9
+anchor_bottom = 1.0
+grow_vertical = 2
+bbcode_enabled = true
+fit_content = true
+autowrap_mode = 0

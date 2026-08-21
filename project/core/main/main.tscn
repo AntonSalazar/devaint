@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://valixd4ftvv0"]
+
+[ext_resource type="Script" uid="uid://ees56xxch1yx" path="res://core/main/main.gd" id="1_8fcwd"]
+[ext_resource type="PackedScene" uid="uid://jn0jcq7evma0" path="res://core/debug_overlay/debug_overlay.tscn" id="2_6vymn"]
+
+[node name="Main" type="Node" unique_id=843432815]
+script = ExtResource("1_8fcwd")
+
+[node name="DebugOverlay" parent="." unique_id=2113123335 instance=ExtResource("2_6vymn")]
+unique_name_in_owner = true

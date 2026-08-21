@@ -41,6 +41,9 @@ var _speed_id: int = 1
 ## Текущий множитель скорости.
 var _speed: int = 1
 
+## Последний индекс не нулевой скорости.
+var _last_speed_id: int = 1
+
 ## Аккумулятор времени. Вбирает в себя время в [method advance].
 var _accumulator: float = 0.0
 
@@ -59,12 +62,30 @@ func get_speed() -> int:
 ## Функция установки скорости по индексу [param id].
 func set_speed(id: int) -> void:
 	_speed_id = clampi(id, 0, SPEEDS.size() - 1)
-	_speed = SPEEDS[_speed_id]
+	
+	# Смотрим, сменилась ли скорость на новую.
+	var speed: int = SPEEDS[_speed_id]
+	if _speed == speed:
+		return
+	_speed = speed
+	print("%s: speed changed to x%d" % [to_string(), _speed])
 
 
 ## Функция смены скорости множителя времени по сдвигу [param offset].
 func change_speed(offset: int) -> void:
 	set_speed(_speed_id + offset)
+
+
+## Функция тумблера паузы.
+func toggle_pause() -> void:
+	# Если время идет, то паузим.
+	if _speed_id > 0:
+		_last_speed_id = _speed_id
+		set_speed(0)
+		return
+	
+	# Вернем скорость.
+	set_speed(_last_speed_id)
 
 
 ## Функция возврата нормализованного прогресса игрового дня [0.0, 1.0).

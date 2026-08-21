@@ -199,6 +199,26 @@ func test_day_progress_freezes_on_pause() -> void:
 	check_near(clock.get_day_progress(), before, "pause keeps the progress frozen")
 
 
+## Тумблер паузы запоминает и возвращает прежнюю скорость.
+func test_toggle_pause() -> void:
+	var clock: GameClock = GameClock.new()
+	
+	clock.toggle_pause()
+	check_eq(clock.get_speed(), 0, "toggle from x1 pauses")
+	clock.toggle_pause()
+	check_eq(clock.get_speed(), 1, "toggle again resumes to x1")
+	
+	clock.set_speed(3)
+	clock.toggle_pause()
+	check_eq(clock.get_speed(), 0, "toggle from x4 pauses")
+	clock.toggle_pause()
+	check_eq(clock.get_speed(), GameClock.SPEEDS[3], "resume restores x4, not x1")
+	
+	clock.set_speed(0)
+	clock.toggle_pause()
+	check_true(clock.get_speed() > 0, "toggle from a direct pause still resumes")
+
+
 ## Стартовое время из конструктора учитывается временем и прогрессом.
 func test_init_start_time() -> void:
 	var clock: GameClock = GameClock.new(12 * 60)
