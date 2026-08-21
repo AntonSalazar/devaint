@@ -3,35 +3,6 @@ extends TestCase
 ## Тесты [EventBus]: доставка, порядок приоритетов, отписка,
 ## наследование типов сообщений, отложенная отправка, мертвые подписки.
 
-#region CLASSES
-
-## Тестовое сообщение с полезной нагрузкой.
-class TestMsg extends EventBus.Message:
-	var value: int = 0
-	
-	func _init(p_value: int = 0) -> void:
-		value = p_value
-
-
-## Наследник тестового сообщения — для проверки доставки по базовому типу.
-class DerivedMsg extends TestMsg:
-	pass
-
-
-## Постороннее сообщение — не должно доставляться подписчикам [TestMsg].
-class OtherMsg extends EventBus.Message:
-	pass
-
-
-## Объект-подписчик на Object (не RefCounted) — для теста мертвых подписок.
-class Dummy extends Object:
-	var calls: int = 0
-	
-	func on_msg(_msg: EventBus.Message) -> void:
-		calls += 1
-
-#endregion
-
 
 #region FUNCTIONS
 #region OVERRIDE_PUBLIC
@@ -136,7 +107,9 @@ func test_unsubscribe() -> void:
 ## Подписка на тип, не наследующий Message, отклоняется.
 func test_subscribe_rejects_non_message() -> void:
 	print("        (an EventBus ERROR is expected below — part of the test)")
-	EventBus.subscribe(EventBus.Record, func(_msg: EventBus.Message) -> void: fail("must not be called"), 0)
+	EventBus.subscribe(
+			EventBus.Record, func(_msg: EventBus.Message) -> void: fail("must not be called"), 0
+	)
 	check_true(true, "rejected without a crash")
 
 
@@ -181,4 +154,34 @@ func test_message_push_helper() -> void:
 	check_eq(calls.size(), 1, "Message.push() delivered the message")
 
 #endregion
+#endregion
+
+
+#region CLASSES
+
+## Тестовое сообщение с полезной нагрузкой.
+class TestMsg extends EventBus.Message:
+	var value: int = 0
+	
+	func _init(p_value: int = 0) -> void:
+		value = p_value
+
+
+## Наследник тестового сообщения — для проверки доставки по базовому типу.
+class DerivedMsg extends TestMsg:
+	pass
+
+
+## Постороннее сообщение — не должно доставляться подписчикам [TestMsg].
+class OtherMsg extends EventBus.Message:
+	pass
+
+
+## Объект-подписчик на Object (не RefCounted) — для теста мертвых подписок.
+class Dummy extends Object:
+	var calls: int = 0
+	
+	func on_msg(_msg: EventBus.Message) -> void:
+		calls += 1
+
 #endregion

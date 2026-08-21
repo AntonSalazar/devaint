@@ -7,7 +7,7 @@ extends RefCounted
 #region REF
 
 ## Синглтон ссылка.
-static var _ref: EventBus = null :
+static var _ref: EventBus = null:
 	get():
 		if not is_instance_valid(_ref):
 			_ref = EventBus.new()
@@ -18,7 +18,7 @@ static var _ref: EventBus = null :
 
 
 #region VARIABLES
-#region REGULAR_PRIVATE
+#region REGULAR_PUBLIC
 
 ## Таблица подписчиков, разбитых по ключам [GDScript] - типы сообщений,
 ## и значениям [Array[EventBus.Record]].
@@ -31,77 +31,13 @@ var cache: Dictionary[GDScript, Array] = {}
 var deferred: Array[Message] = []
 
 ## Глобальный порядковый номер подписки.
-## Пригодится
-var order_counter: int = 0 
+var order_counter: int = 0
 
 #endregion
 #endregion
 
 
 #region FUNCTIONS
-#region STATIC_PRIVATE
-
-## Статичная функция проверяет, что тип - наследник Message.
-static func _is_message_type(message_t: GDScript) -> bool:
-	var cursor: GDScript = message_t
-	while is_instance_valid(cursor):
-		if cursor == Message:
-			return true
-		cursor = cursor.get_base_script()
-	return false
-
-
-## Статичная функция возврата пустого типизированного массива записей [Record].
-static func _empty() -> Array[Record]:
-	var records: Array[Record] = Array([], TYPE_OBJECT, "RefCounted", Record)
-	return records
-
-
-## Статичная функция возврата списка записей к типу сообщений [param message_t].
-static func _get_records(message_t: GDScript) -> Array[Record]:
-	# Возьмем кэш, если он не пуст.
-	var records: Array[Record] = _ref.cache.get(message_t, _empty())
-	if records.size() > 0:
-		return records
-	
-	# Раз он пуст, то возьмем сырые подписки
-	var cursor: GDScript = message_t
-	while is_instance_valid(cursor):
-		records.append_array(_ref.subs.get(cursor, _empty()))
-		cursor = cursor.get_base_script()
-	
-	# Проводим сортировку по приоритетам.
-	records.sort_custom(
-		func(a: Record, b: Record) -> bool:
-			if a.priority != b.priority:
-				return a.priority < b.priority
-			return a.order < b.order
-	)
-	
-	# Кэшируем.
-	_ref.cache[message_t] = records
-	return records
-
-
-## Статичная функция удаления мертвых подписок.
-static func _purge_dead() -> void:
-	# Пройдемся по отключенным записям.
-	var all_records: Array = _ref.subs.values()
-	for idx: int in all_records.size():
-		var records: Array[Record] = all_records[idx]
-		for rec_idx: int in range(records.size() - 1, -1, -1):
-			var record: Record = records[rec_idx]
-			if record.active:
-				continue
-		
-			# Удаляем запись.
-			records.remove_at(rec_idx)
-	
-	# Сбросим кэш.
-	_ref.cache.clear()
-
-#endregion
-
 #region STATIC_PUBLIC
 
 ## Статичная функция подписки метода [param method]
@@ -110,8 +46,8 @@ static func subscribe(message_t: GDScript, method: Callable, priority: int) -> v
 	# Проверяем тип.
 	if not _is_message_type(message_t):
 		push_error(
-			"EventBus.subscribe: `message_t` must inherit `Message`, got: %s" %
-			message_t
+				"EventBus.subscribe: `message_t` must inherit `Message`, got: %s" %
+				message_t
 		)
 		return
 	
@@ -168,7 +104,7 @@ static func push(message: Message) -> void:
 	
 	# Делаем прогон.
 	var message_t: GDScript = message.get_script()
-	var records: = _get_records(message_t)
+	var records := _get_records(message_t)
 	for record: Record in records:
 		# Пропускаем неактивные.
 		if not record.active:
@@ -190,7 +126,7 @@ static func push(message: Message) -> void:
 
 ## Статичная функция отложенной отправки сообщения [param message] на конец кадра.
 static func push_deferred(message: Message) -> void:
-	var messages: = _ref.deferred
+	var messages := _ref.deferred
 	if messages.is_empty():
 		_ref._push_deferred.call_deferred()
 	messages.append(message)
@@ -200,6 +136,68 @@ static func push_deferred(message: Message) -> void:
 static func reset() -> void:
 	_ref = null
 
+#endregion
+
+#region STATIC_PRIVATE
+
+## Статичная функция проверяет, что тип - наследник Message.
+static func _is_message_type(message_t: GDScript) -> bool:
+	var cursor: GDScript = message_t
+	while is_instance_valid(cursor):
+		if cursor == Message:
+			return true
+		cursor = cursor.get_base_script()
+	return false
+
+
+## Статичная функция возврата пустого типизированного массива записей [Record].
+static func _empty() -> Array[Record]:
+	var records: Array[Record] = Array([], TYPE_OBJECT, "RefCounted", Record)
+	return records
+
+
+## Статичная функция возврата списка записей к типу сообщений [param message_t].
+static func _get_records(message_t: GDScript) -> Array[Record]:
+	# Возьмем кэш, если он не пуст.
+	var records: Array[Record] = _ref.cache.get(message_t, _empty())
+	if records.size() > 0:
+		return records
+	
+	# Раз он пуст, то возьмем сырые подписки
+	var cursor: GDScript = message_t
+	while is_instance_valid(cursor):
+		records.append_array(_ref.subs.get(cursor, _empty()))
+		cursor = cursor.get_base_script()
+	
+	# Проводим сортировку по приоритетам.
+	records.sort_custom(
+		func(a: Record, b: Record) -> bool:
+			if a.priority != b.priority:
+				return a.priority < b.priority
+			return a.order < b.order
+	)
+	
+	# Кэшируем.
+	_ref.cache[message_t] = records
+	return records
+
+
+## Статичная функция удаления мертвых подписок.
+static func _purge_dead() -> void:
+	# Пройдемся по отключенным записям.
+	var all_records: Array = _ref.subs.values()
+	for idx: int in all_records.size():
+		var records: Array[Record] = all_records[idx]
+		for rec_idx: int in range(records.size() - 1, -1, -1):
+			var record: Record = records[rec_idx]
+			if record.active:
+				continue
+			
+			# Удаляем запись.
+			records.remove_at(rec_idx)
+	
+	# Сбросим кэш.
+	_ref.cache.clear()
 
 #endregion
 
@@ -231,10 +229,10 @@ class Record extends RefCounted:
 	## Номер приоритета. Выше - позже.
 	var priority: int = 0
 	
-	## Номер записи. Нужен для стабиности порядка вызова при равном приоритете.
+	## Номер записи. Нужен для стабильности порядка вызова при равном приоритете.
 	var order: int = 0
 	
-	## Флаг активности подписки. Обнвляется при создании и удалении записи.
+	## Флаг активности подписки. Обновляется при создании и удалении записи.
 	var active: bool = false
 	
 	#endregion

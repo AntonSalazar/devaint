@@ -15,4 +15,4 @@ editor:
 # Autotests
 test:
     {{GODOT}} --headless --path project --import
-    {{GODOT}} --headless --path project -s res://tests/TestRunner.gd
+    {{GODOT}} --headless --path project -s res://tests/test_runner.gd

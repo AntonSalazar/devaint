@@ -1,8 +1,8 @@
 extends SceneTree
 
 ## Раннер тестов. Запуск: `just test`
-## (godot --headless --path project -s res://tests/TestRunner.gd).
-## Находит в `res://tests/` скрипты `*Test.gd` (наследники [TestCase]),
+## (godot --headless --path project -s res://tests/test_runner.gd).
+## Находит в `res://tests/` скрипты `*_test.gd` (наследники [TestCase]),
 ## исполняет их методы `test_*`, печатает отчет.
 ## Код выхода: 0 — все прошло, 1 — есть провалы.
 
@@ -67,7 +67,7 @@ func _run_all() -> void:
 func _find_test_scripts() -> Array[String]:
 	var paths: Array[String] = []
 	for file: String in DirAccess.get_files_at(TESTS_DIR):
-		if file.ends_with("Test.gd"):
+		if file.ends_with("_test.gd"):
 			paths.append(TESTS_DIR + file)
 	paths.sort()
 	return paths
