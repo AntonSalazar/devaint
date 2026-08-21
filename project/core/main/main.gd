@@ -16,6 +16,9 @@ const START_MINUTES: int = 480
 ## На случай лагов игры или накопления дельты со стороны движка.
 const MAX_FRAME_DELTA: float = 1.0
 
+## Ссылка на префаб робота игрока [Robot].
+const ROBOT_SCENE: PackedScene = preload("uid://jwkot7562ai0")
+
 #endregion
 
 
@@ -25,6 +28,20 @@ const MAX_FRAME_DELTA: float = 1.0
 ## Ссылка на экземпляр игровых часов.
 var _clock: GameClock = null:
 	get = get_clock
+
+#endregion
+#region WORLD
+
+## Ссылка на экземпляр мира.
+var _world: World = null:
+	get = get_world
+
+#endregion
+#region ROBOT
+
+## Ссылка на экземпляр робота игрока.
+var _robot: Robot = null:
+	get = get_robot
 
 #endregion
 #endregion
@@ -47,12 +64,26 @@ var _clock: GameClock = null:
 func get_clock() -> GameClock:
 	return _clock
 
+
+## Геттер ссылки на экземпляр мира.
+func get_world() -> World:
+	return _world
+
+
+## Геттер ссылки на экземпляр робота игрока.
+func get_robot() -> Robot:
+	return _robot
+
 #endregion
 
 #region REGULAR_PRIVATE
 
 ## Функция завершения работы цикла [Main].
 func _teardown() -> void:
+	# Фильтруем повторное выключение.
+	if not is_instance_valid(_clock):
+		return
+	
 	print("%s: Teardown... Bye-bye!" % to_string())
 	
 	# Сбрасываем шину.
@@ -64,14 +95,29 @@ func _teardown() -> void:
 	
 	# Сбрасываем ссылки.
 	_debug_overlay.deinit()
+	_robot.deinit()
+	_robot.queue_free()
+	_robot = null
+	_world = null
 	_clock = null
 
 
 ## Функция запуска работы цикла.
 func _launch() -> void:
-	# Создаем экземпляр таймера и инициализируем.
+	# Создаем экземпляр таймера.
 	_clock = GameClock.new(START_MINUTES)
-	_debug_overlay.init(_clock)
+	
+	# Цепляем мир.
+	_world = %World
+	
+	# Добавляем игрока.
+	_robot = ROBOT_SCENE.instantiate()
+	_world.add_child(_robot)
+	_robot.set_global_position(_world.get_robot_spawn())
+	_robot.init(_clock)
+	
+	# Добавляем отладочный гуй.
+	_debug_overlay.init(_clock, _robot)
 	
 	# Запускаем процессинг.
 	set_process(true)

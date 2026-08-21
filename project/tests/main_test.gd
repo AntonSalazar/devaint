@@ -37,6 +37,11 @@ func test_launch() -> void:
 			"start time comes from START_MINUTES"
 	)
 	check_true(not EventBus._ref.subs.is_empty(), "overlay is subscribed to the bus")
+	check_true(main.get_robot() != null, "robot is spawned on launch")
+	check_near(
+			main.get_robot().get_battery(), Robot.BATTERY_MAX,
+			"robot battery is full on launch"
+	)
 	main.free()
 
 

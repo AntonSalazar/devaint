@@ -59,6 +59,11 @@ func get_speed() -> int:
 	return _speed
 
 
+## Функция возврата флага, на паузе ли вычисления.
+func is_paused() -> bool:
+	return _speed <= 0
+
+
 ## Функция установки скорости по индексу [param id].
 func set_speed(id: int) -> void:
 	_speed_id = clampi(id, 0, SPEEDS.size() - 1)
@@ -78,14 +83,14 @@ func change_speed(offset: int) -> void:
 
 ## Функция тумблера паузы.
 func toggle_pause() -> void:
-	# Если время идет, то паузим.
-	if _speed_id > 0:
-		_last_speed_id = _speed_id
-		set_speed(0)
+	# Вернем скорость, если пауза.
+	if is_paused():
+		set_speed(_last_speed_id)
 		return
 	
-	# Вернем скорость.
-	set_speed(_last_speed_id)
+	# Если время идет, то паузим.
+	_last_speed_id = _speed_id
+	set_speed(0)
 
 
 ## Функция возврата нормализованного прогресса игрового дня [0.0, 1.0).

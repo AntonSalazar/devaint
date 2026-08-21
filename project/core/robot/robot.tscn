@@ -1,0 +1,23 @@
+[gd_scene format=3 uid="uid://jwkot7562ai0"]
+
+[ext_resource type="Script" uid="uid://d1jhnbus5d4tf" path="res://core/robot/robot.gd" id="1_ixewi"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_pdlnn"]
+radius = 14.0
+height = 40.0
+
+[node name="Robot" type="CharacterBody2D" unique_id=232143976]
+script = ExtResource("1_ixewi")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1198252878]
+rotation = 1.5707964
+shape = SubResource("CapsuleShape2D_pdlnn")
+
+[node name="Visual" type="Polygon2D" parent="." unique_id=1124487682]
+color = Color(1, 0.21960784, 0, 1)
+polygon = PackedVector2Array(-20, -25, 1, -90, 20, -25, 0, 0)
+uv = PackedVector2Array(-168.5, 201, -206.49988, 98.30001, -152.59998, -19.400002, -71.19995, -17.199997, -32.69995, 77.4, -101.99988, 202.80002)
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=800606710]
+position_smoothing_enabled = true
+position_smoothing_speed = 10.0

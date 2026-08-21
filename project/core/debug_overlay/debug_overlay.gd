@@ -12,6 +12,9 @@ extends CanvasLayer
 ## Ссылка на экземпляр таймера игрового времени.
 var _clock: GameClock = null
 
+## Ссылка на экземпляр робота.
+var _robot: Robot = null
+
 #endregion
 
 #region ONREADY_PRIVATE
@@ -27,8 +30,9 @@ var _clock: GameClock = null
 #region REGULAR_PUBLIC
 
 ## Функция инициализации.
-func init(clock: GameClock) -> void:
+func init(clock: GameClock, robot: Robot) -> void:
 	_clock = clock
+	_robot = robot
 	EventBus.subscribe(EventBus.Message, _on_message)
 	set_process(true)
 
@@ -38,6 +42,7 @@ func deinit() -> void:
 	set_process(false)
 	EventBus.unsubscribe(EventBus.Message, _on_message)
 	_clock = null
+	_robot = null
 
 #endregion
 
@@ -60,11 +65,15 @@ func _ready() -> void:
 @warning_ignore("unused_parameter")
 func _process(delta: float) -> void:
 	_output.set_text(
-			"%s x%d progress %.04f" %
+			(
+				"%s x%d progress %.04f" +
+				"\nbattery %.1f%%"
+			) %
 			[
 				_clock.get_datetime_str(),
 				_clock.get_speed(),
-				_clock.get_day_progress()
+				_clock.get_day_progress(),
+				_robot.get_battery(),
 			]
 	)
 
