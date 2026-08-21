@@ -49,6 +49,10 @@ func _run_all() -> void:
 			await case.call(method_name)
 			case.after_each()
 			
+			# Ноль выполненных проверок — признак runtime-ошибки внутри теста.
+			if case.checks == 0:
+				case.failures.append("no checks executed (runtime error inside the test?)")
+			
 			total += 1
 			if case.failures.is_empty():
 				print("  PASS  %s (%d checks)" % [method_name, case.checks])

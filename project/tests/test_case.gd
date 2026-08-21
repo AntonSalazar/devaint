@@ -48,6 +48,16 @@ func check_eq(got: Variant, expected: Variant, what: String) -> void:
 		failures.append("%s: expected `%s`, got `%s`" % [what, expected, got])
 
 
+## Проверка близости float [param got] к [param expected]
+## с допуском [param tolerance].
+func check_near(
+		got: float, expected: float, what: String, tolerance: float = 0.00001
+) -> void:
+	checks += 1
+	if absf(got - expected) > tolerance:
+		failures.append("%s: expected ~`%s`, got `%s`" % [what, expected, got])
+
+
 ## Безусловный провал.
 func fail(what: String) -> void:
 	checks += 1
