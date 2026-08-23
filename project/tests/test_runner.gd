@@ -26,6 +26,10 @@ func _initialize() -> void:
 
 ## Функция прогона всех тестов с отчетом и выходом.
 func _run_all() -> void:
+	# Ждем первый кадр: до него корень дерева не ready и @onready
+	# у спавнимых в тестах сцен остаются пустыми.
+	await process_frame
+	
 	var total: int = 0
 	var failed: int = 0
 	

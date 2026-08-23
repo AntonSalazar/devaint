@@ -292,9 +292,93 @@ func test_init_deinit_subscription() -> void:
 		records_left += records.size()
 	check_eq(records_left, 0, "no subscription records after deinit")
 
+
+
+## Подъем через 25% публикует NONE -> CURIOUS с сектором и значением.
+func test_level_up_publishes() -> void:
+	var grid: SignalGrid = SignalGrid.new(ORIGIN, SIZE)
+	grid.add_tower(Vector2i.ZERO, RADIUS)
+	var messages: Array[SignalGrid.OnNoticeLevelChanged] = _collect_levels()
+	
+	grid.accumulate(Iso.cell_to_world(Vector2i.ZERO), 25.0 / SignalGrid.NOTICE_RATE, 1.0)
+	check_eq(messages.size(), 1, "one level message")
+	if messages.size() == 1:
+		check_eq(messages[0].sector, Vector2i.ZERO, "sector in payload")
+		check_eq(messages[0].previous, SignalGrid.Level.NONE, "previous NONE")
+		check_eq(messages[0].level, SignalGrid.Level.CURIOUS, "level CURIOUS")
+		check_near(messages[0].value, 25.0, "value in payload")
+	check_eq(grid.get_level(Vector2i.ZERO), SignalGrid.Level.CURIOUS, "get_level")
+	check_eq(
+			grid.get_level_at(Iso.cell_to_world(Vector2i.ZERO)), SignalGrid.Level.CURIOUS,
+			"get_level_at agrees"
+	)
+
+
+## Скачок через несколько порогов разом — одно сообщение до верхнего уровня.
+func test_level_jump_publishes_once() -> void:
+	var grid: SignalGrid = SignalGrid.new(ORIGIN, SIZE)
+	grid.add_tower(Vector2i.ZERO, RADIUS)
+	var messages: Array[SignalGrid.OnNoticeLevelChanged] = _collect_levels()
+	
+	grid.accumulate(Iso.cell_to_world(Vector2i.ZERO), 60.0 / SignalGrid.NOTICE_RATE, 1.0)
+	check_eq(messages.size(), 1, "a single message for a multi-threshold jump")
+	if messages.size() == 1:
+		check_eq(messages[0].previous, SignalGrid.Level.NONE, "from NONE")
+		check_eq(messages[0].level, SignalGrid.Level.SCOUT, "straight to SCOUT")
+
+
+## Гистерезис: уровень держится до порога минус LEVEL_HYSTERESIS.
+func test_level_hysteresis_on_decay() -> void:
+	var grid: SignalGrid = SignalGrid.new(ORIGIN, SIZE)
+	grid.add_tower(Vector2i.ZERO, RADIUS)
+	var messages: Array[SignalGrid.OnNoticeLevelChanged] = _collect_levels()
+	grid.init()
+	grid.accumulate(Iso.cell_to_world(Vector2i.ZERO), 25.0 / SignalGrid.NOTICE_RATE, 1.0)
+	check_eq(messages.size(), 1, "CURIOUS reached")
+	
+	# Один тик: 25 -> 23.5, это выше 25 - 5 — уровень держится, сообщений нет.
+	_push_minute()
+	check_eq(grid.get_level(Vector2i.ZERO), SignalGrid.Level.CURIOUS, "still CURIOUS at 23.5")
+	check_eq(messages.size(), 1, "no message inside the hysteresis band")
+	
+	# Тикаем, пока не упадем ниже 20: должно прийти CURIOUS -> NONE.
+	for _idx: int in 3:
+		_push_minute()
+	check_eq(grid.get_level(Vector2i.ZERO), SignalGrid.Level.NONE, "dropped to NONE below 20")
+	check_eq(messages.size(), 2, "one message for the drop")
+	if messages.size() == 2:
+		check_eq(messages[1].previous, SignalGrid.Level.CURIOUS, "drop: previous CURIOUS")
+		check_eq(messages[1].level, SignalGrid.Level.NONE, "drop: level NONE")
+	grid.deinit()
+
+
+## Сектор, остывший до нуля, снимает уровень сообщением.
+func test_level_cleared_on_erase() -> void:
+	var grid: SignalGrid = SignalGrid.new(ORIGIN, SIZE)
+	grid.add_tower(Vector2i.ZERO, RADIUS)
+	var messages: Array[SignalGrid.OnNoticeLevelChanged] = _collect_levels()
+	grid.init()
+	grid.accumulate(Iso.cell_to_world(Vector2i.ZERO), 26.0 / SignalGrid.NOTICE_RATE, 1.0)
+	
+	for _idx: int in 30:
+		_push_minute()
+	check_true(grid.get_notices().is_empty(), "record erased")
+	check_eq(grid.get_level(Vector2i.ZERO), SignalGrid.Level.NONE, "level NONE after erase")
+	check_eq(messages[-1].level, SignalGrid.Level.NONE, "last message is the drop to NONE")
+	grid.deinit()
+
 #endregion
 
 #region REGULAR_PRIVATE
+
+## Подписка-сборщик сообщений о смене уровня.
+func _collect_levels() -> Array[SignalGrid.OnNoticeLevelChanged]:
+	var messages: Array[SignalGrid.OnNoticeLevelChanged] = []
+	var collector: Callable = func(message: SignalGrid.OnNoticeLevelChanged) -> void:
+		messages.append(message)
+	EventBus.subscribe(SignalGrid.OnNoticeLevelChanged, collector)
+	return messages
+
 
 ## Публикация минутного тика с валидным снимком времени.
 func _push_minute() -> void:

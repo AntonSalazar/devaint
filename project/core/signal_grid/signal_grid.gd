@@ -8,7 +8,31 @@ extends RefCounted
 ## Одна структура данных для симуляции и отрисовки.
 
 
+#region ENUMS
+
+enum Level {
+	NONE, ## Ниже первого порога.
+	CURIOUS, ## 25% - любопытство.
+	SCOUT, ## 50% - разведка: дрон в район.
+	HUNT, ## 75% - охота: охотник, перепрошивка вблизи.
+	ALARM, ## 100% - тревога: внеочередная волна.
+}
+
+#endregion
+
+
 #region CONSTANTS
+
+## Пороги уровней в % заметности.
+const LEVEL_THRESHOLDS: Dictionary[Level, float] = {
+	Level.CURIOUS: 25.0,
+	Level.SCOUT: 50.0,
+	Level.HUNT: 75.0,
+	Level.ALARM: 100.0,
+}
+
+## Гистерезис: уровень снимается только ниже порога минус это значение.
+const LEVEL_HYSTERESIS: float = 5.0
 
 ## Размер сектора в клетках.
 const SECTOR_SIZE: int = 8
@@ -36,6 +60,9 @@ var _origin: Vector2i = Vector2i.ZERO
 
 ## Размер грида в клетках.
 var _size: Vector2i = Vector2i.ZERO
+
+## Текущие уровни секторов. Нет ключа - [enum Level.NONE].
+var _levels: Dictionary[Vector2i, Level] = {}
 
 ## Слой статики: суммарное покрытие работающих вышек, [0.0, 1.0] на клетку.
 var _static: PackedFloat32Array = PackedFloat32Array()
@@ -88,6 +115,17 @@ func get_sector_at(position: Vector2) -> Vector2i:
 	return sector
 
 
+## Функция возврата уровня тревоги по сектору [param sector].
+func get_level(sector: Vector2i) -> Level:
+	var level: Level = _levels.get(sector, Level.NONE)
+	return level
+
+
+## Функция возврата уровня тревоги по глобальным координатам [param position].
+func get_level_at(position: Vector2) -> Level:
+	return get_level(get_sector_at(position))
+
+
 ## Функция возврата процента заметности в секторе [param sector].
 func get_notice(sector: Vector2i) -> float:
 	return _notice.get(sector, 0.0)
@@ -122,7 +160,11 @@ func accumulate(position: Vector2, emission: float, minutes: float) -> void:
 	_active_sector = sector
 	if is_zero_approx(gain):
 		return
-	_notice[sector] = minf(_notice.get(sector, 0.0) + gain, NOTICE_MAX)
+	
+	# Запишим значение тревоги и обновим уровень.
+	var value: float = minf(_notice.get(sector, 0.0) + gain, NOTICE_MAX)
+	_notice[sector] = value
+	_update_level(sector, value)
 
 
 ## Функция добавления активной вышки в клетке [param cell]
@@ -204,6 +246,30 @@ func _index_to_cell(idx: int) -> Vector2i:
 	return _origin + Vector2i(idx % _size.x, idx / _size.x)
 
 
+## Функция пересчета уровня тревоги сектора [param sector] по значению [param value]
+## с гистерезисом. При смене публикуется сообщение [SignalGrid.OnNoticeLevelChanged].
+func _update_level(sector: Vector2i, value: float) -> void:
+	var previous: Level = _levels.get(sector, Level.NONE)
+	var level: Level = previous
+	for candidate: Level in LEVEL_THRESHOLDS:
+		if value >= LEVEL_THRESHOLDS[candidate]:
+			level = maxi(level, candidate) as Level
+	
+	while level > Level.NONE and value < LEVEL_THRESHOLDS[level] - LEVEL_HYSTERESIS:
+		level = (level - 1) as Level
+	
+	if level == previous:
+		return
+	
+	if level == Level.NONE:
+		_levels.erase(sector)
+	else:
+		_levels[sector] = level
+	
+	# Оповестим окружение.
+	OnNoticeLevelChanged.new(sector, previous, level, value).push()
+
+
 ## Функция перестройки сети роя по активным вышкам.
 ## Поле вышки - линейный спад от 1.0 в центре до 0.0 на радиусе,
 ## расстояние считается по земле (по изометрии), сумма ограничивается до 1.0.
@@ -242,6 +308,9 @@ func _on_minute_passed(_message: GameClock.OnMinutePassed) -> void:
 		_notice[sector] = value
 		if is_zero_approx(value):
 			empty.append(sector)
+			_update_level(sector, 0.0)
+		else:
+			_update_level(sector, value)
 	
 	# Удаляем пустые сектора.
 	for sector: Vector2i in empty:
@@ -304,6 +373,7 @@ class Tower extends RefCounted:
 	#endregion
 
 
+## Сообщение об обновлении сети роя.
 class OnStaticChanged extends EventBus.Message:
 	#region FUNCTIONS
 	#region OVERRIDE_PRIVATE
@@ -314,5 +384,52 @@ class OnStaticChanged extends EventBus.Message:
 	
 	#endregion
 	#endregion
+
+
+## Сообщение об обновлении уровня угрозы.
+class OnNoticeLevelChanged extends EventBus.Message:
+	#region VARIABLES
+	#region REGULAR_PUBLIC
+	
+	## Сектор, где обновилась угроза.
+	var sector: Vector2i = Vector2i.ZERO
+	
+	## Предыдущий уровень угрозы.
+	var previous: Level = Level.NONE
+	
+	## Новый уровень угрозы.
+	var level: Level = Level.NONE
+	
+	## Уровень тревожности в процентах.
+	var value: float = 0.0
+	
+	#endregion
+	#endregion
+	
+	
+	#region FUNCTIONS
+	#region OVERRIDE_PRIVATE
+	
+	## Функция инициализации.
+	func _init(
+			p_sector: Vector2i, p_previous: Level,
+			p_level: Level, p_value: float
+	) -> void:
+		sector = p_sector
+		previous = p_previous
+		level = p_level
+		value = p_value
+	
+	
+	## Функция возврата представления экземпляра класса в виде строки.
+	func _to_string() -> String:
+		return "SignalGrid.OnNoticeLevelChanged %s %s -> %s (%.0f%%)" % [
+				sector, SignalGrid.Level.find_key(previous),
+				SignalGrid.Level.find_key(level), value,
+		]
+	
+	#endregion
+	#endregion
+
 
 #endregion

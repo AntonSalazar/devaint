@@ -29,3 +29,9 @@ shot:
     rm -rf {{SHOT_DIR}} && mkdir -p {{SHOT_DIR}}
     {{GODOT}} --path project --write-movie {{SHOT_DIR}}/frame.png --fixed-fps 10 --quit-after 20 --resolution 1280x720 > /dev/null 2>&1
     @ls {{SHOT_DIR}}/*.png | tail -1
+
+# Screenshot (driven): скрипт ведет робота и время, последний кадр — снимок
+shot-drive:
+    rm -rf {{SHOT_DIR}} && mkdir -p {{SHOT_DIR}}
+    {{GODOT}} --path project --write-movie {{SHOT_DIR}}/frame.png --fixed-fps 30 --quit-after 300 --resolution 1280x720 -s res://tools/shot_drive.gd > /dev/null 2>&1
+    @ls {{SHOT_DIR}}/*.png | tail -1

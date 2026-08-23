@@ -2,13 +2,56 @@
 
 [ext_resource type="Script" uid="uid://kci0gvf6qt56" path="res://core/debug_overlay/debug_overlay.gd" id="1_lbu3r"]
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lbu3r"]
+bg_color = Color(1, 1, 1, 1)
+
 [node name="DebugOverlay" type="CanvasLayer" unique_id=2113123335]
 script = ExtResource("1_lbu3r")
 
-[node name="Output" type="RichTextLabel" parent="." unique_id=1634268121]
+[node name="Output" type="VBoxContainer" parent="." unique_id=1690555857]
 anchors_preset = 9
 anchor_bottom = 1.0
+offset_right = 10.0
 grow_vertical = 2
+
+[node name="Output" type="RichTextLabel" parent="Output" unique_id=1634268121]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
 bbcode_enabled = true
 fit_content = true
 autowrap_mode = 0
+
+[node name="Log" type="RichTextLabel" parent="Output" unique_id=1137090305]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 10
+bbcode_enabled = true
+fit_content = true
+autowrap_mode = 0
+
+[node name="Notice" type="VBoxContainer" parent="." unique_id=1469103379]
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -181.0
+offset_top = -59.0
+offset_right = 181.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="NoticeBar" type="ProgressBar" parent="Notice" unique_id=449443004]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+theme_override_styles/fill = SubResource("StyleBoxFlat_lbu3r")
+show_percentage = false
+
+[node name="NoticeLevel" type="Label" parent="Notice" unique_id=871596861]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Notice Level"
+horizontal_alignment = 1
+vertical_alignment = 1

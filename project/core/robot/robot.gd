@@ -115,9 +115,14 @@ func get_emission() -> float:
 	return emission
 
 
-## Функция возврата уровня тревоги роя по позиции робота.
+## Функция возврата единиц тревоги роя по позиции робота.
 func get_notice() -> float:
 	return _grid.get_notice_at(global_position)
+
+
+## Функция возврата уровня тревоги роя по позиции робота.
+func get_notice_level() -> SignalGrid.Level:
+	return _grid.get_level_at(global_position)
 
 
 ## Функция инициализации.
