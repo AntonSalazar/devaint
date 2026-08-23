@@ -19,6 +19,9 @@ const MAX_FRAME_DELTA: float = 1.0
 ## Ссылка на префаб робота игрока [Robot].
 const ROBOT_SCENE: PackedScene = preload("uid://jwkot7562ai0")
 
+## Радиус работы вышки в мировых координатах (по земле, с учетом изометрии).
+const TOWER_RADIUS: float = 600.0
+
 #endregion
 
 
@@ -44,6 +47,11 @@ var _robot: Robot = null:
 	get = get_robot
 
 #endregion
+
+## Ссылка на экземляр сети роя.
+var _signal_grid: SignalGrid = null:
+	get = get_signal_grid
+
 #endregion
 
 
@@ -74,6 +82,11 @@ func get_world() -> World:
 func get_robot() -> Robot:
 	return _robot
 
+
+## Геттер ссылки на экземпляр сети роя.
+func get_signal_grid() -> SignalGrid:
+	return _signal_grid
+
 #endregion
 
 #region REGULAR_PRIVATE
@@ -95,9 +108,11 @@ func _teardown() -> void:
 	
 	# Сбрасываем ссылки.
 	_debug_overlay.deinit()
+	_world.get_signal_layer().deinit()
 	_robot.deinit()
 	_robot.queue_free()
 	_robot = null
+	_signal_grid = null
 	_world = null
 	_clock = null
 
@@ -109,6 +124,16 @@ func _launch() -> void:
 	
 	# Цепляем мир.
 	_world = %World
+	
+	# Создаем сеть.
+	var cells: Rect2i = _world.get_cell_rect()
+	_signal_grid = SignalGrid.new(cells.position, cells.size)
+	
+	# TODO - временно тут создаем сеть.
+	for cell: Vector2i in [Vector2i(4, 12), Vector2i(8, 2), Vector2i(-2, 10)]:
+		_signal_grid.add_tower(cell, TOWER_RADIUS)
+	
+	_world.get_signal_layer().init(_signal_grid)
 	
 	# Добавляем игрока.
 	_robot = ROBOT_SCENE.instantiate()

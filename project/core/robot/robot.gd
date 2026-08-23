@@ -26,16 +26,33 @@ const WALK_SPEED: float = 220.0
 ## Максимальный размер заряда батареи.
 const BATTERY_MAX: float = 100.0
 
-## Таблица расхода батареи, разбитые на состояния [enum State].
+## Таблица расхода батареи, разбитая на состояния [enum State].
 const DRAIN: Dictionary[State, float] = {
 	State.IDLE: 0.02,
 	State.WALK: 0.05,
 }
 
+## Таблица излучения, разбитая на состояния [enum State].
+const EMISSION: Dictionary[State, float] = {
+	State.IDLE: 1.0,
+	State.WALK: 3.0,
+}
+
+## Маска для локомоции. Всегда поднят хотя бы один из этих флагов.
+const LOCOMOTION_MASK: int = State.IDLE | State.WALK
+
 #endregion
 
 
 #region PROPERTIES
+#region STATE
+
+## Битовая маска состояний [enum STATE].
+var _flags: int = State.IDLE:
+	set = _set_flags,
+	get = get_flags
+
+#endregion
 #region BATTERY
 
 ## Заряд батареи робота.
@@ -57,21 +74,49 @@ var _clock: GameClock = null
 var _seconds: Dictionary[State, float] = {}
 
 #endregion
+#region ONREADY_PRIVATE
+
+## Ссылка на экземляр отрисовки излучения.
+@onready var _halo: Halo = %Halo
+
+#endregion
 #endregion
 
 
 #region FUNCTIONS
 #region REGULAR_PUBLIC
 
+## Геттер битовой маски состояния робота по [enum State].
+func get_flags() -> int:
+	return _flags
+
+
+## Функция проверки, содержится ли бит [param flag]
+## в маске состояния [member _flags].
+func has_flag(flag: State) -> bool:
+	return _flags & flag != 0
+
+
 ## Геттер заряда батареи робота.
 func get_battery() -> float:
 	return _battery
+
+
+## Функция возврата суммарного излучения робота
+## по его текущему состоянию [member _flags], ед/сек.
+func get_emission() -> float:
+	var emission: float = 0.0
+	for flag: State in State.values():
+		if has_flag(flag):
+			emission += EMISSION.get(flag, 0.0)
+	return emission
 
 
 ## Функция инициализации.
 func init(clock: GameClock) -> void:
 	_clock = clock
 	_battery = BATTERY_MAX
+	_halo.set_emission(get_emission())
 	EventBus.subscribe(GameClock.OnMinutePassed, _on_minute_passed)
 	set_physics_process(true)
 
@@ -84,10 +129,19 @@ func deinit() -> void:
 	_seconds.clear()
 	_clock = null
 
-
 #endregion
 
 #region REGULAR_PRIVATE
+
+## Сеттер битовой маски состояния робота по [enum State].
+func _set_flags(flags: int) -> void:
+	if _flags == flags:
+		return
+	
+	# Обновляем маску и рисуем излучение.
+	_flags = flags
+	_halo.set_emission(get_emission())
+
 
 ## Функция, вызываемая при получении сообщения [param message]
 ## о наступлении новой минуты игры.
@@ -132,9 +186,14 @@ func _physics_process(delta: float) -> void:
 	velocity = Iso.move_direction(input) * WALK_SPEED
 	move_and_slide()
 	
+	# Локомоция занимает свою часть маски, модификаторы сохраняются.
+	var locomotion: int = State.IDLE if velocity.is_zero_approx() else State.WALK
+	_set_flags((_flags & ~LOCOMOTION_MASK) | locomotion)
+	
 	# Теперь копим секунды текущего состояния.
-	var state: State = State.IDLE if velocity.is_zero_approx() else State.WALK
-	_seconds[state] = _seconds.get(state, 0.0) + delta
+	for flag: State in State.values():
+		if _flags & flag:
+			_seconds[flag] = _seconds.get(flag, 0.0) + delta
 
 
 ## Функция возврата представления экземпляра класса в виде строки.

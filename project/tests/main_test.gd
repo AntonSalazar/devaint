@@ -45,6 +45,25 @@ func test_launch() -> void:
 	main.free()
 
 
+## Сеть роя создана по границам карты, вышки-заглушки дают покрытие,
+## слой визуализации инициализирован.
+func test_signal_grid_wiring() -> void:
+	var main: Main = _spawn_main()
+	var grid: SignalGrid = main.get_signal_grid()
+	
+	check_true(grid != null, "signal grid is created on launch")
+	if grid == null:
+		main.free()
+		return
+	var world: World = main.get_node("World") as World
+	check_eq(grid.get_size(), world.get_cell_rect().size, "grid size follows the painted map")
+	check_near(grid.get_coverage(Vector2i(4, 12)), 1.0, "first stub tower covers its cell")
+	check_near(grid.get_coverage(Vector2i(8, 2)), 1.0, "second stub tower covers its cell")
+	check_near(grid.get_coverage(Vector2i(-2, 10)), 1.0, "third stub tower covers its cell")
+	check_eq(world.get_signal_layer().polygon.size(), 4, "signal layer is fitted to the grid")
+	main.free()
+
+
 ## Кламп дельты: гигантский кадр впрыскивает не больше MAX_FRAME_DELTA.
 func test_frame_delta_clamp() -> void:
 	var main: Main = _spawn_main()

@@ -10,6 +10,12 @@ extends Node2D
 ## Ссылка на экземпляр маркера, где будет спавниться робот [Robot].
 @onready var _robot_spawn: Marker2D = %RobotSpawn
 
+## Ссылка на экземпляр земли в виде [TileMapLayer].
+@onready var _ground: TileMapLayer = %Ground
+
+## Ссылка на экземпляр отрисовки сетки роя.
+@onready var _signal_layer: SignalLayer = %SignalLayer
+
 #endregion
 #endregion
 
@@ -20,6 +26,16 @@ extends Node2D
 ## Функция возврата глобальных координат местоположения спавна робота [Robot].
 func get_robot_spawn() -> Vector2:
 	return _robot_spawn.get_global_position()
+
+
+## Функция возврата прямоугольника покрашенных клеток земли.
+func get_cell_rect() -> Rect2i:
+	return _ground.get_used_rect()
+
+
+## Функция возврата ссылки на экземляр отрисовки сетки роя.
+func get_signal_layer() -> SignalLayer:
+	return _signal_layer
 
 #endregion
 

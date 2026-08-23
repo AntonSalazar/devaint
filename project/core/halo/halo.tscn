@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://bqi7ucf0b5hco"]
+
+[ext_resource type="Shader" uid="uid://cl2ipaoltohwq" path="res://core/halo/halo.gdshader" id="1_fka72"]
+[ext_resource type="Script" uid="uid://c6j2csext3qf" path="res://core/halo/halo.gd" id="1_nhe5u"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_nhe5u"]
+shader = ExtResource("1_fka72")
+shader_parameter/halo_color = Color(0.3, 0.9, 0.85, 1)
+shader_parameter/radius = 90.0
+shader_parameter/ring_width = 0.12
+shader_parameter/iso_scale_y = 0.5
+
+[node name="Halo" type="Polygon2D" unique_id=1122080660]
+material = SubResource("ShaderMaterial_nhe5u")
+script = ExtResource("1_nhe5u")

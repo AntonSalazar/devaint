@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://jwkot7562ai0"]
 
 [ext_resource type="Script" uid="uid://d1jhnbus5d4tf" path="res://core/robot/robot.gd" id="1_ixewi"]
+[ext_resource type="PackedScene" uid="uid://bqi7ucf0b5hco" path="res://core/halo/halo.tscn" id="2_05bu7"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_pdlnn"]
 radius = 14.0
@@ -13,8 +14,11 @@ script = ExtResource("1_ixewi")
 rotation = 1.5707964
 shape = SubResource("CapsuleShape2D_pdlnn")
 
+[node name="Halo" parent="." unique_id=1122080660 instance=ExtResource("2_05bu7")]
+unique_name_in_owner = true
+
 [node name="Visual" type="Polygon2D" parent="." unique_id=1124487682]
-color = Color(1, 0.21960784, 0, 1)
+color = Color(0.3019608, 0.9019608, 0.8509804, 1)
 polygon = PackedVector2Array(-20, -25, 1, -90, 20, -25, 0, 0)
 uv = PackedVector2Array(-168.5, 201, -206.49988, 98.30001, -152.59998, -19.400002, -71.19995, -17.199997, -32.69995, 77.4, -101.99988, 202.80002)
 
