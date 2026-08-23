@@ -16,6 +16,12 @@ extends Node2D
 ## Ссылка на экземпляр отрисовки сетки роя.
 @onready var _signal_layer: SignalLayer = %SignalLayer
 
+## Ссылка на контейнер с маршрутами [PatrolPath].
+@onready var _routes: Node2D = %Routes
+
+## Ссылка на контейнер с вышками [TowerMarkers].
+@onready var _towers: Node2D = %Towers
+
 #endregion
 #endregion
 
@@ -36,6 +42,24 @@ func get_cell_rect() -> Rect2i:
 ## Функция возврата ссылки на экземляр отрисовки сетки роя.
 func get_signal_layer() -> SignalLayer:
 	return _signal_layer
+
+
+## Функция сборки маршрутов патрулей из узлов [member _routes].
+func get_patrol_routes() -> Array[PatrolRoute]:
+	var routes: Array[PatrolRoute] = []
+	for child: Node in _routes.get_children():
+		if child is PatrolPath:
+			routes.append(child.build_route())
+	return routes
+
+
+## Функция возврата списка маркеров [TowerMarker], где будут находиться вышки.
+func get_tower_markers() -> Array[TowerMarker]:
+	var towers: Array[TowerMarker] = []
+	for child: Node in _towers.get_children():
+		if child is TowerMarker:
+			towers.append(child)
+	return towers
 
 #endregion
 

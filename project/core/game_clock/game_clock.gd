@@ -101,6 +101,12 @@ func get_day_progress() -> float:
 	return result
 
 
+## Функция возврата непрерывного игрового времени.
+## На нём могут жить всякого рода расписания.
+func get_time_minutes() -> float:
+	return _total_minutes + _accumulator / MINUTE_DURATION
+
+
 ## Функция вычисления игрового времени по общим минутам [param total_minutes]
 ## в формате словаря.
 func compute_time(total_minutes: int) -> Dictionary:

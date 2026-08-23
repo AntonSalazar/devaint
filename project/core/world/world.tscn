@@ -3,6 +3,14 @@
 [ext_resource type="Script" uid="uid://dejlcbcpaefd3" path="res://core/world/world.gd" id="1_m07s3"]
 [ext_resource type="TileSet" uid="uid://bwmy0d3wytxp" path="res://core/world/world_tiles.tres" id="1_wavff"]
 [ext_resource type="PackedScene" uid="uid://chgt3a6evmc62" path="res://core/signal_layer/signal_layer.tscn" id="3_xq38f"]
+[ext_resource type="Script" uid="uid://l1o64sjpus2s" path="res://core/patrol/patrol_path.gd" id="4_8k0jh"]
+[ext_resource type="Script" uid="uid://d0lob8xb2ewsa" path="res://core/tower_markers/tower_markers.gd" id="4_p6pjc"]
+
+[sub_resource type="Curve2D" id="Curve2D_41qfr"]
+_data = {
+"points": PackedVector2Array(0, 0, 0, 0, -130, 541, 0, 0, 0, 0, 768, 988, 0, 0, 0, 0, -194, 1472, 0, 0, 0, 0, -1087, 1019)
+}
+point_count = 4
 
 [node name="World" type="Node2D" unique_id=26005529]
 y_sort_enabled = true
@@ -27,3 +35,39 @@ tile_set = ExtResource("1_wavff")
 [node name="RobotSpawn" type="Marker2D" parent="." unique_id=859830981]
 unique_name_in_owner = true
 position = Vector2(145, 328)
+
+[node name="Routes" type="Node2D" parent="." unique_id=592980641]
+unique_name_in_owner = true
+
+[node name="PatrolPath_0" type="Path2D" parent="Routes" unique_id=1486271078]
+curve = SubResource("Curve2D_41qfr")
+script = ExtResource("4_8k0jh")
+metadata/_custom_type_script = "uid://l1o64sjpus2s"
+
+[node name="Towers" type="Node2D" parent="." unique_id=459235160]
+unique_name_in_owner = true
+
+[node name="TowerMarker_0" type="Marker2D" parent="Towers" unique_id=48453120]
+position = Vector2(-128, 637)
+gizmo_extents = 105.2
+script = ExtResource("4_p6pjc")
+metadata/_custom_type_script = "uid://d0lob8xb2ewsa"
+
+[node name="TowerMarker_1" type="Marker2D" parent="Towers" unique_id=8592928]
+position = Vector2(574, 996)
+gizmo_extents = 105.2
+script = ExtResource("4_p6pjc")
+metadata/_custom_type_script = "uid://d0lob8xb2ewsa"
+
+[node name="TowerMarker_2" type="Marker2D" parent="Towers" unique_id=1841304452]
+position = Vector2(-192, 1374)
+gizmo_extents = 105.2
+script = ExtResource("4_p6pjc")
+radius = 1000.0
+metadata/_custom_type_script = "uid://d0lob8xb2ewsa"
+
+[node name="TowerMarker_3" type="Marker2D" parent="Towers" unique_id=1042934823]
+position = Vector2(-896, 1027)
+gizmo_extents = 105.2
+script = ExtResource("4_p6pjc")
+metadata/_custom_type_script = "uid://d0lob8xb2ewsa"

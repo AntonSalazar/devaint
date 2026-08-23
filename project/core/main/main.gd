@@ -19,8 +19,8 @@ const MAX_FRAME_DELTA: float = 1.0
 ## Ссылка на префаб робота игрока [Robot].
 const ROBOT_SCENE: PackedScene = preload("uid://jwkot7562ai0")
 
-## Радиус работы вышки в мировых координатах (по земле, с учетом изометрии).
-const TOWER_RADIUS: float = 600.0
+## Ссылка на префаб патруля [Patrol].
+const PATROL_SCENE: PackedScene = preload("uid://dbnohn5ckil27")
 
 #endregion
 
@@ -47,15 +47,23 @@ var _robot: Robot = null:
 	get = get_robot
 
 #endregion
+#region SIGNAL_GRID
 
 ## Ссылка на экземляр сети роя.
 var _signal_grid: SignalGrid = null:
 	get = get_signal_grid
 
 #endregion
+#endregion
 
 
 #region VARIABLES
+#region REGULAR_PRIVATE
+
+## Список патрулей роя.
+var _patrols: Array[Patrol] = []
+
+#endregion
 #region ONREADY_PRIVATE
 
 ## Ссылка на экземпляр вывода отладки.
@@ -112,6 +120,10 @@ func _teardown() -> void:
 	_robot.deinit()
 	_robot.queue_free()
 	_signal_grid.deinit()
+	for patrol: Patrol in _patrols:
+		patrol.deinit()
+		patrol.queue_free()
+	_patrols.clear()
 	
 	_robot = null
 	_signal_grid = null
@@ -130,10 +142,8 @@ func _launch() -> void:
 	# Создаем сеть.
 	var cells: Rect2i = _world.get_cell_rect()
 	_signal_grid = SignalGrid.new(cells.position, cells.size)
-	
-	# TODO - временно тут создаем сеть.
-	for cell: Vector2i in [Vector2i(4, 12), Vector2i(8, 2), Vector2i(-2, 10)]:
-		_signal_grid.add_tower(cell, TOWER_RADIUS)
+	for marker: TowerMarker in _world.get_tower_markers():
+		_signal_grid.add_tower(Iso.world_to_cell(marker.global_position), marker.radius)
 	
 	_signal_grid.init()
 	_world.get_signal_layer().init(_signal_grid)
@@ -143,6 +153,13 @@ func _launch() -> void:
 	_world.add_child(_robot)
 	_robot.set_global_position(_world.get_robot_spawn())
 	_robot.init(_clock, _signal_grid)
+	
+	# Добавляем патруль.
+	for route: PatrolRoute in _world.get_patrol_routes():
+		var patrol: Patrol = PATROL_SCENE.instantiate()
+		_world.add_child(patrol)
+		patrol.init(_clock, PatrolRecord.new(route))
+		_patrols.append(patrol)
 	
 	# Добавляем отладочный гуй.
 	_debug_overlay.init(_clock, _robot)

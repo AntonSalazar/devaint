@@ -18,8 +18,8 @@ const SPEED_UP_PRESSES: int = 4
 ## Кадр, с которого ведем робота.
 const DRIVE_FROM_FRAME: int = 10
 
-## Клетка вышки-цели (первая заглушка Main).
-const TARGET_CELL: Vector2i = Vector2i(4, 12)
+## Запасная клетка-цель, если в мире нет маркеров вышек.
+const FALLBACK_CELL: Vector2i = Vector2i(4, 12)
 
 ## Дистанция остановки у цели, px.
 const ARRIVE_DISTANCE: float = 24.0
@@ -77,12 +77,12 @@ func _press(action: String) -> void:
 	Input.parse_input_event(event)
 
 
-## Функция ведения робота к TARGET_CELL зажатием действий движения.
+## Функция ведения робота к цели зажатием действий движения.
 func _drive() -> void:
 	var robot: Robot = _main.get_robot()
 	if robot == null:
 		return
-	var delta: Vector2 = Iso.cell_to_world(TARGET_CELL) - robot.global_position
+	var delta: Vector2 = _target_position() - robot.global_position
 	for action: String in MOVE_ACTIONS:
 		var axis: Vector2 = MOVE_ACTIONS[action]
 		var wants: bool = delta.length() > ARRIVE_DISTANCE and delta.dot(axis) > ARRIVE_DISTANCE * 0.5
@@ -90,6 +90,16 @@ func _drive() -> void:
 			Input.action_press(action)
 		else:
 			Input.action_release(action)
+
+
+
+## Функция цели: первый маркер вышки мира, иначе запасная клетка.
+func _target_position() -> Vector2:
+	var world: World = _main.get_node("%World") as World
+	var markers: Array[TowerMarker] = world.get_tower_markers()
+	if markers.is_empty():
+		return Iso.cell_to_world(FALLBACK_CELL)
+	return markers[0].global_position
 
 #endregion
 #endregion

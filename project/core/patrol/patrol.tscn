@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://dbnohn5ckil27"]
+
+[ext_resource type="Script" uid="uid://d0512b1jqmsr2" path="res://core/patrol/patrol.gd" id="1_m7naj"]
+
+[node name="Patrol" type="Node2D" unique_id=1193086185]
+script = ExtResource("1_m7naj")
+
+[node name="ConePivot" type="Node2D" parent="." unique_id=1313905363]
+unique_name_in_owner = true
+scale = Vector2(1, 0.5)
+
+[node name="Cone" type="Polygon2D" parent="ConePivot" unique_id=1594075069]
+unique_name_in_owner = true
+color = Color(1, 0.5372549, 0.4862745, 0.2509804)
+
+[node name="Visual" type="Polygon2D" parent="." unique_id=1365407815]
+color = Color(1, 0.5370987, 0.48677072, 1)
+polygon = PackedVector2Array(0, 0, -30, -25, 0, -90, 30, -25)
+uv = PackedVector2Array(-136, -127.999985, -200, -8, -136, 88.00003, -88, -16)

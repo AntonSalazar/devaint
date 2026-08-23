@@ -57,9 +57,13 @@ func test_signal_grid_wiring() -> void:
 		return
 	var world: World = main.get_node("World") as World
 	check_eq(grid.get_size(), world.get_cell_rect().size, "grid size follows the painted map")
-	check_near(grid.get_coverage(Vector2i(4, 12)), 1.0, "first stub tower covers its cell")
-	check_near(grid.get_coverage(Vector2i(8, 2)), 1.0, "second stub tower covers its cell")
-	check_near(grid.get_coverage(Vector2i(-2, 10)), 1.0, "third stub tower covers its cell")
+	var markers: Array[TowerMarker] = world.get_tower_markers()
+	check_true(markers.size() >= 3, "world provides tower markers")
+	for marker: TowerMarker in markers:
+		check_near(
+				grid.get_coverage(Iso.world_to_cell(marker.global_position)), 1.0,
+				"marker tower covers its cell %s" % marker.name
+		)
 	check_eq(world.get_signal_layer().polygon.size(), 4, "signal layer is fitted to the grid")
 	main.free()
 
