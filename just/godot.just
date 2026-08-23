@@ -17,6 +17,10 @@ test:
     {{GODOT}} --headless --path project --import
     {{GODOT}} --headless --path project -s res://tests/test_runner.gd
 
+# Balance: кривые заметности по сценариям (headless)
+balance:
+    {{GODOT}} --headless --path project -s res://tools/balance.gd
+
 # Screenshot dir (Movie Maker frames)
 SHOT_DIR := env("SHOT_DIR", "/tmp/devaint-shots")
 

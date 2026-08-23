@@ -229,7 +229,7 @@ func test_accumulate_targets_own_sector() -> void:
 	grid.add_tower(far, RADIUS)
 	
 	grid.accumulate(Iso.cell_to_world(far), 1.0, 1.0)
-	check_near(grid.get_notice(Vector2i(1, 0)), 1.0, "far sector got the notice")
+	check_near(grid.get_notice(Vector2i(1, 0)), SignalGrid.NOTICE_RATE, "far sector got the notice")
 	check_near(grid.get_notice(Vector2i.ZERO), 0.0, "home sector is untouched")
 
 
@@ -241,8 +241,9 @@ func test_decay_on_minute_tick() -> void:
 	grid.add_tower(far, RADIUS)
 	grid.init()
 	
-	grid.accumulate(Iso.cell_to_world(far), 10.0, 1.0)
-	grid.accumulate(Iso.cell_to_world(Vector2i.ZERO), 10.0, 1.0)
+	var start: float = 10.0 / SignalGrid.NOTICE_RATE
+	grid.accumulate(Iso.cell_to_world(far), start, 1.0)
+	grid.accumulate(Iso.cell_to_world(Vector2i.ZERO), start, 1.0)
 	_push_minute()
 	check_near(
 			grid.get_notice(Vector2i.ZERO), 10.0 - SignalGrid.DECAY_PER_MINUTE,
@@ -273,7 +274,10 @@ func test_notices_snapshot_is_a_copy() -> void:
 	
 	var snapshot: Dictionary[Vector2i, float] = grid.get_notices()
 	snapshot[Vector2i.ZERO] = 99.0
-	check_near(grid.get_notice(Vector2i.ZERO), 1.0, "grid is unaffected by snapshot edits")
+	check_near(
+			grid.get_notice(Vector2i.ZERO), SignalGrid.NOTICE_RATE,
+			"grid is unaffected by snapshot edits"
+	)
 
 
 ## init подписывает грид на тики, deinit — отписывает.
