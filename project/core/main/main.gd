@@ -111,6 +111,8 @@ func _teardown() -> void:
 	_world.get_signal_layer().deinit()
 	_robot.deinit()
 	_robot.queue_free()
+	_signal_grid.deinit()
+	
 	_robot = null
 	_signal_grid = null
 	_world = null
@@ -133,13 +135,14 @@ func _launch() -> void:
 	for cell: Vector2i in [Vector2i(4, 12), Vector2i(8, 2), Vector2i(-2, 10)]:
 		_signal_grid.add_tower(cell, TOWER_RADIUS)
 	
+	_signal_grid.init()
 	_world.get_signal_layer().init(_signal_grid)
 	
 	# Добавляем игрока.
 	_robot = ROBOT_SCENE.instantiate()
 	_world.add_child(_robot)
 	_robot.set_global_position(_world.get_robot_spawn())
-	_robot.init(_clock)
+	_robot.init(_clock, _signal_grid)
 	
 	# Добавляем отладочный гуй.
 	_debug_overlay.init(_clock, _robot)

@@ -8,6 +8,26 @@ extends RefCounted
 ## Одна структура данных для симуляции и отрисовки.
 
 
+#region CONSTANTS
+
+## Размер сектора в клетках.
+const SECTOR_SIZE: int = 8
+
+## Максимальное значение памяти сектора в процентах.
+const NOTICE_MAX: float = 100.0
+
+## Единица памяти.
+const NOTICE_RATE: float = 1.0
+
+## Спад памяти по минутным тикам.
+const DECAY_PER_MINUTE: float = 1.5
+
+## Спад памяти по минутным тикам там, где нет игрока.
+const ABSENT_DECAY_MULTIPLIER: float = 2.0
+
+#endregion
+
+
 #region VARIABLES
 #region REGULAR_PRIVATE
 
@@ -23,6 +43,13 @@ var _static: PackedFloat32Array = PackedFloat32Array()
 ## Список вышек, где индекс в массиве - это id вышки.
 var _towers: Array[Tower] = []
 
+## Таблица заметности игрока, где ключ - координата сектора,
+## а значение - заметность 0 -> 100.
+var _notice: Dictionary[Vector2i, float] = {}
+
+## Сектор, где источник был последним. В этом месте спад будет медленней.
+var _active_sector: Vector2i = Vector2i.ZERO
+
 ## Ссылка на закэшированную карту покрытия.
 var _static_cache: Image = null
 
@@ -31,6 +58,17 @@ var _static_cache: Image = null
 
 
 #region FUNCTIONS
+#region STATIC_PUBLIC
+
+## Статичная функция конвертации координат клетки грида [param cell] в сектор.
+static func cell_to_sector(cell: Vector2i) -> Vector2i:
+	return Vector2i(
+			floori(cell.x / float(SECTOR_SIZE)),
+			floori(cell.y / float(SECTOR_SIZE))
+	)
+
+#endregion
+
 #region REGULAR_PUBLIC
 
 ## Функция возврата клетки верхнего-левого угла грида.
@@ -41,6 +79,50 @@ func get_origin() -> Vector2i:
 ## Функция возврата размера грида в клетках.
 func get_size() -> Vector2i:
 	return _size
+
+
+## Функция возврата сектора по глобальной координате [param position].
+func get_sector_at(position: Vector2) -> Vector2i:
+	var cell: Vector2i = Iso.world_to_cell(position)
+	var sector: Vector2i = cell_to_sector(cell)
+	return sector
+
+
+## Функция возврата процента заметности в секторе [param sector].
+func get_notice(sector: Vector2i) -> float:
+	return _notice.get(sector, 0.0)
+
+
+## Функция возврата процента заметности по глобальной координате [param position].
+func get_notice_at(position: Vector2) -> float:
+	return get_notice(get_sector_at(position))
+
+
+## Функция возврата снимка всех секторов.
+## Пригодится при постройке карты.
+func get_notices() -> Dictionary[Vector2i, float]:
+	return _notice.duplicate()
+
+
+## Функция инициализации.
+func init() -> void:
+	EventBus.subscribe(GameClock.OnMinutePassed, _on_minute_passed)
+
+
+## Функция деинициализации.
+func deinit() -> void:
+	EventBus.unsubscribe(GameClock.OnMinutePassed, _on_minute_passed)
+
+
+## Функция накопления заметности по излучению [param emission]
+## в позиции мировых координат [param position] по минутам [param minutes].
+func accumulate(position: Vector2, emission: float, minutes: float) -> void:
+	var sector: Vector2i = get_sector_at(position)
+	var gain: float = emission * get_coverage_at(position) * NOTICE_RATE * minutes
+	_active_sector = sector
+	if is_zero_approx(gain):
+		return
+	_notice[sector] = minf(_notice.get(sector, 0.0) + gain, NOTICE_MAX)
 
 
 ## Функция добавления активной вышки в клетке [param cell]
@@ -144,6 +226,26 @@ func _rebuild_static() -> void:
 	# Вещаем, что сетка перестроена.
 	_static_cache = null
 	OnStaticChanged.new().push()
+
+
+## Функция, вызываемая при получении сообщения [param message]
+## о наступления новой игровой минуты.
+func _on_minute_passed(_message: GameClock.OnMinutePassed) -> void:
+	# Пройдемся по тревожным секторам и определим спад в них.
+	var empty: Array[Vector2i] = []
+	for sector: Vector2i in _notice:
+		var decay: float = ABSENT_DECAY_MULTIPLIER * DECAY_PER_MINUTE
+		if sector == _active_sector:
+			decay = DECAY_PER_MINUTE
+		var value: float = _notice[sector]
+		value = maxf(value - decay, 0.0)
+		_notice[sector] = value
+		if is_zero_approx(value):
+			empty.append(sector)
+	
+	# Удаляем пустые сектора.
+	for sector: Vector2i in empty:
+		_notice.erase(sector)
 
 #endregion
 

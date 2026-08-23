@@ -32,7 +32,7 @@ func after_each() -> void:
 func test_init_fills_battery() -> void:
 	var robot: Robot = _spawn_robot()
 	
-	robot.init(GameClock.new())
+	robot.init(GameClock.new(), _make_grid())
 	check_near(robot.get_battery(), Robot.BATTERY_MAX, "init fills the battery")
 	robot.deinit()
 	robot.free()
@@ -42,7 +42,7 @@ func test_init_fills_battery() -> void:
 func test_no_observed_time_no_drain() -> void:
 	var robot: Robot = _spawn_robot()
 	
-	robot.init(GameClock.new())
+	robot.init(GameClock.new(), _make_grid())
 	_push_minute()
 	check_near(robot.get_battery(), Robot.BATTERY_MAX, "no seconds - no drain")
 	robot.deinit()
@@ -53,7 +53,7 @@ func test_no_observed_time_no_drain() -> void:
 func test_idle_minute_drain() -> void:
 	var robot: Robot = _spawn_robot()
 	
-	robot.init(GameClock.new())
+	robot.init(GameClock.new(), _make_grid())
 	robot._seconds[Robot.State.IDLE] = 2.5
 	_push_minute()
 	check_near(
@@ -68,7 +68,7 @@ func test_idle_minute_drain() -> void:
 func test_walk_minute_drain() -> void:
 	var robot: Robot = _spawn_robot()
 	
-	robot.init(GameClock.new())
+	robot.init(GameClock.new(), _make_grid())
 	robot._seconds[Robot.State.WALK] = 2.5
 	_push_minute()
 	check_near(
@@ -83,7 +83,7 @@ func test_walk_minute_drain() -> void:
 func test_mixed_minute_drain() -> void:
 	var robot: Robot = _spawn_robot()
 	
-	robot.init(GameClock.new())
+	robot.init(GameClock.new(), _make_grid())
 	robot._seconds[Robot.State.IDLE] = 1.25
 	robot._seconds[Robot.State.WALK] = 1.25
 	_push_minute()
@@ -101,7 +101,7 @@ func test_mixed_minute_drain() -> void:
 func test_seconds_reset_after_tick() -> void:
 	var robot: Robot = _spawn_robot()
 	
-	robot.init(GameClock.new())
+	robot.init(GameClock.new(), _make_grid())
 	robot._seconds[Robot.State.IDLE] = 2.5
 	_push_minute()
 	var after_first: float = robot.get_battery()
@@ -115,7 +115,7 @@ func test_seconds_reset_after_tick() -> void:
 func test_battery_clamps_at_zero() -> void:
 	var robot: Robot = _spawn_robot()
 	
-	robot.init(GameClock.new())
+	robot.init(GameClock.new(), _make_grid())
 	robot._battery = Robot.DRAIN[Robot.State.WALK] / 2.0
 	robot._seconds[Robot.State.WALK] = 2.5
 	_push_minute()
@@ -143,7 +143,7 @@ func test_emission_table_is_complete() -> void:
 func test_initial_state_and_halo() -> void:
 	var robot: Robot = _spawn_robot()
 	
-	robot.init(GameClock.new())
+	robot.init(GameClock.new(), _make_grid())
 	check_eq(robot.get_flags(), Robot.State.IDLE, "initial flags are IDLE")
 	check_true(robot.has_flag(Robot.State.IDLE), "has_flag(IDLE)")
 	check_true(not robot.has_flag(Robot.State.WALK), "not has_flag(WALK)")
@@ -158,7 +158,7 @@ func test_initial_state_and_halo() -> void:
 func test_emission_sums_over_flags() -> void:
 	var robot: Robot = _spawn_robot()
 	
-	robot.init(GameClock.new())
+	robot.init(GameClock.new(), _make_grid())
 	robot._flags = Robot.State.WALK
 	check_near(robot.get_emission(), Robot.EMISSION[Robot.State.WALK], "walk emission")
 	robot._flags = Robot.State.IDLE | Robot.State.WALK
@@ -174,7 +174,7 @@ func test_emission_sums_over_flags() -> void:
 ## Смена маски обновляет ореол; та же маска — нет.
 func test_flags_drive_halo() -> void:
 	var robot: Robot = _spawn_robot()
-	robot.init(GameClock.new())
+	robot.init(GameClock.new(), _make_grid())
 	var halo: Halo = robot.get_node("%Halo") as Halo
 	var shader: ShaderMaterial = halo.material as ShaderMaterial
 	
@@ -200,7 +200,7 @@ func test_flags_drive_halo() -> void:
 ## секунды копятся по IDLE.
 func test_physics_frame_idle_keeps_modifier_bits() -> void:
 	var robot: Robot = _spawn_robot()
-	robot.init(GameClock.new())
+	robot.init(GameClock.new(), _make_grid())
 	var modifier: int = 0x10
 	
 	robot._flags = Robot.State.WALK | modifier
@@ -218,7 +218,7 @@ func test_physics_frame_idle_keeps_modifier_bits() -> void:
 func test_physics_frame_on_pause_is_inert() -> void:
 	var robot: Robot = _spawn_robot()
 	var clock: GameClock = GameClock.new()
-	robot.init(clock)
+	robot.init(clock, _make_grid())
 	
 	clock.set_speed(0)
 	robot._physics_process(0.1)
@@ -227,11 +227,44 @@ func test_physics_frame_on_pause_is_inert() -> void:
 	robot.free()
 
 
+## Физический кадр вписывает след в память роя: излучение x покрытие x минуты.
+func test_physics_frame_accumulates_notice() -> void:
+	var robot: Robot = _spawn_robot()
+	var grid: SignalGrid = _make_grid()
+	robot.init(GameClock.new(), grid)
+	robot.global_position = Iso.cell_to_world(Vector2i.ZERO)
+	
+	robot._physics_process(0.1)
+	var expected: float = (
+			Robot.EMISSION[Robot.State.IDLE] * SignalGrid.NOTICE_RATE
+			* 0.1 / GameClock.MINUTE_DURATION
+	)
+	check_near(grid.get_notice(Vector2i.ZERO), expected, "one idle frame at full coverage")
+	check_near(robot.get_notice(), expected, "robot reads its own sector notice")
+	robot.deinit()
+	robot.free()
+
+
+## На паузе след не пишется.
+func test_physics_frame_on_pause_accumulates_nothing() -> void:
+	var robot: Robot = _spawn_robot()
+	var grid: SignalGrid = _make_grid()
+	var clock: GameClock = GameClock.new()
+	robot.init(clock, grid)
+	robot.global_position = Iso.cell_to_world(Vector2i.ZERO)
+	
+	clock.set_speed(0)
+	robot._physics_process(0.1)
+	check_true(grid.get_notices().is_empty(), "no notice while paused")
+	robot.deinit()
+	robot.free()
+
+
 ## После deinit подписок на шине не остается.
 func test_deinit_unsubscribes() -> void:
 	var robot: Robot = _spawn_robot()
 	
-	robot.init(GameClock.new())
+	robot.init(GameClock.new(), _make_grid())
 	check_true(not EventBus._ref.subs.is_empty(), "robot is subscribed after init")
 	robot.deinit()
 	var records_left: int = 0
@@ -250,6 +283,13 @@ func _spawn_robot() -> Robot:
 	var robot: Robot = scene.instantiate() as Robot
 	(Engine.get_main_loop() as SceneTree).root.add_child(robot)
 	return robot
+
+
+## Сеть роя для тестов: вышка в (0,0), полное покрытие в ее клетке.
+func _make_grid() -> SignalGrid:
+	var grid: SignalGrid = SignalGrid.new(Vector2i(-10, -10), Vector2i(21, 21))
+	grid.add_tower(Vector2i.ZERO, 300.0)
+	return grid
 
 
 ## Публикация минутного тика с валидным снимком времени.

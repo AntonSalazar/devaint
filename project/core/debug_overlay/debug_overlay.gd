@@ -67,13 +67,15 @@ func _process(delta: float) -> void:
 	_output.set_text(
 			(
 				"%s x%d progress %.04f" +
-				"\nbattery %.1f%%"
+				"\nbattery %.1f%%" +
+				"\nnotice %.1f%%"
 			) %
 			[
 				_clock.get_datetime_str(),
 				_clock.get_speed(),
 				_clock.get_day_progress(),
 				_robot.get_battery(),
+				_robot.get_notice(),
 			]
 	)
 

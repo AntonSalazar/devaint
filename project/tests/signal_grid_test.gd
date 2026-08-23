@@ -2,7 +2,7 @@ extends TestCase
 
 ## Тесты [SignalGrid]: пустой грид, поле одной вышки, нахлест и кламп,
 ## включение/выключение, границы грида, согласованность с Iso, картинка,
-## событие перестройки.
+## событие перестройки; память секторов: накопление, кламп, спад, подписка.
 
 #region CONSTANTS
 
@@ -162,6 +162,139 @@ func test_static_changed_message() -> void:
 	check_eq(count.size(), 2, "toggle publishes OnStaticChanged")
 	grid.set_tower_active(id, false)
 	check_eq(count.size(), 2, "no-op toggle does not publish")
+
+
+## Сектор клетки: квадраты SECTOR_SIZE, отрицательные клетки не схлопываются.
+func test_cell_to_sector() -> void:
+	var size: int = SignalGrid.SECTOR_SIZE
+	check_eq(SignalGrid.cell_to_sector(Vector2i.ZERO), Vector2i.ZERO, "(0,0) -> (0,0)")
+	check_eq(
+			SignalGrid.cell_to_sector(Vector2i(size - 1, size - 1)), Vector2i.ZERO,
+			"last cell of sector 0"
+	)
+	check_eq(SignalGrid.cell_to_sector(Vector2i(size, 0)), Vector2i(1, 0), "first cell of sector 1")
+	check_eq(SignalGrid.cell_to_sector(Vector2i(-1, -1)), Vector2i(-1, -1), "(-1,-1) -> (-1,-1)")
+	check_eq(
+			SignalGrid.cell_to_sector(Vector2i(-size, 3)), Vector2i(-1, 0), "(-size,3) -> (-1,0)"
+	)
+	check_eq(
+			SignalGrid.cell_to_sector(Vector2i(-size - 1, 0)), Vector2i(-2, 0),
+			"(-size-1,0) -> (-2,0)"
+	)
+
+
+## Накопление: излучение x покрытие x NOTICE_RATE x минуты в сектор позиции.
+func test_accumulate_full_coverage() -> void:
+	var grid: SignalGrid = SignalGrid.new(ORIGIN, SIZE)
+	grid.add_tower(Vector2i.ZERO, RADIUS)
+	var center: Vector2 = Iso.cell_to_world(Vector2i.ZERO)
+	
+	grid.accumulate(center, 3.0, 1.0)
+	check_near(
+			grid.get_notice(Vector2i.ZERO), 3.0 * SignalGrid.NOTICE_RATE,
+			"walk emission for one minute at full coverage"
+	)
+	check_near(grid.get_notice_at(center), grid.get_notice(Vector2i.ZERO), "get_notice_at agrees")
+	grid.accumulate(center, 1.0, 0.5)
+	check_near(
+			grid.get_notice(Vector2i.ZERO), 3.5 * SignalGrid.NOTICE_RATE,
+			"accumulation adds up"
+	)
+
+
+## Без покрытия след не пишется и запись сектора не создается.
+func test_accumulate_without_coverage() -> void:
+	var grid: SignalGrid = SignalGrid.new(ORIGIN, SIZE)
+	grid.add_tower(Vector2i.ZERO, RADIUS)
+	
+	grid.accumulate(Iso.cell_to_world(Vector2i(9, 9)), 25.0, 10.0)
+	check_near(grid.get_notice(SignalGrid.cell_to_sector(Vector2i(9, 9))), 0.0, "no notice")
+	check_true(grid.get_notices().is_empty(), "no sector record is created for zero gain")
+
+
+## Заметность клампится в NOTICE_MAX.
+func test_accumulate_clamps() -> void:
+	var grid: SignalGrid = SignalGrid.new(ORIGIN, SIZE)
+	grid.add_tower(Vector2i.ZERO, RADIUS)
+	
+	grid.accumulate(Iso.cell_to_world(Vector2i.ZERO), 25.0, 1000.0)
+	check_near(grid.get_notice(Vector2i.ZERO), SignalGrid.NOTICE_MAX, "clamped at NOTICE_MAX")
+
+
+## След пишется в сектор позиции, а не куда-то еще.
+func test_accumulate_targets_own_sector() -> void:
+	var grid: SignalGrid = SignalGrid.new(ORIGIN, SIZE)
+	var far: Vector2i = Vector2i(SignalGrid.SECTOR_SIZE + 1, 1)
+	grid.add_tower(Vector2i.ZERO, RADIUS)
+	grid.add_tower(far, RADIUS)
+	
+	grid.accumulate(Iso.cell_to_world(far), 1.0, 1.0)
+	check_near(grid.get_notice(Vector2i(1, 0)), 1.0, "far sector got the notice")
+	check_near(grid.get_notice(Vector2i.ZERO), 0.0, "home sector is untouched")
+
+
+## Спад по минутному тику: активный сектор медленнее, чужие быстрее, нули удаляются.
+func test_decay_on_minute_tick() -> void:
+	var grid: SignalGrid = SignalGrid.new(ORIGIN, SIZE)
+	var far: Vector2i = Vector2i(SignalGrid.SECTOR_SIZE + 1, 1)
+	grid.add_tower(Vector2i.ZERO, RADIUS)
+	grid.add_tower(far, RADIUS)
+	grid.init()
+	
+	grid.accumulate(Iso.cell_to_world(far), 10.0, 1.0)
+	grid.accumulate(Iso.cell_to_world(Vector2i.ZERO), 10.0, 1.0)
+	_push_minute()
+	check_near(
+			grid.get_notice(Vector2i.ZERO), 10.0 - SignalGrid.DECAY_PER_MINUTE,
+			"active sector decays by DECAY_PER_MINUTE"
+	)
+	check_near(
+			grid.get_notice(Vector2i(1, 0)),
+			10.0 - SignalGrid.DECAY_PER_MINUTE * SignalGrid.ABSENT_DECAY_MULTIPLIER,
+			"absent sector decays faster"
+	)
+	
+	grid.accumulate(Iso.cell_to_world(far), 1.0, 1.0)
+	grid.accumulate(Iso.cell_to_world(Vector2i.ZERO), 0.0, 1.0)
+	for _idx: int in 10:
+		_push_minute()
+	check_true(
+			not grid.get_notices().has(Vector2i(1, 0)),
+			"sector that decayed to zero is erased"
+	)
+	grid.deinit()
+
+
+## Снимок секторов — копия: правка снимка не трогает грид.
+func test_notices_snapshot_is_a_copy() -> void:
+	var grid: SignalGrid = SignalGrid.new(ORIGIN, SIZE)
+	grid.add_tower(Vector2i.ZERO, RADIUS)
+	grid.accumulate(Iso.cell_to_world(Vector2i.ZERO), 1.0, 1.0)
+	
+	var snapshot: Dictionary[Vector2i, float] = grid.get_notices()
+	snapshot[Vector2i.ZERO] = 99.0
+	check_near(grid.get_notice(Vector2i.ZERO), 1.0, "grid is unaffected by snapshot edits")
+
+
+## init подписывает грид на тики, deinit — отписывает.
+func test_init_deinit_subscription() -> void:
+	var grid: SignalGrid = SignalGrid.new(ORIGIN, SIZE)
+	
+	grid.init()
+	check_true(not EventBus._ref.subs.is_empty(), "subscribed after init")
+	grid.deinit()
+	var records_left: int = 0
+	for records: Array in EventBus._ref.subs.values():
+		records_left += records.size()
+	check_eq(records_left, 0, "no subscription records after deinit")
+
+#endregion
+
+#region REGULAR_PRIVATE
+
+## Публикация минутного тика с валидным снимком времени.
+func _push_minute() -> void:
+	GameClock.OnMinutePassed.new(1, {"minute": 1, "hour": 0, "day": 1}).push()
 
 #endregion
 #endregion

@@ -69,6 +69,9 @@ var _battery: float = 0.0:
 ## Ссылка на экземпляр таймера игрового времени.
 var _clock: GameClock = null
 
+## Ссылка на экземпляр сети роя.
+var _grid: SignalGrid = null
+
 ## Секунды реального времени с прошлого игрового минутного тика.
 ## Необходимы для вычисления разряда батареи. Разбито по состояниям.
 var _seconds: Dictionary[State, float] = {}
@@ -112,9 +115,15 @@ func get_emission() -> float:
 	return emission
 
 
+## Функция возврата уровня тревоги роя по позиции робота.
+func get_notice() -> float:
+	return _grid.get_notice_at(global_position)
+
+
 ## Функция инициализации.
-func init(clock: GameClock) -> void:
+func init(clock: GameClock, grid: SignalGrid) -> void:
 	_clock = clock
+	_grid = grid
 	_battery = BATTERY_MAX
 	_halo.set_emission(get_emission())
 	EventBus.subscribe(GameClock.OnMinutePassed, _on_minute_passed)
@@ -127,6 +136,7 @@ func deinit() -> void:
 	EventBus.unsubscribe(GameClock.OnMinutePassed, _on_minute_passed)
 	_battery = 0.0
 	_seconds.clear()
+	_grid = null
 	_clock = null
 
 #endregion
@@ -194,6 +204,12 @@ func _physics_process(delta: float) -> void:
 	for flag: State in State.values():
 		if _flags & flag:
 			_seconds[flag] = _seconds.get(flag, 0.0) + delta
+	
+	# Теперь вписываем свой след в память роя (игровые минуты из реального времени).
+	_grid.accumulate(
+			global_position, get_emission(),
+			delta * _clock.get_speed() / GameClock.MINUTE_DURATION
+	)
 
 
 ## Функция возврата представления экземпляра класса в виде строки.
