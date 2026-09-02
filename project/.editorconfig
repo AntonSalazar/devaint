@@ -14,5 +14,7 @@ dotnet_analyzer_diagnostic.category-Style.severity = warning
 csharp_new_line_before_open_brace = all
 # Однострочные методы можно писать телом-выражением `=>`
 csharp_style_expression_bodied_methods = when_on_single_line
+# Неиспользованный возврат (fire-and-forget вроде `msg.Push()`) - не предупреждение
+dotnet_diagnostic.IDE0058.severity = none
 csharp_style_namespace_declarations = file_scoped:warning
 dotnet_sort_system_directives_first = true

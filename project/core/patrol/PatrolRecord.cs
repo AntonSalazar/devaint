@@ -11,20 +11,30 @@ using Godot;
 /// </summary>
 public class PatrolRecord
 {
-    /// <summary>Предвычисленные отрезки в порядке обхода.</summary>
+    /// <summary>
+    /// Предвычисленные отрезки в порядке обхода.
+    /// </summary>
     private readonly List<Segment> _segments = [];
 
-    ///<summary>Ссылка на экземпляр маршрута.</summary>
+    ///<summary>
+    ///Ссылка на экземпляр маршрута.
+    ///</summary>
     public PatrolRoute Route { get; }
 
-    /// <summary>Период расписания в игровых минутах.</summary>
+    /// <summary>
+    /// Период расписания в игровых минутах.
+    /// </summary>
     public float Period { get; private set; } = 1.0f;
 
-    /// <summary>Число отрезков на маршруте.</summary>
+    /// <summary>
+    /// Число отрезков на маршруте.
+    /// </summary>
     public int SegmentCount => _segments.Count;
 
 
-    /// <summary>Конструктор.</summary>
+    /// <summary>
+    /// Конструктор.
+    /// </summary>
     public PatrolRecord(PatrolRoute route)
     {
         Route = route;
@@ -37,7 +47,10 @@ public class PatrolRecord
         Build();
     }
 
-    /// <summary>Метод снимка патруля в момент игрового времени.</summary>
+    /// <summary>
+    /// Метод снимка патруля в момент игрового времени.
+    /// </summary>
+    /// <param name="timeMinutes">Игровые минуты.</param>
     public Sample SampleAt(float timeMinutes)
     {
         if (SegmentCount == 0)
@@ -71,7 +84,11 @@ public class PatrolRecord
     }
 
 
-    /// <summary>Метод создания отрезка с from до to с длительностью по скорости.</summary>
+    /// <summary>
+    /// Метод создания отрезка с from до to с длительностью по скорости.
+    /// </summary>
+    /// <param name="from">Откуда начинается отрезок.</param>
+    /// <param name="to">Где заканчивается отрезок.</param>
     private Segment MakeSegment(Vector2 from, Vector2 to)
     {
         float travel = 0.0f;
@@ -83,7 +100,9 @@ public class PatrolRecord
     }
 
 
-    /// <summary>Метод предвычисления отрезков и периода по маршруту.</summary>
+    /// <summary>
+    /// Метод предвычисления отрезков и периода по маршруту.
+    /// </summary>
     private void Build()
     {
         _segments.Clear();
