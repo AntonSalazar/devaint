@@ -4,6 +4,11 @@
 # Build folder
 builds/
 
+# .NET / C#
+bin/
+obj/
+*.user
+
 # TexturePacker ignores
 *.tpsheet
 *.tpsheet.import
