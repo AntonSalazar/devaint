@@ -2,6 +2,10 @@ using System;
 using System.Collections.Generic;
 using Godot;
 
+
+/// <summary>
+/// Статичный класс шины.
+/// </summary>
 public static class EventBus
 {
 

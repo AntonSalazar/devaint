@@ -3,7 +3,7 @@ using Godot;
 
 /// <summary>Контейнер данных о маршруте.</summary>
 /// <param name="cells">Ячейки путей.</param>
-/// <param name="speed"><Скорость, мировых px за игровую минуту./param>
+/// <param name="speed">Скорость, мировых px за игровую минуту.</param>
 /// <param name="dwellMinutes">Стоянка на каждой путевой точке в игровых минутах.</param>
 /// <param name="loop">Флаг, является ли маршрут замкнутым. Если нет, то вернется обратно.</param>
 /// <param name="startOffsetMinutes">Сдвиг расписания в игровых минутах - чтоб два патруля на одном маршруте не шли строем.</param>

@@ -16,5 +16,18 @@ csharp_new_line_before_open_brace = all
 csharp_style_expression_bodied_methods = when_on_single_line
 # Неиспользованный возврат (fire-and-forget вроде `msg.Push()`) - не предупреждение
 dotnet_diagnostic.IDE0058.severity = none
+
+# StyleCop: включена только категория Ordering (порядок членов класса),
+# остальные категории дублируют dotnet format или слишком шумные
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.SpecialRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.SpacingRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.ReadabilityRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.OrderingRules.severity = warning
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.NamingRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.MaintainabilityRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.LayoutRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.DocumentationRules.severity = none
+# SA1200 требует usings внутри namespace - у нас нет namespace'ов
+dotnet_diagnostic.SA1200.severity = none
 csharp_style_namespace_declarations = file_scoped:warning
 dotnet_sort_system_directives_first = true

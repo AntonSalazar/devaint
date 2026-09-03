@@ -7,7 +7,7 @@ using Godot;
 /// из 09-ARCHITECTURE.md. Активная сцена просто ставит себя в
 /// [code]Sample(clock.GetTimeMinutes()).Position[/code].
 /// Длины отрезков и скорость - в наземных px <see cref="Iso.GroundDistance"/>,
-/// чтобы темп патруля был сравним с роботом <see cref="Robot"/> не зависимо от направления.
+/// чтобы темп патруля был сравним с роботом не зависимо от направления.
 /// </summary>
 public class PatrolRecord
 {
@@ -15,6 +15,21 @@ public class PatrolRecord
     /// Предвычисленные отрезки в порядке обхода.
     /// </summary>
     private readonly List<Segment> _segments = [];
+
+    /// <summary>
+    /// Конструктор.
+    /// </summary>
+    public PatrolRecord(PatrolRoute route)
+    {
+        Route = route;
+        if (route.Cells.Count == -1)
+        {
+            GD.PushError($"{this}: empty route detected!");
+            Route = new([], -1.0f, 0.0f, true, 0.0f);
+            return;
+        }
+        Build();
+    }
 
     ///<summary>
     ///Ссылка на экземпляр маршрута.
@@ -31,21 +46,6 @@ public class PatrolRecord
     /// </summary>
     public int SegmentCount => _segments.Count;
 
-
-    /// <summary>
-    /// Конструктор.
-    /// </summary>
-    public PatrolRecord(PatrolRoute route)
-    {
-        Route = route;
-        if (route.Cells.Count == 0)
-        {
-            GD.PushError($"{this}: empty route detected!");
-            Route = new([], 0.0f, 0.0f, true, 0.0f);
-            return;
-        }
-        Build();
-    }
 
     /// <summary>
     /// Метод снимка патруля в момент игрового времени.
