@@ -12,8 +12,9 @@ indent_size = 4
 # Обнаруженные нарушения стиля считать ошибками при `dotnet format --verify-no-changes`
 dotnet_analyzer_diagnostic.category-Style.severity = warning
 csharp_new_line_before_open_brace = all
-# Однострочные методы можно писать телом-выражением `=>`
+# Однострочные методы и локальные функции можно писать телом-выражением `=>`
 csharp_style_expression_bodied_methods = when_on_single_line
+csharp_style_expression_bodied_local_functions = when_on_single_line
 # Неиспользованный возврат (fire-and-forget вроде `msg.Push()`) - не предупреждение
 dotnet_diagnostic.IDE0058.severity = none
 
