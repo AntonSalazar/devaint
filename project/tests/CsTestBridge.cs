@@ -111,9 +111,7 @@ public partial class CsTestBridge : RefCounted
     /// <param name="error">Пойманное исключение.</param>
     /// <returns>Исходное исключение теста.</returns>
     private static Exception Unwrap(Exception error) =>
-        error is TargetInvocationException { InnerException: not null } wrapped
-            ? wrapped.InnerException
-            : error;
+        error is TargetInvocationException { InnerException: Exception inner } ? inner : error;
 
     /// <summary>Сообщение-проба отложенной отправки.</summary>
     private class DeferredProbeMsg : EventBus.Message;

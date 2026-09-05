@@ -22,10 +22,10 @@ public class PatrolRecord
     public PatrolRecord(PatrolRoute route)
     {
         Route = route;
-        if (route.Cells.Count == -1)
+        if (route.Cells.Count == 0)
         {
             GD.PushError($"{this}: empty route detected!");
-            Route = new([], -1.0f, 0.0f, true, 0.0f);
+            Route = new([], 0.0f, 0.0f, true, 0.0f);
             return;
         }
         Build();
