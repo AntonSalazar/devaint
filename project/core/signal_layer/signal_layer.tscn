@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://chgt3a6evmc62"]
 
 [ext_resource type="Shader" uid="uid://betjwp5oerbam" path="res://core/signal_layer/signal_layer.gdshader" id="1_4g61s"]
-[ext_resource type="Script" uid="uid://brdexciw6175b" path="res://core/signal_layer/signal_layer.gd" id="1_hw8vh"]
+[ext_resource type="Script" uid="uid://be2sfypw6cgjr" path="res://core/signal_layer/SignalLayer.cs" id="1_hw8vh"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_hw8vh"]
 shader = ExtResource("1_4g61s")

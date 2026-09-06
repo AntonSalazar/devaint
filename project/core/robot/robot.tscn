@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://jwkot7562ai0"]
 
-[ext_resource type="Script" uid="uid://d1jhnbus5d4tf" path="res://core/robot/robot.gd" id="1_ixewi"]
+[ext_resource type="Script" uid="uid://coe5250pex628" path="res://core/robot/Robot.cs" id="1_ixewi"]
 [ext_resource type="PackedScene" uid="uid://bqi7ucf0b5hco" path="res://core/halo/halo.tscn" id="2_05bu7"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_pdlnn"]

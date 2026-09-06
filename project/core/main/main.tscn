@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://valixd4ftvv0"]
 
-[ext_resource type="Script" uid="uid://ees56xxch1yx" path="res://core/main/main.gd" id="1_8fcwd"]
+[ext_resource type="Script" uid="uid://2ytuswc2p40k" path="res://core/main/Main.cs" id="1_8fcwd"]
 [ext_resource type="PackedScene" uid="uid://jn0jcq7evma0" path="res://core/debug_overlay/debug_overlay.tscn" id="2_6vymn"]
 [ext_resource type="PackedScene" uid="uid://bsxoo2xtbw67u" path="res://core/world/world.tscn" id="3_vwfi5"]
 

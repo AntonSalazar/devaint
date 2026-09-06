@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://dbnohn5ckil27"]
 
-[ext_resource type="Script" uid="uid://d0512b1jqmsr2" path="res://core/patrol/patrol.gd" id="1_m7naj"]
+[ext_resource type="Script" uid="uid://dvje88h00mj2a" path="res://core/patrol/Patrol.cs" id="1_m7naj"]
 
 [node name="Patrol" type="Node2D" unique_id=1193086185]
 script = ExtResource("1_m7naj")

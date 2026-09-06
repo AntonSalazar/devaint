@@ -32,6 +32,22 @@ public static class EventBus
 
 
     /// <summary>
+    /// Число живых подписок на шине - для тестов инициализации/деинициализации.
+    /// </summary>
+    internal static int SubscriptionCount
+    {
+        get
+        {
+            int count = 0;
+            foreach (List<Record> records in _subs.Values)
+            {
+                count += records.Count;
+            }
+            return count;
+        }
+    }
+
+    /// <summary>
     /// Статичный метод сброса шины.
     /// </summary>
     public static void Reset()

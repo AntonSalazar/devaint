@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://jn0jcq7evma0"]
 
-[ext_resource type="Script" uid="uid://kci0gvf6qt56" path="res://core/debug_overlay/debug_overlay.gd" id="1_lbu3r"]
+[ext_resource type="Script" uid="uid://b4b6subp7qtc" path="res://core/debug_overlay/DebugOverlay.cs" id="1_lbu3r"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lbu3r"]
 bg_color = Color(1, 1, 1, 1)
