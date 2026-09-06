@@ -28,7 +28,7 @@ format:
 
 # Balance: кривые заметности по сценариям (headless)
 balance: build
-    {{GODOT}} --headless --path project -s res://tools/balance.gd
+    {{GODOT}} --headless --path project -s res://tools/Balance.cs
 
 # Screenshot dir (Movie Maker frames)
 SHOT_DIR := env("SHOT_DIR", "/tmp/devaint-shots")
@@ -42,5 +42,5 @@ shot: build
 # Screenshot (driven): скрипт ведет робота и время, последний кадр — снимок
 shot-drive: build
     rm -rf {{SHOT_DIR}} && mkdir -p {{SHOT_DIR}}
-    {{GODOT}} --path project --write-movie {{SHOT_DIR}}/frame.png --fixed-fps 30 --quit-after 300 --resolution 1280x720 -s res://tools/shot_drive.gd > /dev/null 2>&1
+    {{GODOT}} --path project --write-movie {{SHOT_DIR}}/frame.png --fixed-fps 30 --quit-after 300 --resolution 1280x720 -s res://tools/ShotDrive.cs > /dev/null 2>&1
     @ls {{SHOT_DIR}}/*.png | tail -1
