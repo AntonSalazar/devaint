@@ -19,7 +19,7 @@ public class PatrolTest : CsTestCase
     private const double PositionTolerance = 0.001;
 
     /// <summary>Путевые клетки тестового маршрута.</summary>
-    private static readonly Vector2I[] Cells = [new(0, 0), new(4, 0), new(4, 4)];
+    private static readonly Vector2I[] _cells = [new(0, 0), new(4, 0), new(4, 4)];
 
     /// <summary>Узлы текущего теста - освобождаются в AfterEach.</summary>
     private readonly List<Node> _nodes = [];
@@ -85,7 +85,7 @@ public class PatrolTest : CsTestCase
         patrol.Init(clock, record);
 
         // Середина первого перехода.
-        double minutes = Dwell + (Travel(Cells[0], Cells[1]) / 2.0);
+        double minutes = Dwell + (Travel(_cells[0], _cells[1]) / 2.0);
         clock.Advance(minutes * GameClock.MinuteDuration);
         patrol._Process(0.0);
         PatrolRecord.Sample sample = record.SampleAt((float)clock.TimeMinutes);
@@ -150,9 +150,9 @@ public class PatrolTest : CsTestCase
         CheckTrue(!patrol.IsProcessing(), "processing stopped after deinit");
     }
 
-    /// <summary>Тестовый замкнутый маршрут по <see cref="Cells"/>.</summary>
+    /// <summary>Тестовый замкнутый маршрут по <see cref="_cells"/>.</summary>
     /// <returns>Новый маршрут с копией клеток.</returns>
-    private static PatrolRoute MakeRoute() => new([.. Cells], Speed, Dwell, true, 0.0f);
+    private static PatrolRoute MakeRoute() => new([.. _cells], Speed, Dwell, true, 0.0f);
 
     /// <summary>Длительность перехода между клетками, игровых минут.</summary>
     /// <param name="from">Клетка начала.</param>

@@ -17,13 +17,13 @@ public class PatrolRecordTest : CsTestCase
     private const double PositionTolerance = 0.001;
 
     /// <summary>Путевые клетки тестового маршрута.</summary>
-    private static readonly Vector2I[] Cells = [new(0, 0), new(4, 0), new(4, 4)];
+    private static readonly Vector2I[] _cells = [new(0, 0), new(4, 0), new(4, 4)];
 
     /// <summary>Период замкнутого маршрута: сумма стоянок и наземных длин по скорости.</summary>
     public void TestLoopPeriod()
     {
         PatrolRecord record = new(MakeRoute(loop: true));
-        CheckEq(record.SegmentCount, Cells.Length, "loop: segment per cell");
+        CheckEq(record.SegmentCount, _cells.Length, "loop: segment per cell");
         CheckNear(record.Period, LoopPeriod(), "period is dwells plus travels", PositionTolerance);
     }
 
@@ -32,7 +32,7 @@ public class PatrolRecordTest : CsTestCase
     {
         PatrolRecord record = new(MakeRoute(loop: true));
         PatrolRecord.Sample sample = record.SampleAt(0.0f);
-        CheckEq(sample.Position, Iso.CellToWorld(Cells[0]), "position is the first cell");
+        CheckEq(sample.Position, Iso.CellToWorld(_cells[0]), "position is the first cell");
         CheckTrue(sample.Dwelling, "dwelling at start");
         CheckEq(sample.Segment, 0, "segment 0");
     }
@@ -41,9 +41,9 @@ public class PatrolRecordTest : CsTestCase
     public void TestSampleMidSegment()
     {
         PatrolRecord record = new(MakeRoute(loop: true));
-        float travel = Travel(Cells[0], Cells[1]);
+        float travel = Travel(_cells[0], _cells[1]);
         PatrolRecord.Sample sample = record.SampleAt(Dwell + (travel / 2.0f));
-        Vector2 expected = Iso.CellToWorld(Cells[0]).Lerp(Iso.CellToWorld(Cells[1]), 0.5f);
+        Vector2 expected = Iso.CellToWorld(_cells[0]).Lerp(Iso.CellToWorld(_cells[1]), 0.5f);
         CheckNearPosition(sample.Position, expected, "midpoint");
         CheckTrue(!sample.Dwelling, "moving, not dwelling");
     }
@@ -52,9 +52,9 @@ public class PatrolRecordTest : CsTestCase
     public void TestSampleSecondSegment()
     {
         PatrolRecord record = new(MakeRoute(loop: true));
-        float t = Dwell + Travel(Cells[0], Cells[1]) + Dwell + (Travel(Cells[1], Cells[2]) / 2.0f);
+        float t = Dwell + Travel(_cells[0], _cells[1]) + Dwell + (Travel(_cells[1], _cells[2]) / 2.0f);
         PatrolRecord.Sample sample = record.SampleAt(t);
-        Vector2 expected = Iso.CellToWorld(Cells[1]).Lerp(Iso.CellToWorld(Cells[2]), 0.5f);
+        Vector2 expected = Iso.CellToWorld(_cells[1]).Lerp(Iso.CellToWorld(_cells[2]), 0.5f);
         CheckEq(sample.Segment, 1, "second segment");
         CheckNearPosition(sample.Position, expected, "midpoint of segment 2");
     }
@@ -88,12 +88,12 @@ public class PatrolRecordTest : CsTestCase
     public void TestPingPong()
     {
         PatrolRecord record = new(MakeRoute(loop: false));
-        CheckEq(record.SegmentCount, (Cells.Length - 1) * 2, "segments there and back");
+        CheckEq(record.SegmentCount, (_cells.Length - 1) * 2, "segments there and back");
 
-        // Середина последнего (обратного) отрезка: из Cells[1] в Cells[0].
-        float t = record.Period - (Travel(Cells[1], Cells[0]) / 2.0f);
+        // Середина последнего (обратного) отрезка: из _cells[1] в _cells[0].
+        float t = record.Period - (Travel(_cells[1], _cells[0]) / 2.0f);
         PatrolRecord.Sample sample = record.SampleAt(t);
-        Vector2 expected = Iso.CellToWorld(Cells[1]).Lerp(Iso.CellToWorld(Cells[0]), 0.5f);
+        Vector2 expected = Iso.CellToWorld(_cells[1]).Lerp(Iso.CellToWorld(_cells[0]), 0.5f);
         CheckNearPosition(sample.Position, expected, "return leg");
     }
 
@@ -172,12 +172,12 @@ public class PatrolRecordTest : CsTestCase
         }
     }
 
-    /// <summary>Тестовый маршрут по <see cref="Cells"/>.</summary>
+    /// <summary>Тестовый маршрут по <see cref="_cells"/>.</summary>
     /// <param name="loop">Флаг замкнутости.</param>
     /// <param name="startOffsetMinutes">Сдвиг расписания, минут.</param>
     /// <returns>Новый маршрут с копией клеток.</returns>
     private static PatrolRoute MakeRoute(bool loop, float startOffsetMinutes = 0.0f) =>
-        new([.. Cells], Speed, Dwell, loop, startOffsetMinutes);
+        new([.. _cells], Speed, Dwell, loop, startOffsetMinutes);
 
     /// <summary>Длительность перехода между клетками, игровых минут.</summary>
     /// <param name="from">Клетка начала.</param>
@@ -186,14 +186,14 @@ public class PatrolRecordTest : CsTestCase
     private static float Travel(Vector2I from, Vector2I to) =>
         Iso.GroundDistance(Iso.CellToWorld(from), Iso.CellToWorld(to)) / Speed;
 
-    /// <summary>Период замкнутого маршрута по <see cref="Cells"/>.</summary>
+    /// <summary>Период замкнутого маршрута по <see cref="_cells"/>.</summary>
     /// <returns>Сумма стоянок и переходов.</returns>
     private static float LoopPeriod()
     {
-        float period = Dwell * Cells.Length;
-        for (int idx = 0; idx < Cells.Length; idx++)
+        float period = Dwell * _cells.Length;
+        for (int idx = 0; idx < _cells.Length; idx++)
         {
-            period += Travel(Cells[idx], Cells[(idx + 1) % Cells.Length]);
+            period += Travel(_cells[idx], _cells[(idx + 1) % _cells.Length]);
         }
         return period;
     }

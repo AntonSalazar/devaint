@@ -26,6 +26,8 @@ public partial class CsTestBridge : RefCounted
 
         foreach (Type type in FindSuites())
         {
+            // Заголовок набора в формате раннера, чтобы C#-классы читались как отдельные файлы.
+            GD.Print($"\n=== {type.Name}.cs ===");
             CsTestCase suite = (CsTestCase)Activator.CreateInstance(type)!;
             foreach (MethodInfo method in FindTestMethods(type))
             {
