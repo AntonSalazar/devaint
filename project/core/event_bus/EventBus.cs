@@ -223,6 +223,12 @@ public static class EventBus
         /// если в сообщении данные модифицированы.
         /// </returns>
         public Message Push() => EventBus.Push(this);
+
+        /// <summary>
+        /// Имя типа сообщения: вложенные типы через точку, как в GDScript.
+        /// </summary>
+        /// <returns>Полное имя типа сообщения.</returns>
+        public override string ToString() => GetType().FullName!.Replace('+', '.');
     }
 
 

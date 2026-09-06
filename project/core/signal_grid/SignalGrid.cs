@@ -521,7 +521,8 @@ public class SignalGrid(Vector2I origin, Vector2I size)
         /// Метод возврата представления экземпляра класса в виде строки.
         /// </summary>
         /// <returns>Вернет строку.</returns>
-        public override string ToString() => $"{this} {Sector} {Previous} -> {Current} ({Value:F0}%)";
+        public override string ToString() =>
+            $"{base.ToString()} {Sector} {Previous} -> {Current} ({Value:F0}%)";
     }
 
 
