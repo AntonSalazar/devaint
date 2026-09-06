@@ -5,13 +5,12 @@ using Godot;
 /// <summary>
 /// Тесты <see cref="Robot"/>: расход батареи по долям состояний, кламп,
 /// полнота таблиц, битовая маска состояний и излучение, ореол, физический кадр.
-/// Сцена robot.tscn держит GDScript-версию, поэтому дерево собирается руками,
-/// а ввод имитируется через Input.ActionPress.
+/// Робот инстанцируется из robot.tscn, ввод имитируется через Input.ActionPress.
 /// </summary>
 public class RobotTest : CsTestCase
 {
-    /// <summary>Шейдер ореола из проекта.</summary>
-    private const string HaloShaderPath = "res://core/halo/halo.gdshader";
+    /// <summary>Сцена робота.</summary>
+    private const string RobotScenePath = "res://core/robot/robot.tscn";
 
     /// <summary>Действие ввода для ходьбы в тестах.</summary>
     private const string WalkAction = "move_right";
@@ -307,20 +306,11 @@ public class RobotTest : CsTestCase
     private static void PushMinute() =>
         new GameClock.OnMinutePassed(1, new GameClock.GameTime(Day: 1, Hour: 0, Minute: 1)).Push();
 
-    /// <summary>Сборка робота с ореолом руками (как в robot.tscn) и добавление в корень дерева.</summary>
+    /// <summary>Создание робота из сцены с добавлением в корень дерева (нужен %Halo).</summary>
     /// <returns>Робот, освобождаемый в AfterEach.</returns>
     private Robot SpawnRobot()
     {
-        Robot robot = new();
-        Halo halo = new()
-        {
-            Name = "Halo",
-            Material = new ShaderMaterial { Shader = GD.Load<Shader>(HaloShaderPath) },
-        };
-        robot.AddChild(halo);
-        halo.Owner = robot;
-        halo.UniqueNameInOwner = true;
-
+        Robot robot = GD.Load<PackedScene>(RobotScenePath).Instantiate<Robot>();
         ((SceneTree)Engine.GetMainLoop()).Root.AddChild(robot);
         _nodes.Add(robot);
         return robot;

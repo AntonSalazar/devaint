@@ -4,12 +4,15 @@ using Godot;
 /// <summary>
 /// Тесты <see cref="DebugOverlay"/>: шкала заметности (значение, уровень, цвет),
 /// экранный лог (строки, фильтр шума, длина буфера, очистка).
-/// Сцены держат GDScript-версии, поэтому деревья оверлея и робота собираются руками.
+/// Оверлей и робот инстанцируются из своих сцен.
 /// </summary>
 public class DebugOverlayTest : CsTestCase
 {
-    /// <summary>Шейдер ореола - роботу нужен полноценный ребенок Halo.</summary>
-    private const string HaloShaderPath = "res://core/halo/halo.gdshader";
+    /// <summary>Сцена оверлея.</summary>
+    private const string OverlayScenePath = "res://core/debug_overlay/debug_overlay.tscn";
+
+    /// <summary>Сцена робота.</summary>
+    private const string RobotScenePath = "res://core/robot/robot.tscn";
 
     /// <summary>Узлы текущего теста - освобождаются в AfterEach.</summary>
     private readonly List<Node> _nodes = [];
@@ -101,54 +104,24 @@ public class DebugOverlayTest : CsTestCase
         CheckEq(logOutput.Text, string.Empty, "log output is cleared on Deinit");
     }
 
-    /// <summary>Сборка оверлея руками, как в debug_overlay.tscn, и добавление в корень дерева.</summary>
+    /// <summary>Создание оверлея из сцены с добавлением в корень дерева.</summary>
     /// <returns>Оверлей, освобождаемый в AfterEach.</returns>
-    private DebugOverlay SpawnOverlay()
-    {
-        DebugOverlay overlay = new();
-        VBoxContainer outputBox = new() { Name = "Output" };
-        VBoxContainer noticeBox = new() { Name = "Notice" };
-        overlay.AddChild(outputBox);
-        overlay.AddChild(noticeBox);
+    private DebugOverlay SpawnOverlay() => Spawn<DebugOverlay>(OverlayScenePath);
 
-        Node[] uniques =
-        [
-            new RichTextLabel { Name = "Output" },
-            new RichTextLabel { Name = "Log" },
-            new ProgressBar { Name = "NoticeBar" },
-            new Label { Name = "NoticeLevel" },
-        ];
-        outputBox.AddChild(uniques[0]);
-        outputBox.AddChild(uniques[1]);
-        noticeBox.AddChild(uniques[2]);
-        noticeBox.AddChild(uniques[3]);
-        foreach (Node node in uniques)
-        {
-            node.Owner = overlay;
-            node.UniqueNameInOwner = true;
-        }
-
-        ((SceneTree)Engine.GetMainLoop()).Root.AddChild(overlay);
-        _nodes.Add(overlay);
-        return overlay;
-    }
-
-    /// <summary>Сборка робота с ореолом (как в robot.tscn) и добавление в корень дерева.</summary>
+    /// <summary>Создание робота из сцены с добавлением в корень дерева.</summary>
     /// <returns>Робот, освобождаемый в AfterEach.</returns>
-    private Robot SpawnRobot()
-    {
-        Robot robot = new();
-        Halo halo = new()
-        {
-            Name = "Halo",
-            Material = new ShaderMaterial { Shader = GD.Load<Shader>(HaloShaderPath) },
-        };
-        robot.AddChild(halo);
-        halo.Owner = robot;
-        halo.UniqueNameInOwner = true;
+    private Robot SpawnRobot() => Spawn<Robot>(RobotScenePath);
 
-        ((SceneTree)Engine.GetMainLoop()).Root.AddChild(robot);
-        _nodes.Add(robot);
-        return robot;
+    /// <summary>Инстанцирование сцены в корень дерева с учетом освобождения.</summary>
+    /// <param name="path">Путь к сцене.</param>
+    /// <typeparam name="T">Тип корня сцены.</typeparam>
+    /// <returns>Корень сцены.</returns>
+    private T Spawn<T>(string path)
+        where T : Node
+    {
+        T node = GD.Load<PackedScene>(path).Instantiate<T>();
+        ((SceneTree)Engine.GetMainLoop()).Root.AddChild(node);
+        _nodes.Add(node);
+        return node;
     }
 }

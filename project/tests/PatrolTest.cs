@@ -5,10 +5,13 @@ using Godot;
 /// <summary>
 /// Тесты <see cref="Patrol"/>: позиция из расписания, веер конуса, взгляд по курсу,
 /// круговой обзор на стоянке, заморозка на паузе, деинициализация.
-/// Сцена patrol.tscn держит GDScript-версию, поэтому дерево ноды собирается руками.
+/// Патруль инстанцируется из patrol.tscn.
 /// </summary>
 public class PatrolTest : CsTestCase
 {
+    /// <summary>Сцена патруля.</summary>
+    private const string PatrolScenePath = "res://core/patrol/patrol.tscn";
+
     /// <summary>Скорость, наземных px за игровую минуту.</summary>
     private const float Speed = 200.0f;
 
@@ -161,23 +164,11 @@ public class PatrolTest : CsTestCase
     private static float Travel(Vector2I from, Vector2I to) =>
         Iso.GroundDistance(Iso.CellToWorld(from), Iso.CellToWorld(to)) / Speed;
 
-    /// <summary>
-    /// Сборка дерева патруля руками, как в patrol.tscn, и добавление в корень сцены:
-    /// вход в дерево вызывает _Ready. Уникальные имена (%) требуют владельца.
-    /// </summary>
+    /// <summary>Создание патруля из сцены с добавлением в корень дерева (вход в дерево вызывает _Ready).</summary>
     /// <returns>Патруль, освобождаемый в AfterEach.</returns>
     private Patrol SpawnPatrol()
     {
-        Patrol patrol = new();
-        Node2D pivot = new() { Name = "ConePivot", Scale = new Vector2(1.0f, 0.5f) };
-        Polygon2D cone = new() { Name = "Cone" };
-        patrol.AddChild(pivot);
-        pivot.AddChild(cone);
-        pivot.Owner = patrol;
-        pivot.UniqueNameInOwner = true;
-        cone.Owner = patrol;
-        cone.UniqueNameInOwner = true;
-
+        Patrol patrol = GD.Load<PackedScene>(PatrolScenePath).Instantiate<Patrol>();
         ((SceneTree)Engine.GetMainLoop()).Root.AddChild(patrol);
         _nodes.Add(patrol);
         return patrol;

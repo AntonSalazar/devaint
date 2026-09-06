@@ -4,12 +4,12 @@ using Godot;
 /// <summary>
 /// Тесты <see cref="Halo"/>: геометрия квада, параметры шейдера, монотонность по излучению,
 /// плавное схождение радиуса к цели, продвижение фазы пульса.
-/// Сцена halo.tscn держит GDScript-версию, поэтому материал собирается руками.
+/// Ореол инстанцируется из halo.tscn.
 /// </summary>
 public class HaloTest : CsTestCase
 {
-    /// <summary>Шейдер ореола из проекта.</summary>
-    private const string HaloShaderPath = "res://core/halo/halo.gdshader";
+    /// <summary>Сцена ореола.</summary>
+    private const string HaloScenePath = "res://core/halo/halo.tscn";
 
     /// <summary>Узлы текущего теста - освобождаются в AfterEach.</summary>
     private readonly List<Node> _nodes = [];
@@ -112,15 +112,11 @@ public class HaloTest : CsTestCase
         CheckTrue(phase is >= 0.0f and < 1.0f, "phase wraps into [0, 1)");
     }
 
-    /// <summary>
-    /// Создание ореола с материалом на шейдере проекта (без добавления в дерево).
-    /// Шейдер и материал - ресурсы (RefCounted), освобождать нужно только ноду.
-    /// </summary>
+    /// <summary>Создание ореола из сцены (без добавления в дерево).</summary>
     /// <returns>Ореол, освобождаемый в AfterEach.</returns>
     private Halo SpawnHalo()
     {
-        Shader shader = GD.Load<Shader>(HaloShaderPath);
-        Halo halo = new() { Material = new ShaderMaterial { Shader = shader } };
+        Halo halo = GD.Load<PackedScene>(HaloScenePath).Instantiate<Halo>();
         _nodes.Add(halo);
         return halo;
     }

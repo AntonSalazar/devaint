@@ -4,12 +4,12 @@ using Godot;
 /// <summary>
 /// Тесты <see cref="SignalLayer"/>: подгонка полигона под грид с полем, параметры шейдера,
 /// текстура статики и ее обновление по OnStaticChanged, отписка.
-/// Сцена signal_layer.tscn держит GDScript-версию, поэтому материал собирается руками.
+/// Слой инстанцируется из signal_layer.tscn.
 /// </summary>
 public class SignalLayerTest : CsTestCase
 {
-    /// <summary>Шейдер слоя из проекта.</summary>
-    private const string LayerShaderPath = "res://core/signal_layer/signal_layer.gdshader";
+    /// <summary>Сцена слоя.</summary>
+    private const string LayerScenePath = "res://core/signal_layer/signal_layer.tscn";
 
     /// <summary>Угол тестового грида.</summary>
     private static readonly Vector2I _origin = new(-2, -2);
@@ -131,12 +131,11 @@ public class SignalLayerTest : CsTestCase
         CheckTrue(ReferenceEquals(before, after), "texture is not re-uploaded after Deinit");
     }
 
-    /// <summary>Создание слоя с материалом на шейдере проекта (без добавления в дерево).</summary>
+    /// <summary>Создание слоя из сцены (без добавления в дерево).</summary>
     /// <returns>Слой, освобождаемый в AfterEach.</returns>
     private SignalLayer SpawnLayer()
     {
-        Shader shader = GD.Load<Shader>(LayerShaderPath);
-        SignalLayer layer = new() { Material = new ShaderMaterial { Shader = shader } };
+        SignalLayer layer = GD.Load<PackedScene>(LayerScenePath).Instantiate<SignalLayer>();
         _nodes.Add(layer);
         return layer;
     }
