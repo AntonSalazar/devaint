@@ -1,7 +1,7 @@
 extends TestCase
 
 ## Обертка C#-тестов: мост [CsTestBridge] рефлексией гоняет наследников
-## CsTestCase (EventBus, GameClock и далее) и печатает построчный отчет,
+## CsTestCase (EventBus, Main и далее) и печатает построчный отчет,
 ## сюда вливается общий итог для раннера.
 
 
