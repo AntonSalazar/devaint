@@ -50,14 +50,13 @@ flowchart LR
 ## Понедельная раскладка
 
 ### Неделя 1 — ядро данных
-- Сборка `project/sim/DevAInt.Sim.csproj`, подключение к `DevAInt.csproj`,
-  `just build` зелёный с обеими.
+- Сборки `sim/DevAInt.Sim` и `sim/DevAInt.Sim.Tests` (xUnit), ссылка
+  из `DevAInt.csproj`, `just build`/`just test` зелёные с обеими.
 - `Hex` (аксиал, соседи, дистанция, offset round-trip), `Layer<T>`.
 - `Rules.Load` + все `*.json` с числами из `07-BALANCE.md`; валидация
   данных как тест.
 - `MapGen` от сида: кластеры, роутеры-коридоры, линки, старты, имена;
   тест связности/достижимости; ASCII-дамп карты в консоль для глаз.
-- Решение по xUnit для `Sim` (`12-SCOPE-RISKS.md`).
 
 ### Неделя 2 — правила без картинки
 - `GameState`, `Sim.NewGame`, все `Action`, `Legal`/`Check`/`Apply`,

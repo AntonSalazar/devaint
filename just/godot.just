@@ -16,11 +16,15 @@ run: build
 editor:
     {{GODOT}} --path project/ --editor
 
-# Autotests
-test: build
+# Autotests: стиль, xUnit-тесты симуляции, Godot-тесты сцен
+test: build test-sim
     dotnet format project/DevAInt.sln --verify-no-changes
     {{GODOT}} --headless --path project --import
     {{GODOT}} --headless --path project -s res://tests/test_runner.gd
+
+# Sim tests: быстрый цикл без движка
+test-sim:
+    dotnet test sim/DevAInt.Sim.Tests/
 
 # Format: поправить стиль C# по .editorconfig
 format:

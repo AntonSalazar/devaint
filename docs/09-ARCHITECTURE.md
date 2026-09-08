@@ -30,20 +30,25 @@
 ## Сборки
 
 ```
+.editorconfig               — общий стиль C# для обеих сборок
+sim/
+  DevAInt.Sim/              — чистая симуляция (net8.0 classlib, без Godot)
+  DevAInt.Sim.Tests/        — xUnit-тесты симуляции (`dotnet test`)
 project/
-  DevAInt.sln
-  DevAInt.csproj            — Godot-проект (рендер, ввод, HUD, сцены)
-  sim/DevAInt.Sim.csproj    — чистая симуляция (net8.0, без Godot)
+  DevAInt.sln               — включает Godot-проект и обе сборки sim/
+  DevAInt.csproj            — Godot-проект (рендер, ввод, HUD, сцены), ProjectReference на Sim
   data/*.json               — таблицы правил
   core/…                    — Godot-код: Main, World (рендер), HUD, Hero-сцена
-  tests/                    — раннер + C#-тесты (обе сборки)
+  tests/                    — Godot-раннер + тесты сцен
   tools/                    — Balance.cs (авто-партии), Shot*.cs
 ```
 
-`DevAInt.Sim` — обычный `classlib`, `TreatWarningsAsErrors`, тот же
-`.editorconfig`. Внутри: `Hex`, `Layer<T>`, `World`, `MapGen`,
-`GameState`, `Actions`, `Rules`, `WorldEvents`, `Ai`, `Data` (загрузка
-и валидация JSON), `Rng`, `Serialization`.
+`sim/` лежит **вне** `project/`: Godot-csproj по умолчанию компилирует все
+`**/*.cs` под собой, и вложенная сборка потребовала бы исключений.
+`DevAInt.Sim` — обычный `classlib` с тем же `.editorconfig` и StyleCop.
+Внутри: `Hex`, `Layer<T>`, `World`, `MapGen`, `GameState`, `Actions`,
+`Rules`, `WorldEvents`, `Ai`, `Data` (загрузка и валидация JSON), `Rng`,
+`Serialization`.
 
 ## Схема систем
 
@@ -114,10 +119,9 @@ Godot-слой **не содержит правил**: если что-то ре
   `test_runner.gd` гоняет C#-наборы через мост. Sim-тесты — обычные
   классы, им движок не нужен, но гонять их в том же раннере — ок
   для единообразия.
-- **Открытый вопрос:** отдельный `DevAInt.Sim.Tests` на xUnit
-  (`dotnet test`, секунды вместо запуска Godot). Решить на неделе 1
-  (`12-SCOPE-RISKS.md`). Аргумент за: скорость итераций по правилам;
-  против: вторая тестовая инфраструктура.
+- **`Sim` тестируется xUnit** (`sim/DevAInt.Sim.Tests`, `dotnet test`,
+  секунды без запуска движка; `just test-sim` — быстрый цикл,
+  `just test` гоняет оба набора). Решено 2026-09-08.
 - Обязательные тесты: round-trip гекс-координат; генератор — связность
   и достижимость от сида; инварианты баланса на данных (`07-BALANCE.md §8`);
   «два бота доигрывают партию»; полнота таблиц данных (все ОС × тиры).
