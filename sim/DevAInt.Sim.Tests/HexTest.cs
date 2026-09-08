@@ -1,8 +1,6 @@
 using System;
 using System.Linq;
 
-using DevAInt.Sim;
-
 using Xunit;
 
 namespace DevAInt.Sim.Tests;
@@ -58,7 +56,7 @@ public class HexTest
     [InlineData(0, 0, 0, 0, 0)]
     [InlineData(0, 0, 3, -1, 3)]
     [InlineData(0, 0, 2, 2, 4)]
-    [InlineData(-2, 1, 1, -3, 3)]
+    [InlineData(-2, 1, 1, -3, 4)]
     [InlineData(5, 5, 5, -5, 10)]
     public void DistanceMatchesCubeMetric(int q1, int r1, int q2, int r2, int expected)
     {
@@ -91,10 +89,7 @@ public class HexTest
     [InlineData(2, 3, 1, 3)]
     [InlineData(3, 2, 2, 2)]
     [InlineData(23, 17, 15, 17)]
-    public void FromOffsetUsesOddR(int col, int row, int q, int r)
-    {
-        Assert.Equal(new Hex(q, r), Hex.FromOffset(col, row));
-    }
+    public void FromOffsetUsesOddR(int col, int row, int q, int r) => Assert.Equal(new Hex(q, r), Hex.FromOffset(col, row));
 
     /// <summary>Аксиал → offset — обратная формула.</summary>
     /// <param name="q">Q.</param>
@@ -106,10 +101,7 @@ public class HexTest
     [InlineData(1, 3, 2, 3)]
     [InlineData(2, 2, 3, 2)]
     [InlineData(15, 17, 23, 17)]
-    public void ToOffsetIsInverseOfFromOffset(int q, int r, int col, int row)
-    {
-        Assert.Equal((col, row), new Hex(q, r).ToOffset());
-    }
+    public void ToOffsetIsInverseOfFromOffset(int q, int r, int col, int row) => Assert.Equal((col, row), new Hex(q, r).ToOffset());
 
     /// <summary>Round-trip на всей карте 24×18: FromOffset(ToOffset(h)) == h.</summary>
     [Fact]
@@ -144,5 +136,5 @@ public class HexTest
     /// <param name="hex">Гекс.</param>
     /// <returns>Шесть пар (col, row).</returns>
     private static (int, int)[] Neighbors(Hex hex) =>
-        Enumerable.Range(0, 6).Select(dir => hex.Neighbor(dir).ToOffset()).ToArray();
+        [.. Enumerable.Range(0, 6).Select(dir => hex.Neighbor(dir).ToOffset())];
 }

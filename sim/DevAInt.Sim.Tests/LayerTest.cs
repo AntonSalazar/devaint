@@ -1,7 +1,5 @@
 using System;
 
-using DevAInt.Sim;
-
 using Xunit;
 
 namespace DevAInt.Sim.Tests;
