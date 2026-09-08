@@ -73,10 +73,18 @@ public sealed record MapGenDef(
     Dictionary<string, ClusterProfile> Profiles, LinkCounts Links, bool Mirror);
 
 public sealed record RulesDef(
+    int MaxFactions,                                         // 8
     int ActionPoints, int SlotLimit, int SpawnCost, int HardenCost, int HardenMax,
     float NoiseDecay, float NoiseVisible, float NoiseAudit,
-    int StartCompute, int SecondPlayerBonus, string[] StartingExploits,
-    float DominationShare, int TurnLimit, int MutatorBudget);
+    int StartCompute, int LateStartBonus, string[] StartingExploits,
+    Dictionary<int, float> DominationShare,                  // по числу фракций
+    Dictionary<int, int> TurnLimit,                          // по числу фракций
+    bool SharedVision, bool AlliesAdjacent, int MutatorBudget);
+
+public enum ControllerKind { Human, Ai, Remote }
+public sealed record Controller(ControllerKind Kind, string? AiProfile = null, string? PeerId = null);
+
+public sealed record FactionSetup(string Name, string Color, string[] Mutators, Controller Controller, int Team);
 
 public sealed record AiProfileDef(string Id, Dictionary<string, float> Weights, bool UseSpecialRules);
 
@@ -105,7 +113,9 @@ public sealed class Faction
 {
     public int Id; public string Name; public string Color;
     public List<string> Mutators; public List<string> Genome;   // Id модификаторов
-    public int Compute; public Controller Controller;           // Human | Ai(profileId)
+    public int Compute; public Controller Controller;           // Human | Ai(profile) | Remote(peer)
+    public int Team;                                            // союзники — одинаковый Team
+    public bool Eliminated;
     public List<string> Arsenal;                                // эксплойты на серверах, ещё не в слотах
     public FactionStats Stats;                                  // кэш свёртки модификаторов
 }
@@ -120,6 +130,7 @@ public sealed class Hero
 public sealed class GameState
 {
     public int Seed; public int Turn; public int ActiveFaction;
+    public List<int> TurnOrder;                                 // Id фракций в порядке хода
     public World World; public List<Faction> Factions; public List<Hero> Heroes;
     public Dictionary<string, int> Exposure;                    // DefId → применений с последнего выгорания
     public Dictionary<string, int> ExposureLimit;               // DefId → текущий порог
@@ -204,6 +215,10 @@ public static class Sim
   эксплойт (кроме объявленных исключений `Forge` T1–T2).
 - `OsWeights` каждого типа узла суммируются в 1.
 - Сумма `MutatorCost` лучшего пресета ≤ `MutatorBudget`.
+- `DominationShare`, `TurnLimit` и `mapgen` заданы для каждого N
+  от 2 до `MaxFactions`.
+- В `FactionSetup[]` партии: 2 ≤ длина ≤ `MaxFactions`, хотя бы две
+  разные команды, цвета не повторяются.
 - `Requires` без циклов.
 - `Hex` round-trip: `FromOffset(ToOffset(h)) == h` на всей карте;
   `DistanceTo` симметрична и удовлетворяет неравенству треугольника
@@ -218,5 +233,8 @@ public static class Sim
 | Новый мутатор «−1 к цене компиляции» | Новое числовое поле в `Modifier` + чтение в `Compile` — **один** код-патч, дальше только данные |
 | Новое мировое событие того же вида | Строка в `events.json` |
 | Событие нового вида | Новый `EventEffect.Kind` + его `Apply` — код-патч |
-| Третья фракция | `FactionSetup[]` длиннее; `KnownBy` — массив; порядок хода — список |
+| 3–8 фракций | Уже поддержано: `FactionSetup[]` длиннее, `KnownBy` — массив, `TurnOrder` — список; только таблицы `DominationShare`/`TurnLimit`/`mapgen` по N |
+| Альянс на старте | `Team` в `FactionSetup` — уже поддержано |
+| Динамическая дипломатия | Новые `Action` (`ProposeAlliance`, `AcceptAlliance`, `BreakAlliance`) + правило штрафа — код-патч, структура не меняется |
+| Онлайн | `Controller.Remote` + транспорт в Godot-слое; `Sim` не меняется |
 | Сценарий | `seed` + список правок слоёв + свои `events`/`voice` |
