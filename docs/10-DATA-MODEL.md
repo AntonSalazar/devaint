@@ -40,60 +40,92 @@ public sealed class Layer<T>
 
 ## 3. Определения (JSON → record)
 
+Все определения — `sealed record` с позиционными параметрами, имена
+полей 1:1 с ключами JSON (camelCase в файле, PascalCase в коде —
+`PropertyNameCaseInsensitive`). Enum-ы — строками (`JsonStringEnumConverter`).
+Таблицы «по числу фракций» — списки записей с полем `Factions`, по одной
+на каждый N от 2 до `MaxFactions` (без диапазонов — явно и проверяемо).
+
 ```csharp
 public enum NodeType { Empty, Home, Workstation, Server, Router, IoT, Controller }
 public enum Os { Kestrel, Bastion, Mote, Forge }
 public enum LinkKind { Backbone, Vpn, Sneakernet }
 public enum Rarity { Common, ZeroDay }
+public enum TriggerKind { EveryTurn, Schedule, Chance, ExposureLimit }
+public enum EffectKind { PatchWave, Audit, Burnout, LinkOutage, Migration }
 
+// rules.json
+public sealed record VictoryDef(int Factions, float DominationShare, int TurnLimit);
+public sealed record RulesDef(
+    int MaxFactions, int ActionPoints, int SlotLimit, int SpawnCost, int HardenCost, int HardenMax,
+    float NoiseDecay, float NoiseVisible, float NoiseAudit, float ScanNoise, float HardenNoise,
+    int StartCompute, int LateStartBonus, string[] StartingExploits,
+    VictoryDef[] Victory, bool RequireAllRouters, bool SharedVision, bool AlliesAdjacent, int MutatorBudget);
+
+// nodes.json
 public sealed record NodeTypeDef(
-    NodeType Type, int BasePatch, float Yield, int ScanRadius, float AiValue,
-    Dictionary<Os, float> OsWeights, string[] NamePool);
+    NodeType Type, int BasePatch, float Yield, int ScanRadius, float AiValue, Dictionary<Os, float> OsWeights);
 
+// exploits.json
 public sealed record ExploitDef(
     string Id, string Name, Os TargetOs, int Power, int MaxCharges,
     int ComputeCost, int ExposureLimit, float NoisePerUse, Rarity Rarity);
 
+// modifiers.json — одна структура для мутатора и гена
 public sealed record Modifier(
     string Id, string Name, string Description, string[] Tags,
     int MutatorCost, int ComputeCost, string[] Requires,
-    Dictionary<Os, int>? PowerBonus, float NoiseMult = 1f, float ComputeMult = 1f,
-    int ExtraActionPoints = 0, int ExtraCharges = 0, int ExtraHeroSlots = 0,
+    Dictionary<Os, int>? PowerBonus = null, float NoiseMult = 1f, float ComputeMult = 1f,
+    int ExtraActionPoints = 0, int ExtraCharges = 0, int ExtraDaemonSlots = 0,
     int ExtraSlotLimit = 0, int HardenBonus = 0, int ScanRadiusBonus = 0,
     string? StartingExploit = null);
 
-public sealed record WorldEventDef(
-    string Id, string Name, string Text,
-    EventTrigger Trigger,        // { Kind: EveryNTurns | Chance | ExposureLimit, Params… }
-    EventEffect Effect);         // { Kind: PatchWave | Audit | Burnout | LinkOutage | Migration, Params… }
+// events.json
+public sealed record SchedulePhase(int FromTurn, int Every);
+public sealed record EventTrigger(TriggerKind Kind, SchedulePhase[]? Schedule = null, int FromTurn = 1, float Chance = 0f);
+public sealed record EventEffect(EffectKind Kind, int Amount = 0, int Duration = 0, int LimitMultiplier = 1);
+public sealed record WorldEventDef(string Id, string Name, string Text, EventTrigger Trigger, EventEffect Effect);
 
+// mapgen.json
+public sealed record LinkCounts(int Backbone, int Vpn, int Sneakernet);
+public sealed record MapSizeDef(
+    int Factions, int Width, int Height, int Clusters, int Datacenters, int Factories,
+    LinkCounts Links, int MinStartDist);
+public sealed record ClusterProfile(
+    string Id, Dictionary<NodeType, float> NodeWeights, NodeType? Center, int PatchBonus, string[] NamePool);
 public sealed record MapGenDef(
-    int Width, int Height, int Clusters, int ClusterRadiusMin, int ClusterRadiusMax,
-    float HoleChance, int MinCenterDist, int MinStartDist,
-    Dictionary<string, ClusterProfile> Profiles, LinkCounts Links, bool Mirror);
+    int ClusterRadiusMin, int ClusterRadiusMax, float HoleChance, int MinCenterDist, bool Mirror,
+    MapSizeDef[] Sizes, ClusterProfile[] Profiles);
 
-public sealed record RulesDef(
-    int MaxFactions,                                         // 8
-    int ActionPoints, int SlotLimit, int SpawnCost, int HardenCost, int HardenMax,
-    float NoiseDecay, float NoiseVisible, float NoiseAudit,
-    int StartCompute, int LateStartBonus, string[] StartingExploits,
-    Dictionary<int, float> DominationShare,                  // по числу фракций
-    Dictionary<int, int> TurnLimit,                          // по числу фракций
-    bool SharedVision, bool AlliesAdjacent, int MutatorBudget);
-
-public enum ControllerKind { Human, Ai, Remote }
-public sealed record Controller(ControllerKind Kind, string? AiProfile = null, string? PeerId = null);
-
-public sealed record FactionSetup(string Name, string Color, string[] Mutators, Controller Controller, int Team);
-
-public sealed record AiProfileDef(string Id, Dictionary<string, float> Weights, bool UseSpecialRules);
-
+// ai.json, factions.json
+public sealed record AiProfileDef(string Id, bool UseSpecialRules, Dictionary<string, float> Weights);
 public sealed record FactionPresetDef(string Id, string Name, string Color, string[] Mutators, string AiProfile, string[] Voice);
 ```
 
-Всё это собирается в один неизменяемый `Rules` при старте:
-`Rules.Load("res://data")` в Godot / `Rules.Load(path)` в headless.
-Загрузка **валидирует** (§7) и падает с понятной ошибкой.
+Всё это собирается в один неизменяемый `Rules`:
+
+```csharp
+public sealed class Rules
+{
+    public RulesDef Core { get; }
+    public IReadOnlyDictionary<NodeType, NodeTypeDef> NodeTypes { get; }
+    public IReadOnlyDictionary<string, ExploitDef> Exploits { get; }
+    public IReadOnlyDictionary<string, Modifier> Modifiers { get; }
+    public IReadOnlyList<WorldEventDef> Events { get; }
+    public MapGenDef MapGen { get; }                                   // + MapGen.Profiles как словарь по Id
+    public IReadOnlyDictionary<string, AiProfileDef> AiProfiles { get; }
+    public IReadOnlyDictionary<string, FactionPresetDef> Presets { get; }
+
+    public static Rules Load(string dir);          // читает все файлы, валидирует, бросает InvalidDataException
+    public VictoryDef VictoryFor(int factions);    // вне 2..MaxFactions → ArgumentOutOfRangeException
+    public MapSizeDef MapSizeFor(int factions);
+}
+```
+
+`Rules.Load("res://data")` — из Godot (через `ProjectSettings.GlobalizePath`),
+`Rules.Load(path)` — из тестов и headless. Загрузка **валидирует** (§7)
+и падает `InvalidDataException` с текстом, в котором есть имя файла
+и виновный `Id`.
 
 ## 4. Состояние партии
 
@@ -120,7 +152,7 @@ public sealed class Faction
     public FactionStats Stats;                                  // кэш свёртки модификаторов
 }
 
-public sealed class Hero
+public sealed class Daemon
 {
     public int Id; public int FactionId; public string Name;
     public Hex Pos; public int ActionPoints;
@@ -131,35 +163,35 @@ public sealed class GameState
 {
     public int Seed; public int Turn; public int ActiveFaction;
     public List<int> TurnOrder;                                 // Id фракций в порядке хода
-    public World World; public List<Faction> Factions; public List<Hero> Heroes;
+    public World World; public List<Faction> Factions; public List<Daemon> Daemons;
     public Dictionary<string, int> Exposure;                    // DefId → применений с последнего выгорания
     public Dictionary<string, int> ExposureLimit;               // DefId → текущий порог
     public Dictionary<string, int> PowerPenalty;                // DefId → накопленное −Power от выгораний
-    public int NextHeroId;
+    public int NextDaemonId;
     public GameState Clone();
 }
 ```
 
 `FactionStats` — свёртка: `PowerBonus[Os]`, `NoiseMult`, `ComputeMult`,
-`ActionPoints`, `SlotLimit`, `ExtraCharges`, `HeroLimitBonus`,
+`ActionPoints`, `SlotLimit`, `ExtraCharges`, `DaemonLimitBonus`,
 `HardenBonus`, `ScanRadius`. Пересчитывается при `Mutate`.
 
 ## 5. Действия и события
 
 ```csharp
 public abstract record Action(int FactionId);
-public sealed record Move(int FactionId, int HeroId, Hex To) : Action(FactionId);
-public sealed record Exploit(int FactionId, int HeroId, Hex Target, int SlotIx) : Action(FactionId);
-public sealed record Scan(int FactionId, int HeroId) : Action(FactionId);
-public sealed record Harden(int FactionId, int HeroId) : Action(FactionId);
-public sealed record Lurk(int FactionId, int HeroId) : Action(FactionId);
-public sealed record Compile(int FactionId, Hex Server, string ExploitId, int? HeroId) : Action(FactionId);
+public sealed record Move(int FactionId, int DaemonId, Hex To) : Action(FactionId);
+public sealed record Exploit(int FactionId, int DaemonId, Hex Target, int SlotIx) : Action(FactionId);
+public sealed record Scan(int FactionId, int DaemonId) : Action(FactionId);
+public sealed record Harden(int FactionId, int DaemonId) : Action(FactionId);
+public sealed record Lurk(int FactionId, int DaemonId) : Action(FactionId);
+public sealed record Compile(int FactionId, Hex Server, string ExploitId, int? DaemonId) : Action(FactionId);
 public sealed record Spawn(int FactionId, Hex Server) : Action(FactionId);
 public sealed record Mutate(int FactionId, string ModifierId) : Action(FactionId);
 public sealed record EndTurn(int FactionId) : Action(FactionId);
 
 public abstract record SimEvent(int Turn);
-// NodeCaptured, CaptureFailed(reason), HeroSpawned, HeroKilled(cause),
+// NodeCaptured, CaptureFailed(reason), DaemonSpawned, DaemonKilled(cause),
 // ExploitCompiled, ExploitBurned, GenomeChanged, WorldEventFired(id),
 // TurnStarted(faction), GameOver(winner, condition)
 ```
@@ -173,7 +205,7 @@ public static class Sim
     public static IReadOnlyList<Action> Legal(Rules rules, GameState s, int factionId);
     public static Verdict Check(Rules rules, GameState s, Action a);      // Ok | Illegal(reason)
     public static IReadOnlyList<SimEvent> Apply(Rules rules, GameState s, Action a, Rng rng);
-    public static CaptureCheck CanCapture(Rules rules, GameState s, Hero h, int slotIx, Hex target);
+    public static CaptureCheck CanCapture(Rules rules, GameState s, Daemon h, int slotIx, Hex target);
 }
 ```
 
@@ -184,15 +216,14 @@ public static class Sim
 
 | Файл | Содержимое |
 |---|---|
-| `data/rules.json` | `RulesDef` — общие числа |
-| `data/nodes.json` | `NodeTypeDef[]` |
-| `data/exploits.json` | `ExploitDef[]` (20 common + зеро-деи) |
-| `data/modifiers.json` | `Modifier[]` |
-| `data/events.json` | `WorldEventDef[]` |
-| `data/mapgen.json` | `MapGenDef` |
-| `data/ai.json` | `AiProfileDef[]` |
-| `data/factions.json` | `FactionPresetDef[]` |
-| `data/names/*.json` | Пулы имён по профилям кластеров |
+| `data/rules.json` | `RulesDef` — общие числа и таблица победы по N |
+| `data/nodes.json` | `NodeTypeDef[]` — 6 типов (без Empty) |
+| `data/exploits.json` | `ExploitDef[]` — 18 common (Forge без T1–T2) + 4 зеро-дея |
+| `data/modifiers.json` | `Modifier[]` — 15 записей |
+| `data/events.json` | `WorldEventDef[]` — 5 событий |
+| `data/mapgen.json` | `MapGenDef` — размеры по N, профили кластеров с пулами имён |
+| `data/ai.json` | `AiProfileDef[]` — 5 профилей |
+| `data/factions.json` | `FactionPresetDef[]` — 4 пресета |
 
 Пример `exploits.json`:
 
@@ -213,6 +244,8 @@ public static class Sim
   пресетов, `AiProfile` ссылаются на существующие записи.
 - Для каждой ОС и тира из `07-BALANCE.md §3` есть ровно один `Common`
   эксплойт (кроме объявленных исключений `Forge` T1–T2).
+- Все `NodeType`, кроме `Empty`, определены; `NodeWeights` профилей
+  кластеров суммируются в 1; у профиля с `Center` он не `Empty`.
 - `OsWeights` каждого типа узла суммируются в 1.
 - Сумма `MutatorCost` лучшего пресета ≤ `MutatorBudget`.
 - `DominationShare`, `TurnLimit` и `mapgen` заданы для каждого N

@@ -40,8 +40,8 @@
 | T4 | 4 | 2 | 40 | 12 | 0.4 |
 | T5 | 5 | 1 | 65 | 8 | 0.5 |
 
-По одному на каждую ОС и тир (20 записей); `Forge` T1–T2 не существуют
-(контроллеры — не для старта). Зеро-деи: T4–T5, 1–2 заряда, limit 6.
+По одному на каждую ОС и тир; `Forge` T1–T2 не существуют (контроллеры —
+не для старта), итого 18 common-записей. Зеро-деи: T4–T5, 1–2 заряда, limit 6.
 
 После выгорания следующий `ExposureLimit` = предыдущий × 2.
 
@@ -74,7 +74,7 @@
 | zero_day_cache | offense | 2 | — | — | Стартовый зеро-дей T3 |
 | swift | mobility | 2 | 35 | — | ExtraActionPoints +1 |
 | optic | mobility | 1 | 15 | — | ScanRadiusBonus +1 |
-| hive | swarm | 2 | 30 | — | ExtraHeroSlots +1 |
+| hive | swarm | 2 | 30 | — | ExtraDaemonSlots +1 |
 | wide_slots | swarm | — | 30 | hive | SlotLimit +1 |
 
 Бюджет мутаторов — 3 очка. 15 записей на срез.

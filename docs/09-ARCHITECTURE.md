@@ -44,7 +44,7 @@ project/
   DevAInt.sln               — включает Godot-проект и обе сборки sim/
   DevAInt.csproj            — Godot-проект (рендер, ввод, HUD, сцены), ProjectReference на Sim
   data/*.json               — таблицы правил
-  core/…                    — Godot-код: Main, World (рендер), HUD, Hero-сцена
+  core/…                    — Godot-код: Main, World (рендер), HUD, Daemon-сцена
   tests/                    — Godot-раннер + тесты сцен
   tools/                    — Balance.cs (авто-партии), Shot*.cs
 ```
@@ -69,7 +69,7 @@ flowchart TD
     AP --> GS
     AP -->|"события"| EB["EventBus — статический,<br/>типизированные Message"]
     GS -->|"слои → DataTexture"| R["World-рендер:<br/>TileMapLayer + шейдер"]
-    GS -->|"герои, линки"| SC["Сцены Hero / Link"]
+    GS -->|"герои, линки"| SC["Сцены Daemon / Link"]
     EB --> HUD["HUD, лог, глитч-постобработка"]
     EB --> SC
     D["data/*.json → Rules (Sim.Data)"] --> AP
@@ -78,10 +78,10 @@ flowchart TD
 
 ## Поток одного действия
 
-1. Ввод (или ИИ) формирует `Action` (`Exploit(heroId, targetHex, slotIx)`).
+1. Ввод (или ИИ) формирует `Action` (`Exploit(daemonId, targetHex, slotIx)`).
 2. `Sim.Legal(state, action)` — проверка; UI спрашивает её же для подсветки.
 3. `Sim.Apply` возвращает новое состояние и список `SimEvent`
-   (`NodeCaptured`, `HeroKilled`, `ExploitBurned`, …). Состояние —
+   (`NodeCaptured`, `DaemonKilled`, `ExploitBurned`, …). Состояние —
    изменяемый объект, копируется только для снапшотов (undo/реплей).
 4. `Main` публикует события в `EventBus` → лог, HUD, анимации.
 5. `Main` перезаливает текстуру данных и двигает сцены героев.

@@ -61,7 +61,7 @@ flowchart TD
     S -->|"тип/ОС узла — статика"| TM["TileMapLayer (гекс-тайлсет):<br/>тайл = тип узла"]
     DT --> SH["Шейдер TileMapLayer:<br/>владение, кромки, туман-шум, дрожание"]
     TM --> SH
-    S -->|"герои, линки"| N["Сцены: Hero (AnimatedSprite2D),<br/>Link (Line2D)"]
+    S -->|"герои, линки"| N["Сцены: Daemon (AnimatedSprite2D),<br/>Link (Line2D)"]
     SH --> PP["CanvasLayer + ColorRect:<br/>сканлайны, глитч событий"]
     N --> PP
     HUD["Control-дерево HUD"] --> PP
@@ -78,7 +78,7 @@ flowchart TD
 - **Герои и линки** — обычные сцены, позиция из `MapToLocal(offset)`.
   Анимация хода — твин между гексами.
 - **Постобработка** — `CanvasLayer` поверх всего: сканлайны постоянно,
-  глитч — по событию шины (`WorldEventFired`, `HeroKilled`).
+  глитч — по событию шины (`WorldEventFired`, `DaemonKilled`).
 - **Инвариант:** `World` и `TileMapLayer` стоят в (0,0) без трансформа —
   мировые координаты = локальные слоя. Камера двигается, слой — нет.
 
