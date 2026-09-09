@@ -132,6 +132,46 @@ public class HexTest
         Assert.DoesNotContain((3, 4), oddRow);
     }
 
+    /// <summary>Линия между гексами: начинается в a, кончается в b, длина = дистанция + 1, шаги по соседям.</summary>
+    /// <param name="q1">Q начала.</param>
+    /// <param name="r1">R начала.</param>
+    /// <param name="q2">Q конца.</param>
+    /// <param name="r2">R конца.</param>
+    [Theory]
+    [InlineData(0, 0, 0, 0)]
+    [InlineData(0, 0, 3, 0)]
+    [InlineData(0, 0, 3, -1)]
+    [InlineData(-2, 1, 4, 2)]
+    [InlineData(5, 5, -3, 6)]
+    public void LineToWalksNeighborByNeighbor(int q1, int r1, int q2, int r2)
+    {
+        Hex a = new(q1, r1);
+        Hex b = new(q2, r2);
+
+        Hex[] line = a.LineTo(b).ToArray();
+
+        Assert.Equal(a.DistanceTo(b) + 1, line.Length);
+        Assert.Equal(a, line[0]);
+        Assert.Equal(b, line[^1]);
+        for (int i = 1; i < line.Length; i++)
+        {
+            Assert.Equal(1, line[i - 1].DistanceTo(line[i]));
+        }
+    }
+
+    /// <summary>Линия детерминирована и не зависит от направления, кроме порядка.</summary>
+    [Fact]
+    public void LineToIsSymmetric()
+    {
+        Hex a = new(1, -4);
+        Hex b = new(6, 2);
+
+        Hex[] forward = a.LineTo(b).ToArray();
+        Hex[] backward = b.LineTo(a).Reverse().ToArray();
+
+        Assert.Equal(forward, backward);
+    }
+
     /// <summary>Соседи гекса в offset-координатах.</summary>
     /// <param name="hex">Гекс.</param>
     /// <returns>Шесть пар (col, row).</returns>
