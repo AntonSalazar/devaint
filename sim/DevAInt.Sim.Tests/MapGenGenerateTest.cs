@@ -135,6 +135,8 @@ public class MapGenGenerateTest
                 case LinkKind.Sneakernet:
                     Assert.Equal((NodeType.Home, NodeType.Workstation), (a, b));
                     break;
+                default:
+                    break;
             }
         }
 
@@ -151,7 +153,7 @@ public class MapGenGenerateTest
     {
         MapResult result = MapGen.Generate(_rules, 42, 2);
         World world = result.World;
-        List<Hex> routers = world.Nodes().Where(h => world.Type[h] == NodeType.Router).ToList();
+        List<Hex> routers = [.. world.Nodes().Where(h => world.Type[h] == NodeType.Router)];
         int farthest = routers.SelectMany(a => routers.Select(b => a.DistanceTo(b))).Max();
 
         Link backbone = world.Links.First(l => l.Kind == LinkKind.Backbone);

@@ -26,6 +26,10 @@ test: build test-sim
 test-sim:
     dotnet test sim/DevAInt.Sim.Tests/
 
+# Map: сгенерировать карту от сида и напечатать ASCII-дамп (без Godot)
+map seed="42" factions="2":
+    dotnet run --project sim/DevAInt.Sim.Tool/ -- map project/data {{seed}} {{factions}}
+
 # Format: поправить стиль C# по .editorconfig
 format:
     dotnet format project/DevAInt.sln

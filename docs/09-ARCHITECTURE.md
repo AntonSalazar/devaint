@@ -40,6 +40,7 @@
 sim/
   DevAInt.Sim/              — чистая симуляция (net8.0 classlib, без Godot)
   DevAInt.Sim.Tests/        — xUnit-тесты симуляции (`dotnet test`)
+  DevAInt.Sim.Tool/         — консольные инструменты без Godot: `just map` (дамп карты), позже `just balance`
 project/
   DevAInt.sln               — включает Godot-проект и обе сборки sim/
   DevAInt.csproj            — Godot-проект (рендер, ввод, HUD, сцены), ProjectReference на Sim
@@ -153,7 +154,7 @@ Godot-слой **не содержит правил**: если что-то ре
 | `core/event_bus/EventBus.cs` | Шина, без изменений |
 | `core/debug_overlay/` | Экранный лог всех сообщений шины (кольцевой буфер) |
 | `tests/` | Раннер, база, мост C#, `style_test.gd`, тесты `EventBus`/`Main`/`DebugOverlay` |
-| `just` рецепты | `build`, `run`, `editor`, `test`, `format`, `shot`; `balance` вернётся на неделе 3 под авто-партии |
+| `just` рецепты | `build`, `run`, `editor`, `test`, `test-sim`, `map`, `format`, `shot`; `balance` вернётся на неделе 3 под авто-партии (в `Sim.Tool`, без Godot) |
 
 Удалены целиком: `GameClock`, `Iso`, `World` с тайлами, `SignalGrid`,
 `SignalLayer`, `Halo`, `TowerMarker`, `Robot`, `Patrol*`, `tools/`

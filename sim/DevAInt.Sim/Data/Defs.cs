@@ -343,9 +343,10 @@ public sealed record LinkCounts(int Backbone, int Vpn, int Sneakernet);
 /// <param name="Factories">Сколько заводов.</param>
 /// <param name="Links">Сколько дальних линков.</param>
 /// <param name="MinStartDist">Минимальная дистанция между стартами в гексах.</param>
+/// <param name="ExtraCorridors">Дополнительные коридоры между кластерами.</param>
 public sealed record MapSizeDef(
     int Factions, int Width, int Height, int Clusters, int Datacenters, int Factories,
-    LinkCounts Links, int MinStartDist);
+    LinkCounts Links, int MinStartDist, int ExtraCorridors);
 
 /// <summary>
 /// Описание кластера.
