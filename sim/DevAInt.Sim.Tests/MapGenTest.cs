@@ -193,7 +193,7 @@ public class MapGenTest
         List<Hex> corridor = [];
         foreach (Hex hex in world.Cells())
         {
-            int index = hex.ToOffset().Row * world.Width + hex.ToOffset().Col;
+            int index = (hex.ToOffset().Row * world.Width) + hex.ToOffset().Col;
             if (before[index] != NodeType.Empty)
             {
                 Assert.Equal(before[index], world.Type[hex]);
@@ -222,7 +222,7 @@ public class MapGenTest
 
         MapGen.BuildCorridor(world, _rules, new Rng(2), a, b);
 
-        Hex[] line = a.LineTo(b).ToArray();
+        Hex[] line = [.. a.LineTo(b)];
         for (int i = 1; i < line.Length - 1; i++)
         {
             NodeType expected = (i - 1) % 2 == 0 ? NodeType.Router : NodeType.IoT;

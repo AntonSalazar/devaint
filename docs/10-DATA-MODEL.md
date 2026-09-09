@@ -89,7 +89,7 @@ public sealed record WorldEventDef(string Id, string Name, string Text, EventTri
 // mapgen.json
 public sealed record LinkCounts(int Backbone, int Vpn, int Sneakernet);
 public sealed record MapSizeDef(
-    int Factions, int Width, int Height, int Clusters, int Datacenters, int Factories,
+    int Factions, int Width, int Height, int Clusters, int ExtraCorridors, int Datacenters, int Factories,
     LinkCounts Links, int MinStartDist);
 public sealed record ClusterProfile(
     string Id, Dictionary<NodeType, float> NodeWeights, NodeType? Center, int PatchBonus, string[] NamePool);

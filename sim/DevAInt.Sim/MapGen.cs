@@ -133,44 +133,26 @@ public static class MapGen
     /// <param name="radius">Радиус кластера.</param>
     internal static void FillCluster(World world, Rules rules, Rng rng, Hex center, ClusterProfile profile, int radius)
     {
-        Queue<Hex> queue = new();
-        HashSet<Hex> seen = [center];
-        queue.Enqueue(center);
         int nameIndex = 0;
+        IEnumerable<Hex> disk = Search.Bfs(center, hex => InRadius(world, hex, center, radius));
 
-        while (queue.Count > 0)
+        foreach (Hex hex in disk)
         {
-            Hex hex = queue.Dequeue();
-
-            // Соседей ставим в очередь до любых решений о самом гексе.
-            // Дырка или занятый гекс не должны останавливать волну.
-            for (int dir = 0; dir < Hex.Directions.Length; dir++)
-            {
-                Hex next = hex.Neighbor(dir);
-                if (world.Type.Contains(next) && center.DistanceTo(next) <= radius && seen.Add(next))
-                {
-                    queue.Enqueue(next);
-                }
-            }
-
-            // Чужой узел и дырку пропускаем.
             bool isCenter = hex == center;
             if (world.IsNode(hex) || (!isCenter && rng.Chance(rules.MapGen.HoleChance)))
             {
                 continue;
             }
 
-            // Определим узел.
             NodeType type = isCenter && profile.Center is NodeType centerType
                 ? centerType
                 : PickWeighted(rng, profile.NodeWeights);
             NodeTypeDef def = rules.NodeTypes[type];
 
-            // Даем рандомный бонус патча узлу.
             int patch = def.BasePatch + profile.PatchBonus;
             if (!isCenter)
             {
-                patch += rng.Next(3) - 1; // -1, 0, 1.
+                patch += rng.Next(3) - 1;
             }
 
             world.Type[hex] = type;
@@ -179,6 +161,105 @@ public static class MapGen
             world.Name[hex] = $"{rng.Pick(profile.NamePool)} {nameIndex++}";
         }
     }
+
+
+    /// <summary>
+    /// Метод объединения кластеров.
+    /// </summary>
+    /// <param name="centers">Список центров, которые будут соединены.</param>
+    /// <param name="extraEdges">Дополнительные ребра для обходных путей.</param>
+    /// <returns>Список кортежей объедененных кластеров.</returns>
+    internal static List<(int A, int B)> SpanningEdges(IReadOnlyList<Hex> centers, int extraEdges)
+    {
+        List<(int A, int B)> edges = [];
+        HashSet<int> inTree = [0];
+
+        // Пока не все в дереве — добавляем кратчайшее ребро.
+        while (inTree.Count < centers.Count)
+        {
+            (int A, int B) best = (-1, -1);
+            int bestDist = int.MaxValue;
+            for (int a = 0; a < centers.Count; a++)
+            {
+                if (!inTree.Contains(a))
+                {
+                    continue;
+                }
+
+                for (int b = 0; b < centers.Count; b++)
+                {
+                    int dist = centers[a].DistanceTo(centers[b]);
+                    if (!inTree.Contains(b) && dist < bestDist)
+                    {
+                        best = (a, b);
+                        bestDist = dist;
+                    }
+                }
+            }
+
+            edges.Add(best);
+            inTree.Add(best.B);
+        }
+
+        // Лишние рёбра — кратчайшие из оставшихся, для обходных путей.
+        List<(int A, int B)> candidates = [];
+        for (int a = 0; a < centers.Count; a++)
+        {
+            for (int b = a + 1; b < centers.Count; b++)
+            {
+                if (!edges.Contains((a, b)) && !edges.Contains((b, a)))
+                {
+                    candidates.Add((a, b));
+                }
+            }
+        }
+
+        candidates.Sort((x, y) => centers[x.A].DistanceTo(centers[x.B]).CompareTo(centers[y.A].DistanceTo(centers[y.B])));
+        edges.AddRange(candidates.Take(extraEdges));
+        return edges;
+    }
+
+
+    /// <summary>
+    /// Метод постройки коридоров в виде линий.
+    /// </summary>
+    /// <param name="world">Инфа о мире.</param>
+    /// <param name="rules">Правила игры.</param>
+    /// <param name="rng">Экземпляр генератора.</param>
+    /// <param name="from">От какого гекса строим коридор.</param>
+    /// <param name="to">Целевой гекс, где коридор заканчивается.</param>
+    internal static void BuildCorridor(World world, Rules rules, Rng rng, Hex from, Hex to)
+    {
+        int placed = 0;
+        foreach (Hex hex in from.LineTo(to))
+        {
+            if (!world.Type.Contains(hex) || world.IsNode(hex))
+            {
+                continue;
+            }
+
+            NodeType type = placed % 2 == 0 ? NodeType.Router : NodeType.IoT;
+            NodeTypeDef def = rules.NodeTypes[type];
+            world.Type[hex] = type;
+            world.Os[hex] = PickWeighted(rng, def.OsWeights);
+            world.Patch[hex] = def.BasePatch;
+            world.Name[hex] = $"edge {placed}";
+            placed++;
+        }
+    }
+
+
+    /// <summary>
+    /// Метод возврата флага, соединены ли два гекса между собой.
+    /// </summary>
+    /// <param name="world">Инфа о мире.</param>
+    /// <param name="from">Откуда начинается коридор.</param>
+    /// <param name="to">Где заканчивается коридор.</param>
+    /// <returns>Флаг соединения.</returns>
+    internal static bool Connected(World world, Hex from, Hex to) =>
+        world.IsNode(from)
+        && world.IsNode(to)
+        && Search.Bfs(from, hex => world.Neighbors(hex).Where(world.IsNode)).Contains(to);
 
 
     /// <summary>
@@ -198,4 +279,26 @@ public static class MapGen
         NodeType.Controller => 'C',
         _ => '?',
     };
+
+
+    /// <summary>
+    /// Метод возврата списка 6 соседей внутри карты
+    /// и не дальше <paramref name="radius"/> от <paramref name="center"/>.
+    /// </summary>
+    /// <param name="world">Инфа о мире.</param>
+    /// <param name="hex">У кого берем соседей.</param>
+    /// <param name="center">Центральный гекс у кластера.</param>
+    /// <param name="radius">Радиус поиска.</param>
+    /// <returns>[TODO:return]</returns>
+    private static IEnumerable<Hex> InRadius(World world, Hex hex, Hex center, int radius)
+    {
+        for (int dir = 0; dir < Hex.Directions.Length; dir++)
+        {
+            Hex next = hex.Neighbor(dir);
+            if (world.Type.Contains(next) && center.DistanceTo(next) <= radius)
+            {
+                yield return next;
+            }
+        }
+    }
 }

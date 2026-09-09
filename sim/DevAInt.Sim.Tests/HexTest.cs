@@ -148,7 +148,7 @@ public class HexTest
         Hex a = new(q1, r1);
         Hex b = new(q2, r2);
 
-        Hex[] line = a.LineTo(b).ToArray();
+        Hex[] line = [.. a.LineTo(b)];
 
         Assert.Equal(a.DistanceTo(b) + 1, line.Length);
         Assert.Equal(a, line[0]);
@@ -166,8 +166,8 @@ public class HexTest
         Hex a = new(1, -4);
         Hex b = new(6, 2);
 
-        Hex[] forward = a.LineTo(b).ToArray();
-        Hex[] backward = b.LineTo(a).Reverse().ToArray();
+        Hex[] forward = [.. a.LineTo(b)];
+        Hex[] backward = [.. b.LineTo(a).Reverse()];
 
         Assert.Equal(forward, backward);
     }

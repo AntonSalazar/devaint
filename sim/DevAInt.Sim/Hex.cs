@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace DevAInt.Sim;
 
@@ -68,4 +69,41 @@ public readonly record struct Hex(int Q, int R)
     /// <returns>Вернет новый экземпляр клетки.</returns>
     public static Hex FromOffset(int col, int row) =>
         new(col - ((row - (row & 1)) / 2), row);
+
+
+    /// <summary>
+    /// Метод построения линии до целевого гекса.
+    /// </summary>
+    /// <param name="other">Целевой гекс</param>
+    /// <returns>Путь до целевого гекса.</returns>
+    public IEnumerable<Hex> LineTo(Hex other)
+    {
+        int n = DistanceTo(other);
+        for (int i = 0; i <= n; i++)
+        {
+            float t = n == 0 ? 0f : (float)i / n;
+            float q = Q + ((other.Q - Q) * t);
+            float r = R + ((other.R - R) * t);
+            float s = -q - r;
+
+            int rq = (int)MathF.Round(q);
+            int rr = (int)MathF.Round(r);
+            int rs = (int)MathF.Round(s);
+
+            float dq = MathF.Abs(rq - q);
+            float dr = MathF.Abs(rr - r);
+            float ds = MathF.Abs(rs - s);
+
+            if (dq > dr && dq > ds)
+            {
+                rq = -rr - rs;
+            }
+            else if (dr > ds)
+            {
+                rr = -rq - rs;
+            }
+
+            yield return new Hex(rq, rr);
+        }
+    }
 }

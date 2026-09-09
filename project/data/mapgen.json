@@ -5,13 +5,13 @@
   "minCenterDist": 7,
   "mirror": false,
   "sizes": [
-    { "factions": 2, "width": 26, "height": 20, "clusters": 7,  "datacenters": 1, "factories": 1, "links": { "backbone": 1, "vpn": 2, "sneakernet": 2 }, "minStartDist": 14 },
-    { "factions": 3, "width": 32, "height": 24, "clusters": 9, "datacenters": 2, "factories": 1, "links": { "backbone": 2, "vpn": 3, "sneakernet": 2 }, "minStartDist": 12 },
-    { "factions": 4, "width": 32, "height": 24, "clusters": 10, "datacenters": 2, "factories": 1, "links": { "backbone": 2, "vpn": 3, "sneakernet": 2 }, "minStartDist": 12 },
-    { "factions": 5, "width": 40, "height": 30, "clusters": 13, "datacenters": 2, "factories": 2, "links": { "backbone": 3, "vpn": 4, "sneakernet": 3 }, "minStartDist": 11 },
-    { "factions": 6, "width": 40, "height": 30, "clusters": 15, "datacenters": 3, "factories": 2, "links": { "backbone": 3, "vpn": 4, "sneakernet": 3 }, "minStartDist": 11 },
-    { "factions": 7, "width": 48, "height": 36, "clusters": 17, "datacenters": 3, "factories": 2, "links": { "backbone": 4, "vpn": 6, "sneakernet": 4 }, "minStartDist": 10 },
-    { "factions": 8, "width": 48, "height": 36, "clusters": 19, "datacenters": 3, "factories": 2, "links": { "backbone": 4, "vpn": 6, "sneakernet": 4 }, "minStartDist": 10 }
+    { "factions": 2, "width": 26, "height": 20, "clusters": 7, "extraCorridors": 2,  "datacenters": 1, "factories": 1, "links": { "backbone": 1, "vpn": 2, "sneakernet": 2 }, "minStartDist": 14 },
+    { "factions": 3, "width": 32, "height": 24, "clusters": 9, "extraCorridors": 3, "datacenters": 2, "factories": 1, "links": { "backbone": 2, "vpn": 3, "sneakernet": 2 }, "minStartDist": 12 },
+    { "factions": 4, "width": 32, "height": 24, "clusters": 10, "extraCorridors": 3, "datacenters": 2, "factories": 1, "links": { "backbone": 2, "vpn": 3, "sneakernet": 2 }, "minStartDist": 12 },
+    { "factions": 5, "width": 40, "height": 30, "clusters": 13, "extraCorridors": 4, "datacenters": 2, "factories": 2, "links": { "backbone": 3, "vpn": 4, "sneakernet": 3 }, "minStartDist": 11 },
+    { "factions": 6, "width": 40, "height": 30, "clusters": 15, "extraCorridors": 4, "datacenters": 3, "factories": 2, "links": { "backbone": 3, "vpn": 4, "sneakernet": 3 }, "minStartDist": 11 },
+    { "factions": 7, "width": 48, "height": 36, "clusters": 17, "extraCorridors": 5, "datacenters": 3, "factories": 2, "links": { "backbone": 4, "vpn": 6, "sneakernet": 4 }, "minStartDist": 10 },
+    { "factions": 8, "width": 48, "height": 36, "clusters": 19, "extraCorridors": 5, "datacenters": 3, "factories": 2, "links": { "backbone": 4, "vpn": 6, "sneakernet": 4 }, "minStartDist": 10 }
   ],
   "profiles": [
     {
