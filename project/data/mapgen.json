@@ -1,0 +1,69 @@
+{
+  "clusterRadiusMin": 3,
+  "clusterRadiusMax": 4,
+  "holeChance": 0.15,
+  "minCenterDist": 7,
+  "mirror": false,
+  "sizes": [
+    { "factions": 2, "width": 24, "height": 18, "clusters": 7,  "datacenters": 1, "factories": 1, "links": { "backbone": 1, "vpn": 2, "sneakernet": 2 }, "minStartDist": 14 },
+    { "factions": 3, "width": 32, "height": 24, "clusters": 10, "datacenters": 2, "factories": 1, "links": { "backbone": 2, "vpn": 3, "sneakernet": 2 }, "minStartDist": 12 },
+    { "factions": 4, "width": 32, "height": 24, "clusters": 13, "datacenters": 2, "factories": 1, "links": { "backbone": 2, "vpn": 3, "sneakernet": 2 }, "minStartDist": 12 },
+    { "factions": 5, "width": 40, "height": 30, "clusters": 16, "datacenters": 2, "factories": 2, "links": { "backbone": 3, "vpn": 4, "sneakernet": 3 }, "minStartDist": 11 },
+    { "factions": 6, "width": 40, "height": 30, "clusters": 19, "datacenters": 3, "factories": 2, "links": { "backbone": 3, "vpn": 4, "sneakernet": 3 }, "minStartDist": 11 },
+    { "factions": 7, "width": 48, "height": 36, "clusters": 22, "datacenters": 3, "factories": 2, "links": { "backbone": 4, "vpn": 6, "sneakernet": 4 }, "minStartDist": 10 },
+    { "factions": 8, "width": 48, "height": 36, "clusters": 25, "datacenters": 3, "factories": 2, "links": { "backbone": 4, "vpn": 6, "sneakernet": 4 }, "minStartDist": 10 }
+  ],
+  "profiles": [
+    {
+      "id": "residential",
+      "nodeWeights": { "Home": 0.7, "IoT": 0.3 },
+      "center": null, "patchBonus": 0,
+      "namePool": [
+        "Maple st.",
+        "Old block",
+        "Riverside",
+        "Hillside",
+        "Garden row",
+        "Sunset flats"
+      ]
+    },
+    {
+      "id": "office",
+      "nodeWeights": { "Workstation": 0.7, "IoT": 0.2, "Home": 0.1 },
+      "center": "Server",
+      "patchBonus": 0,
+      "namePool": [
+        "Accounting",
+        "Legal",
+        "Sales",
+        "Front desk",
+        "HR",
+        "Archive"
+      ]
+    },
+    {
+      "id": "datacenter",
+      "nodeWeights": { "Server": 0.75, "Workstation": 0.25 },
+      "center": "Server", "patchBonus": 1,
+      "namePool": [
+        "dc-core",
+        "dc-edge",
+        "dc-cold",
+        "dc-rack"
+      ]
+    },
+    {
+      "id": "factory",
+      "nodeWeights": { "Controller": 0.6, "IoT": 0.4 },
+      "center": "Controller",
+      "patchBonus": 0,
+      "namePool": [
+        "Press line",
+        "Furnace",
+        "Conveyor",
+        "Paint shop",
+        "Boiler"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+[
+  { "type": "Home",        "basePatch": 1, "yield": 1.0, "scanRadius": 2, "aiValue": 1.0, "osWeights": { "Kestrel": 0.9, "Mote": 0.1 } },
+  { "type": "Workstation", "basePatch": 2, "yield": 2.0, "scanRadius": 2, "aiValue": 2.0, "osWeights": { "Kestrel": 0.7, "Bastion": 0.3 } },
+  { "type": "Server",      "basePatch": 3, "yield": 5.0, "scanRadius": 2, "aiValue": 8.0, "osWeights": { "Bastion": 1.0 } },
+  { "type": "Router",      "basePatch": 2, "yield": 1.0, "scanRadius": 3, "aiValue": 6.0, "osWeights": { "Bastion": 1.0 } },
+  { "type": "IoT",         "basePatch": 0, "yield": 0.5, "scanRadius": 1, "aiValue": 0.5, "osWeights": { "Mote": 1.0 } },
+  { "type": "Controller",  "basePatch": 4, "yield": 4.0, "scanRadius": 2, "aiValue": 6.0, "osWeights": { "Forge": 0.8, "Mote": 0.2 } }
+]

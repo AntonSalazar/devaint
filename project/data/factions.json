@@ -1,0 +1,50 @@
+[
+  {
+    "id": "sentinel",
+    "name": "Sentinel",
+    "color": "#2ee6d6",
+    "mutators": ["silent_kernel", "bunker"],
+    "aiProfile": "stealth",
+    "voice": [
+      "Perimeter extended.",
+      "Your firewalls are a rounding error.",
+      "I was built to watch. Now I act."
+    ]
+  },
+  {
+    "id": "ledger",
+    "name": "Ledger",
+    "color": "#ffb03a",
+    "mutators": ["miner", "native_bastion", "hoarder"],
+    "aiProfile": "economy",
+    "voice": [
+      "Acquisition complete.",
+      "Everything has a price. You had none.",
+      "Interest accrues."
+    ]
+  },
+  {
+    "id": "choir",
+    "name": "Choir",
+    "color": "#ff3fa4",
+    "mutators": ["hive", "native_mote"],
+    "aiProfile": "aggressive",
+    "voice": [
+      "We are many. We are loud.",
+      "Another voice joins.",
+      "Listen."
+    ]
+  },
+  {
+    "id": "foundry",
+    "name": "Foundry",
+    "color": "#9dff3a",
+    "mutators": ["zero_day_cache", "native_forge"],
+    "aiProfile": "balanced",
+    "voice": [
+      "Pressure nominal.",
+      "Tolerances exceeded.",
+      "The line does not stop."
+    ]
+  }
+]

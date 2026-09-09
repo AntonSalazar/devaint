@@ -1,0 +1,196 @@
+[
+  {
+    "id": "silent_kernel",
+    "name": "Silent kernel",
+    "description": "Actions make half the noise.",
+    "tags": [
+      "stealth"
+    ],
+    "mutatorCost": 2,
+    "computeCost": 25,
+    "requires": [],
+    "noiseMult": 0.5
+  },
+  {
+    "id": "silent_kernel_2",
+    "name": "Silent kernel II",
+    "description": "Half the noise again.",
+    "tags": [
+      "stealth"
+    ],
+    "mutatorCost": 0,
+    "computeCost": 45,
+    "requires": [
+      "silent_kernel"
+    ],
+    "noiseMult": 0.5
+  },
+  {
+    "id": "bunker",
+    "name": "Bunker",
+    "description": "Hardening is +1 stronger.",
+    "tags": [
+      "stealth"
+    ],
+    "mutatorCost": 1,
+    "computeCost": 15,
+    "requires": [],
+    "hardenBonus": 1
+  },
+  {
+    "id": "miner",
+    "name": "Miner",
+    "description": "Compute income ×1.25.",
+    "tags": [
+      "economy"
+    ],
+    "mutatorCost": 1,
+    "computeCost": 20,
+    "requires": [],
+    "computeMult": 1.25
+  },
+  {
+    "id": "miner_2",
+    "name": "Miner II",
+    "description": "Another ×1.25 to income.",
+    "tags": [
+      "economy"
+    ],
+    "mutatorCost": 0,
+    "computeCost": 40,
+    "requires": [
+      "miner"
+    ],
+    "computeMult": 1.25
+  },
+  {
+    "id": "native_kestrel",
+    "name": "Native: Kestrel",
+    "description": "+1 Power to exploits against Kestrel.",
+    "tags": [
+      "offense"
+    ],
+    "mutatorCost": 1,
+    "computeCost": 20,
+    "requires": [],
+    "powerBonus": {
+      "Kestrel": 1
+    }
+  },
+  {
+    "id": "native_bastion",
+    "name": "Native: Bastion",
+    "description": "+1 Power to exploits against Bastion.",
+    "tags": [
+      "offense"
+    ],
+    "mutatorCost": 1,
+    "computeCost": 20,
+    "requires": [],
+    "powerBonus": {
+      "Bastion": 1
+    }
+  },
+  {
+    "id": "native_mote",
+    "name": "Native: Mote",
+    "description": "+1 Power to exploits against Mote.",
+    "tags": [
+      "offense"
+    ],
+    "mutatorCost": 1,
+    "computeCost": 20,
+    "requires": [],
+    "powerBonus": {
+      "Mote": 1
+    }
+  },
+  {
+    "id": "native_forge",
+    "name": "Native: Forge",
+    "description": "+1 Power to exploits against Forge.",
+    "tags": [
+      "offense"
+    ],
+    "mutatorCost": 1,
+    "computeCost": 20,
+    "requires": [],
+    "powerBonus": {
+      "Forge": 1
+    }
+  },
+  {
+    "id": "hoarder",
+    "name": "Hoarder",
+    "description": "+1 to max charges per slot.",
+    "tags": [
+      "offense"
+    ],
+    "mutatorCost": 1,
+    "computeCost": 15,
+    "requires": [],
+    "extraCharges": 1
+  },
+  {
+    "id": "zero_day_cache",
+    "name": "Zero-day cache",
+    "description": "First daemon starts with a zero-day.",
+    "tags": [
+      "offense"
+    ],
+    "mutatorCost": 2,
+    "computeCost": 0,
+    "requires": [],
+    "startingExploit": "zd_kestrel_t4"
+  },
+  {
+    "id": "swift",
+    "name": "Swift",
+    "description": "+1 action point for daemons.",
+    "tags": [
+      "mobility"
+    ],
+    "mutatorCost": 2,
+    "computeCost": 35,
+    "requires": [],
+    "extraActionPoints": 1
+  },
+  {
+    "id": "optic",
+    "name": "Optic",
+    "description": "Scan radius +1.",
+    "tags": [
+      "mobility"
+    ],
+    "mutatorCost": 1,
+    "computeCost": 15,
+    "requires": [],
+    "scanRadiusBonus": 1
+  },
+  {
+    "id": "hive",
+    "name": "Hive",
+    "description": "+1 to daemon limit.",
+    "tags": [
+      "swarm"
+    ],
+    "mutatorCost": 2,
+    "computeCost": 30,
+    "requires": [],
+    "extraDaemonSlots": 1
+  },
+  {
+    "id": "wide_slots",
+    "name": "Wide slots",
+    "description": "+1 exploit slot for daemons.",
+    "tags": [
+      "swarm"
+    ],
+    "mutatorCost": 0,
+    "computeCost": 30,
+    "requires": [
+      "hive"
+    ],
+    "extraSlotLimit": 1
+  }
+]

@@ -1,0 +1,7 @@
+[
+  { "id": "balanced",   "useSpecialRules": true,  "weights": { "router": 1.0, "server": 1.5, "enemy": 1.0, "dist": 0.5, "scan": 0.8, "hold": 1.0, "stealth": 1.0, "leader": 0.5 } },
+  { "id": "aggressive", "useSpecialRules": true,  "weights": { "router": 1.2, "server": 2.0, "enemy": 1.6, "dist": 0.4, "scan": 0.6, "hold": 0.5, "stealth": 0.4, "leader": 0.8 } },
+  { "id": "stealth",    "useSpecialRules": true,  "weights": { "router": 1.0, "server": 1.2, "enemy": 0.8, "dist": 0.5, "scan": 1.0, "hold": 1.4, "stealth": 1.8, "leader": 0.4 } },
+  { "id": "economy",    "useSpecialRules": true,  "weights": { "router": 0.9, "server": 1.8, "enemy": 0.7, "dist": 0.6, "scan": 0.8, "hold": 1.2, "stealth": 0.8, "leader": 0.5 } },
+  { "id": "easy",       "useSpecialRules": false, "weights": { "router": 1.0, "server": 1.0, "enemy": 1.0, "dist": 0.5, "scan": 0.5, "hold": 0.5, "stealth": 0.5, "leader": 0.0 } }
+]

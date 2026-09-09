@@ -1,0 +1,32 @@
+[
+  {
+    "id": "burnout", "name": "Vulnerability closed",
+    "text": "{exploit}: vulnerability closed, Power −1 for everyone",
+    "trigger": { "kind": "ExposureLimit" },
+    "effect": { "kind": "Burnout", "amount": 1, "limitMultiplier": 2 }
+  },
+  {
+    "id": "patch_wave", "name": "Patch wave",
+    "text": "Patch for {os}: every node on this OS gets Patch +1",
+    "trigger": { "kind": "Schedule", "schedule": [ { "fromTurn": 1, "every": 8 }, { "fromTurn": 21, "every": 5 }, { "fromTurn": 41, "every": 3 } ] },
+    "effect": { "kind": "PatchWave", "amount": 1 }
+  },
+  {
+    "id": "audit", "name": "Audit",
+    "text": "Audit: {node} wiped clean",
+    "trigger": { "kind": "EveryTurn" },
+    "effect": { "kind": "Audit", "amount": 1 }
+  },
+  {
+    "id": "link_outage", "name": "Link outage",
+    "text": "Link {link} down for {duration} turns",
+    "trigger": { "kind": "Chance", "fromTurn": 15, "chance": 0.1 },
+    "effect": { "kind": "LinkOutage", "duration": 3 }
+  },
+  {
+    "id": "migration", "name": "Migration",
+    "text": "{node} migrated to another OS",
+    "trigger": { "kind": "Chance", "fromTurn": 20, "chance": 0.05 },
+    "effect": { "kind": "Migration" }
+  }
+]

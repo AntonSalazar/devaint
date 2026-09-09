@@ -1,0 +1,29 @@
+{
+  "maxFactions": 8,
+  "actionPoints": 3,
+  "slotLimit": 3,
+  "spawnCost": 15,
+  "hardenCost": 6,
+  "hardenMax": 3,
+  "noiseDecay": 0.8,
+  "noiseVisible": 0.5,
+  "noiseAudit": 0.8,
+  "scanNoise": 0.1,
+  "hardenNoise": 0.2,
+  "startCompute": 20,
+  "lateStartBonus": 3,
+  "startingExploits": ["kestrel_t1", "mote_t1"],
+  "victory": [
+    { "factions": 2, "dominationShare": 0.60, "turnLimit": 60 },
+    { "factions": 3, "dominationShare": 0.50, "turnLimit": 80 },
+    { "factions": 4, "dominationShare": 0.50, "turnLimit": 80 },
+    { "factions": 5, "dominationShare": 0.40, "turnLimit": 100 },
+    { "factions": 6, "dominationShare": 0.40, "turnLimit": 100 },
+    { "factions": 7, "dominationShare": 0.35, "turnLimit": 120 },
+    { "factions": 8, "dominationShare": 0.35, "turnLimit": 120 }
+  ],
+  "requireAllRouters": true,
+  "sharedVision": true,
+  "alliesAdjacent": true,
+  "mutatorBudget": 3
+}
