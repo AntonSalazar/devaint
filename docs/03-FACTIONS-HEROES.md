@@ -26,7 +26,7 @@
 
 ## 2. Модификатор — одна структура для мутатора и генома
 
-```
+```csharp
 Modifier {
   Id, Name, Description
   Tags                 // ветка: stealth | economy | offense | mobility | swarm
@@ -80,7 +80,7 @@ Compute. Геном — единственная «наука», и он мал�
 Герой — юнит фракции. В коде, данных и UI — **`Daemon`** (фоновый процесс,
 отпочкованный ИИ); «герой» в прозе доков — аналогия с Героями:
 
-```
+```csharp
 Daemon {
   Id, FactionId, Name
   Pos: Hex                 // всегда свой узел

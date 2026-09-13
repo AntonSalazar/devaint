@@ -35,7 +35,7 @@
 
 ## Сборки
 
-```
+```text
 .editorconfig               — общий стиль C# для обеих сборок
 sim/
   DevAInt.Sim/              — чистая симуляция (net8.0 classlib, без Godot)
