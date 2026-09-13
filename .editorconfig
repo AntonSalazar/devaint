@@ -17,6 +17,9 @@ csharp_style_expression_bodied_methods = when_on_single_line
 csharp_style_expression_bodied_local_functions = when_on_single_line
 # Неиспользованный возврат (fire-and-forget вроде `msg.Push()`) - не предупреждение
 dotnet_diagnostic.IDE0058.severity = none
+# Цепочки guard-`if` с `return Verdict.No(...)` не сворачивать в тернарники: правила читаются сверху вниз
+csharp_style_prefer_conditional_expression_over_return = false
+dotnet_diagnostic.IDE0046.severity = none
 
 # StyleCop: включена только категория Ordering (порядок членов класса),
 # остальные категории дублируют dotnet format или слишком шумные
