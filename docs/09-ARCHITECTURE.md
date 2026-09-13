@@ -1,12 +1,12 @@
 # Архитектура (принято)
 
-> Godot 4.7 mono, C# / net8.0. Структуры данных — в `10-DATA-MODEL.md`.
+> Godot 4.7 mono, C# / net10.0. Структуры данных — в `10-DATA-MODEL.md`.
 
 ## Принципы
 
 1. **Ноль внешних зависимостей в Godot.** Никаких аддонов и плагинов —
    весь код свой, шейдеры свои.
-2. **Игровой код — C#** (godot-mono 4.7.2, net8.0, Nullable).
+2. **Игровой код — C#** (godot-mono 4.7.2, net10.0, Nullable).
    Стиль — официальный Godot через `.editorconfig` + StyleCop,
    `just format` / проверка в `just test`. GDScript — только каркас
    тестового раннера (`tests/test_runner.gd`, `test_case.gd`,
@@ -38,7 +38,7 @@
 ```text
 .editorconfig               — общий стиль C# для обеих сборок
 sim/
-  DevAInt.Sim/              — чистая симуляция (net8.0 classlib, без Godot)
+  DevAInt.Sim/              — чистая симуляция (net10.0 classlib, без Godot)
   DevAInt.Sim.Tests/        — xUnit-тесты симуляции (`dotnet test`)
   DevAInt.Sim.Tool/         — консольные инструменты без Godot: `just map` (дамп карты), позже `just balance`
 project/

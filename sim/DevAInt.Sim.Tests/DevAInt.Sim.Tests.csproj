@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- xUnit-тесты симуляции: net10.0 — единственный установленный рантайм; net8.0-библиотеку он подхватывает. -->
+  <!-- xUnit-тесты симуляции: net10.0, как и все сборки проекта. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>DevAInt.Sim.Tests</RootNamespace>
