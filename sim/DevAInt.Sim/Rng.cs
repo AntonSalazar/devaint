@@ -13,10 +13,11 @@ namespace DevAInt.Sim;
 public sealed class Rng(int seed)
 {
     /// <summary>
-    /// Текущее состояние генератора.
-    /// При инициализации задается зерно.
+    /// Внутреннее состояние генератора.
+    /// Читается, чтобы сохранить его в <see cref="RunState"/>, и записывается,
+    /// чтобы продолжить ту же последовательность после загрузки сейва.
     /// </summary>
-    private ulong _state = ((ulong)(uint)seed + 1) * 0x9E3779B97F4A7C15UL; // Домножение на "золотое сечение" (2⁶⁴/φ).
+    public ulong State { get; set; } = ((ulong)(uint)seed + 1) * 0x9E3779B97F4A7C15UL; // Домножение на "золотое сечение" (2⁶⁴/φ).
 
 
     /// <summary>
@@ -26,11 +27,11 @@ public sealed class Rng(int seed)
     /// <returns>Вернет сырое число.</returns>
     public ulong NextU64()
     {
-        _state ^= _state >> 12;
-        _state ^= _state << 25;
-        _state ^= _state >> 27;
+        State ^= State >> 12;
+        State ^= State << 25;
+        State ^= State >> 27;
         // Домножение на финальный размешиватель.
-        return _state * 0x2545F4914F6CDD1DUL;
+        return State * 0x2545F4914F6CDD1DUL;
     }
 
 

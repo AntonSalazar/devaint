@@ -125,7 +125,7 @@ public class RulesTest
         Assert.InRange(size.Clusters, 3, 12);
         Assert.True(size.Datacenters >= 1);
         Assert.True(gen.ClusterRadiusMin <= gen.ClusterRadiusMax);
-        Assert.True(gen.MinCenterDist >= 2 * gen.ClusterRadiusMax + 2, "clusters need a gap of at least two hexes for a corridor");
+        Assert.True(gen.MinCenterDist >= (2 * gen.ClusterRadiusMax) + 2, "clusters need a gap of at least two hexes for a corridor");
         Assert.True(size.MinTargetDist < size.Width, "target distance must fit the map");
     }
 

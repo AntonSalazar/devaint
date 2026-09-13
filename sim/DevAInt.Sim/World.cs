@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 using DevAInt.Sim.Data;
 
@@ -54,6 +55,32 @@ public sealed class World
             KnownBy[i] = new(width, height);
         }
         Links = [];
+    }
+
+
+    /// <summary>
+    /// Конструктор-копия: все слои и линки копируются, ссылок на оригинал не остаётся.
+    /// </summary>
+    /// <param name="other">Карта, которую копируем.</param>
+    private World(World other)
+    {
+        Width = other.Width;
+        Height = other.Height;
+        Type = other.Type.Clone();
+        Os = other.Os.Clone();
+        Patch = other.Patch.Clone();
+        Hardening = other.Hardening.Clone();
+        Owner = other.Owner.Clone();
+        Noise = other.Noise.Clone();
+        Name = other.Name.Clone();
+        KnownBy = new Layer<bool>[other.KnownBy.Length];
+        for (int i = 0; i < KnownBy.Length; i++)
+        {
+            KnownBy[i] = other.KnownBy[i].Clone();
+        }
+
+        // Link - record: `with { }` делает копию, чтобы DisabledUntilTurn у копии жил отдельно.
+        Links = [.. other.Links.Select(static link => link with { })];
     }
 
 
@@ -119,6 +146,13 @@ public sealed class World
     /// <param name="h">Целевой гекс.</param>
     /// <returns>Флаг, является ли гекс узлом.</returns>
     public bool IsNode(Hex h) => Type.Contains(h) && Type[h] != NodeType.Empty;
+
+
+    /// <summary>
+    /// Метод создания независимой копии карты.
+    /// </summary>
+    /// <returns>Вернет копию.</returns>
+    public World Clone() => new(this);
 
 
     /// <summary>

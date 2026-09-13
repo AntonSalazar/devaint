@@ -38,6 +38,18 @@ public sealed class Layer<T>
 
 
     /// <summary>
+    /// Конструктор-копия: тот же размер, те же значения, но свой массив.
+    /// </summary>
+    /// <param name="other">Слой, который копируем.</param>
+    private Layer(Layer<T> other)
+    {
+        Width = other.Width;
+        Height = other.Height;
+        _cells = (T[])other._cells.Clone();
+    }
+
+
+    /// <summary>
     /// Размер слоя в ширину.
     /// </summary>
     public int Width { get; }
@@ -61,6 +73,14 @@ public sealed class Layer<T>
         get => _cells[IndexOf(h)];
         set => _cells[IndexOf(h)] = value;
     }
+
+    /// <summary>
+    /// Метод создания независимой копии слоя.
+    /// Изменения в копии не трогают оригинал и наоборот.
+    /// </summary>
+    /// <returns>Вернет копию.</returns>
+    public Layer<T> Clone() => new(this);
+
 
     /// <summary>
     /// Метод проверки, содержится ли гекс в слое.
