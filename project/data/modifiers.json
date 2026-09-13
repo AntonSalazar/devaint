@@ -7,35 +7,7 @@
       "stealth"
     ],
     "mutatorCost": 2,
-    "computeCost": 25,
-    "requires": [],
     "noiseMult": 0.5
-  },
-  {
-    "id": "silent_kernel_2",
-    "name": "Silent kernel II",
-    "description": "Half the noise again.",
-    "tags": [
-      "stealth"
-    ],
-    "mutatorCost": 0,
-    "computeCost": 45,
-    "requires": [
-      "silent_kernel"
-    ],
-    "noiseMult": 0.5
-  },
-  {
-    "id": "bunker",
-    "name": "Bunker",
-    "description": "Hardening is +1 stronger.",
-    "tags": [
-      "stealth"
-    ],
-    "mutatorCost": 1,
-    "computeCost": 15,
-    "requires": [],
-    "hardenBonus": 1
   },
   {
     "id": "miner",
@@ -45,22 +17,6 @@
       "economy"
     ],
     "mutatorCost": 1,
-    "computeCost": 20,
-    "requires": [],
-    "computeMult": 1.25
-  },
-  {
-    "id": "miner_2",
-    "name": "Miner II",
-    "description": "Another ×1.25 to income.",
-    "tags": [
-      "economy"
-    ],
-    "mutatorCost": 0,
-    "computeCost": 40,
-    "requires": [
-      "miner"
-    ],
     "computeMult": 1.25
   },
   {
@@ -71,8 +27,6 @@
       "offense"
     ],
     "mutatorCost": 1,
-    "computeCost": 20,
-    "requires": [],
     "powerBonus": {
       "Kestrel": 1
     }
@@ -85,8 +39,6 @@
       "offense"
     ],
     "mutatorCost": 1,
-    "computeCost": 20,
-    "requires": [],
     "powerBonus": {
       "Bastion": 1
     }
@@ -99,8 +51,6 @@
       "offense"
     ],
     "mutatorCost": 1,
-    "computeCost": 20,
-    "requires": [],
     "powerBonus": {
       "Mote": 1
     }
@@ -113,8 +63,6 @@
       "offense"
     ],
     "mutatorCost": 1,
-    "computeCost": 20,
-    "requires": [],
     "powerBonus": {
       "Forge": 1
     }
@@ -127,8 +75,6 @@
       "offense"
     ],
     "mutatorCost": 1,
-    "computeCost": 15,
-    "requires": [],
     "extraCharges": 1
   },
   {
@@ -139,8 +85,6 @@
       "offense"
     ],
     "mutatorCost": 2,
-    "computeCost": 0,
-    "requires": [],
     "startingExploit": "zd_kestrel_t4"
   },
   {
@@ -151,8 +95,6 @@
       "mobility"
     ],
     "mutatorCost": 2,
-    "computeCost": 35,
-    "requires": [],
     "extraActionPoints": 1
   },
   {
@@ -163,21 +105,7 @@
       "mobility"
     ],
     "mutatorCost": 1,
-    "computeCost": 15,
-    "requires": [],
     "scanRadiusBonus": 1
-  },
-  {
-    "id": "hive",
-    "name": "Hive",
-    "description": "+1 to daemon limit.",
-    "tags": [
-      "swarm"
-    ],
-    "mutatorCost": 2,
-    "computeCost": 30,
-    "requires": [],
-    "extraDaemonSlots": 1
   },
   {
     "id": "wide_slots",
@@ -186,11 +114,7 @@
     "tags": [
       "swarm"
     ],
-    "mutatorCost": 0,
-    "computeCost": 30,
-    "requires": [
-      "hive"
-    ],
+    "mutatorCost": 2,
     "extraSlotLimit": 1
   }
 ]

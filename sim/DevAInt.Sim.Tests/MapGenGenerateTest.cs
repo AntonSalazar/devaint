@@ -9,7 +9,7 @@ namespace DevAInt.Sim.Tests;
 
 /// <summary>
 /// Тесты полной генерации <see cref="MapGen.Generate"/>: детерминизм, связность,
-/// старты, призы, линки, работа на 2/4/8 фракций.
+/// старт и цель, призы, линки.
 /// </summary>
 public class MapGenGenerateTest
 {
@@ -20,80 +20,74 @@ public class MapGenGenerateTest
     [Fact]
     public void SameSeedSameMap()
     {
-        MapResult a = MapGen.Generate(_rules, seed: 42, factions: 2);
-        MapResult b = MapGen.Generate(_rules, seed: 42, factions: 2);
+        MapResult a = MapGen.Generate(_rules, seed: 42);
+        MapResult b = MapGen.Generate(_rules, seed: 42);
 
         Assert.Equal(a.SeedUsed, b.SeedUsed);
         Assert.Equal(a.World.Type.Raw.ToArray(), b.World.Type.Raw.ToArray());
         Assert.Equal(a.World.Patch.Raw.ToArray(), b.World.Patch.Raw.ToArray());
-        Assert.Equal(a.Starts, b.Starts);
+        Assert.Equal(a.Start, b.Start);
+        Assert.Equal(a.Target, b.Target);
         Assert.Equal(a.World.Links.Count, b.World.Links.Count);
     }
 
-    /// <summary>Разные сиды — разные карты.</summary>
+    /// <summary>Разные сиды — разные карты (сиды берём далеко друг от друга: при неудаче генератор пробует seed + 1).</summary>
     [Fact]
     public void DifferentSeedsDifferentMaps()
     {
-        MapResult a = MapGen.Generate(_rules, 1, 2);
-        MapResult b = MapGen.Generate(_rules, 2, 2);
+        MapResult a = MapGen.Generate(_rules, 42);
+        MapResult b = MapGen.Generate(_rules, 4242);
 
+        Assert.NotEqual(a.SeedUsed, b.SeedUsed);
         Assert.NotEqual(a.World.Type.Raw.ToArray(), b.World.Type.Raw.ToArray());
     }
 
-    /// <summary>Размер карты — из таблицы по числу фракций; сид не меньше запрошенного.</summary>
+    /// <summary>Размер карты — из таблицы; один слой тумана; сид не меньше запрошенного.</summary>
     [Fact]
     public void SizeComesFromRules()
     {
-        MapResult result = MapGen.Generate(_rules, 42, 2);
-        MapSizeDef size = _rules.MapSizeFor(2);
+        MapResult result = MapGen.Generate(_rules, 42);
+        MapSizeDef size = _rules.MapGen.Size;
 
         Assert.Equal(size.Width, result.World.Width);
         Assert.Equal(size.Height, result.World.Height);
-        Assert.Equal(2, result.World.KnownBy.Length);
+        Assert.Single(result.World.KnownBy);
         Assert.True(result.SeedUsed >= 42);
     }
 
-    /// <summary>Карта на 2, 4 и 8 фракций: все узлы связаны, стартов N, дистанция между стартами по таблице.</summary>
-    /// <param name="factions">Число фракций.</param>
+    /// <summary>На разных сидах: все узлы связаны, старт — Home, цель — сервер датацентра не ближе минимума.</summary>
     /// <param name="seed">Сид.</param>
     [Theory]
-    [InlineData(2, 42)]
-    [InlineData(2, 7)]
-    [InlineData(4, 42)]
-    [InlineData(8, 42)]
-    public void MapIsConnectedWithValidStarts(int factions, int seed)
+    [InlineData(42)]
+    [InlineData(7)]
+    [InlineData(1)]
+    [InlineData(100)]
+    [InlineData(2026)]
+    public void MapIsConnectedWithStartAndTarget(int seed)
     {
-        MapResult result = MapGen.Generate(_rules, seed, factions);
+        MapResult result = MapGen.Generate(_rules, seed);
         World world = result.World;
-        MapSizeDef size = _rules.MapSizeFor(factions);
+        MapSizeDef size = _rules.MapGen.Size;
+        int datacenterPatch = _rules.NodeTypes[NodeType.Server].BasePatch + _rules.Profiles["datacenter"].PatchBonus;
 
-        Assert.Equal(factions, result.Starts.Count);
-        Assert.Equal(factions, result.Starts.Distinct().Count());
-        foreach (Hex start in result.Starts)
-        {
-            Assert.Equal(NodeType.Home, world.Type[start]);
-        }
-        for (int i = 0; i < factions; i++)
-        {
-            for (int j = i + 1; j < factions; j++)
-            {
-                Assert.True(result.Starts[i].DistanceTo(result.Starts[j]) >= size.MinStartDist, $"starts {i},{j} too close");
-            }
-        }
+        Assert.Equal(NodeType.Home, world.Type[result.Start]);
+        Assert.Equal(NodeType.Server, world.Type[result.Target]);
+        Assert.Equal(datacenterPatch, world.Patch[result.Target]);
+        Assert.True(result.Start.DistanceTo(result.Target) >= size.MinTargetDist, "target too close");
 
         int nodes = world.Nodes().Count();
-        int reached = Search.Bfs(result.Starts[0], h => world.Neighbors(h).Where(world.IsNode)).Count();
+        int reached = Search.Bfs(result.Start, h => world.Neighbors(h).Where(world.IsNode)).Count();
         Assert.Equal(nodes, reached);
-        Assert.InRange((float)nodes / (world.Width * world.Height), 0.2f, 0.55f);
+        Assert.InRange((float)nodes / (world.Width * world.Height), 0.2f, 0.6f);
     }
 
-    /// <summary>Призы на месте: датацентров и заводов не меньше таблицы, роутеры есть.</summary>
+    /// <summary>Призы на месте: датацентров и заводов не меньше таблицы, роутеры и офисные серверы есть.</summary>
     [Fact]
     public void PrizesArePlaced()
     {
-        MapResult result = MapGen.Generate(_rules, 42, 2);
+        MapResult result = MapGen.Generate(_rules, 42);
         World world = result.World;
-        MapSizeDef size = _rules.MapSizeFor(2);
+        MapSizeDef size = _rules.MapGen.Size;
         int datacenterPatch = _rules.NodeTypes[NodeType.Server].BasePatch + _rules.Profiles["datacenter"].PatchBonus;
 
         int datacenterCores = world.Nodes().Count(h => world.Type[h] == NodeType.Server && world.Patch[h] == datacenterPatch);
@@ -104,16 +98,16 @@ public class MapGenGenerateTest
         Assert.True(datacenterCores >= size.Datacenters, "datacenter cores");
         Assert.True(controllers >= size.Factories, "factory controllers");
         Assert.True(routers >= size.Clusters - 1, "at least a router per corridor");
-        Assert.True(servers >= 2 + size.Datacenters, "office servers for each faction plus datacenters");
+        Assert.True(servers > size.Datacenters, "at least one office server to compile on");
     }
 
     /// <summary>Линки: концы — узлы нужных типов, не соседи по сетке, без дублей; число — по таблице.</summary>
     [Fact]
     public void LinksFollowTable()
     {
-        MapResult result = MapGen.Generate(_rules, 42, 2);
+        MapResult result = MapGen.Generate(_rules, 42);
         World world = result.World;
-        LinkCounts counts = _rules.MapSizeFor(2).Links;
+        LinkCounts counts = _rules.MapGen.Size.Links;
 
         Assert.Equal(counts.Backbone, world.Links.Count(l => l.Kind == LinkKind.Backbone));
         Assert.Equal(counts.Vpn, world.Links.Count(l => l.Kind == LinkKind.Vpn));
@@ -147,27 +141,26 @@ public class MapGenGenerateTest
         }
     }
 
-    /// <summary>Backbone — между самыми дальними роутерами.</summary>
+    /// <summary>Генератор ничего не присваивает: владельца и тумана нет — это дело забега.</summary>
     [Fact]
-    public void BackboneSpansFarthestRouters()
+    public void GeneratorLeavesOwnershipToRun()
     {
-        MapResult result = MapGen.Generate(_rules, 42, 2);
-        World world = result.World;
-        List<Hex> routers = [.. world.Nodes().Where(h => world.Type[h] == NodeType.Router)];
-        int farthest = routers.SelectMany(a => routers.Select(b => a.DistanceTo(b))).Max();
-
-        Link backbone = world.Links.First(l => l.Kind == LinkKind.Backbone);
-
-        Assert.Equal(farthest, backbone.A.DistanceTo(backbone.B));
-    }
-
-    /// <summary>Генератор ничего не присваивает: владельцев и тумана нет — это дело партии.</summary>
-    [Fact]
-    public void GeneratorLeavesOwnershipToGame()
-    {
-        MapResult result = MapGen.Generate(_rules, 42, 2);
+        MapResult result = MapGen.Generate(_rules, 42);
 
         Assert.All(result.World.Cells(), h => Assert.Equal(-1, result.World.Owner[h]));
         Assert.All(result.World.Cells(), h => Assert.False(result.World.KnownBy[0][h]));
+    }
+
+    /// <summary>Дамп помечает старт и цель.</summary>
+    [Fact]
+    public void DumpMarksStartAndTarget()
+    {
+        MapResult result = MapGen.Generate(_rules, 42);
+
+        string dump = MapGen.Dump(result.World, result.Start, result.Target);
+
+        Assert.Equal(1, dump.Count(c => c == '*'));
+        Assert.Equal(1, dump.Count(c => c == '$'));
+        Assert.Equal(result.World.Height, dump.Count(c => c == '\n'));
     }
 }

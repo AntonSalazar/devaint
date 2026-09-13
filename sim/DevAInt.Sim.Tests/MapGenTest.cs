@@ -245,22 +245,23 @@ public class MapGenTest
         Assert.True(MapGen.Connected(world, a, b));
     }
 
-    /// <summary>ASCII-дамп: строка на ряд, нечётные ряды со сдвигом, старты помечены.</summary>
+    /// <summary>ASCII-дамп: строка на ряд, нечётные ряды со сдвигом, старт и цель помечены.</summary>
     [Fact]
     public void DumpRendersRowsWithOffset()
     {
-        World world = new(4, 3, factions: 2);
+        World world = new(4, 3, factions: 1);
         world.Type[Hex.FromOffset(1, 0)] = NodeType.Home;
-        world.Type[Hex.FromOffset(2, 1)] = NodeType.Server;
+        Hex target = Hex.FromOffset(2, 1);
+        world.Type[target] = NodeType.Server;
         Hex start = Hex.FromOffset(0, 2);
         world.Type[start] = NodeType.Home;
 
-        string dump = MapGen.Dump(world, [start]);
+        string dump = MapGen.Dump(world, start, target);
         string[] lines = dump.TrimEnd('\n').Split('\n');
 
         Assert.Equal(3, lines.Length);
         Assert.Equal(". h . .", lines[0]);
-        Assert.Equal(" . . S .", lines[1]);
+        Assert.Equal(" . . $ .", lines[1]);
         Assert.Equal("* . . .", lines[2]);
     }
 }

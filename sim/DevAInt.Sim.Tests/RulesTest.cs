@@ -19,15 +19,20 @@ public class RulesTest
     /// <summary>Загруженные один раз реальные данные.</summary>
     private static readonly Rules _real = Rules.Load(DataDir.Path);
 
-    /// <summary>Общие числа читаются.</summary>
+    /// <summary>Общие числа читаются и совпадают с 03-BALANCE.md.</summary>
     [Fact]
     public void CoreValuesLoaded()
     {
-        Assert.Equal(8, _real.Core.MaxFactions);
         Assert.Equal(3, _real.Core.ActionPoints);
+        Assert.Equal(3, _real.Core.SlotLimit);
+        Assert.Equal(5, _real.Core.PatchMax);
         Assert.Equal(3, _real.Core.MutatorBudget);
         Assert.Equal(0.8f, _real.Core.NoiseDecay);
-        Assert.True(_real.Core.SharedVision);
+        Assert.Equal(0.8f, _real.Core.NoiseAudit);
+        Assert.Equal(40, _real.Core.DawnTurn);
+        Assert.Equal(1, _real.Core.MoveCost);
+        Assert.Equal(1, _real.Core.ExploitCost);
+        Assert.True(_real.Core.ScorePerTurnLeft > 0 && _real.Core.ScorePerNode > 0);
     }
 
     /// <summary>Типы узлов: все, кроме Empty; веса ОС в сумме дают 1.</summary>
@@ -63,7 +68,7 @@ public class RulesTest
         Assert.Equal(4, _real.Exploits.Values.Count(e => e.Rarity == Rarity.ZeroDay));
     }
 
-    /// <summary>Инварианты баланса из 07 §8: T1 берёт Home/IoT, T2 — Workstation и неукреплённый Router, датацентр — T4.</summary>
+    /// <summary>Инварианты баланса из 03-BALANCE.md §7: T1 берёт Home/IoT, T2 — Workstation и Router, датацентр — T4.</summary>
     [Fact]
     public void BalanceInvariants()
     {
@@ -85,60 +90,43 @@ public class RulesTest
         Assert.All(_real.Core.StartingExploits, id => Assert.True(_real.Exploits.ContainsKey(id), id));
         foreach (Modifier mod in _real.Modifiers.Values)
         {
-            Assert.All(mod.Requires, req => Assert.True(_real.Modifiers.ContainsKey(req), $"{mod.Id} requires {req}"));
             if (mod.StartingExploit is not null)
             {
                 Assert.True(_real.Exploits.ContainsKey(mod.StartingExploit), $"{mod.Id} starting exploit");
             }
         }
-        foreach (FactionPresetDef preset in _real.Presets.Values)
-        {
-            Assert.All(preset.Mutators, id => Assert.True(_real.Modifiers.ContainsKey(id), $"{preset.Id} mutator {id}"));
-            Assert.True(_real.AiProfiles.ContainsKey(preset.AiProfile), $"{preset.Id} ai profile");
-        }
     }
 
-    /// <summary>Пресеты укладываются в бюджет мутаторов и используют только доступные как мутаторы записи.</summary>
+    /// <summary>Мутаторы: каждый стоит от 1 очка до бюджета, ветка-тег задана, коэффициенты читаются.</summary>
     [Fact]
-    public void PresetsFitMutatorBudget()
+    public void MutatorsFitBudgetAndHaveTag()
     {
-        foreach (FactionPresetDef preset in _real.Presets.Values)
-        {
-            int cost = preset.Mutators.Sum(id => _real.Modifiers[id].MutatorCost);
-            Assert.InRange(cost, 1, _real.Core.MutatorBudget);
-            Assert.All(preset.Mutators, id => Assert.True(_real.Modifiers[id].MutatorCost > 0, $"{id} is not a mutator"));
-        }
-    }
-
-    /// <summary>Модификаторы: у каждого есть хотя бы одна роль (мутатор или ген), ветка-тег задана.</summary>
-    [Fact]
-    public void ModifiersHaveRoleAndTag()
-    {
+        Assert.Equal(11, _real.Modifiers.Count);
         foreach (Modifier mod in _real.Modifiers.Values)
         {
-            Assert.True(mod.MutatorCost > 0 || mod.ComputeCost > 0, $"{mod.Id} is neither mutator nor gene");
+            Assert.InRange(mod.MutatorCost, 1, _real.Core.MutatorBudget);
             Assert.NotEmpty(mod.Tags);
         }
         Assert.Equal(0.5f, _real.Modifiers["silent_kernel"].NoiseMult);
         Assert.Equal(1, _real.Modifiers["native_forge"].PowerBonus![Os.Forge]);
         Assert.Equal(1f, _real.Modifiers["native_forge"].NoiseMult);
+        Assert.Equal(1, _real.Modifiers["wide_slots"].ExtraSlotLimit);
+        Assert.NotNull(_real.Modifiers["zero_day_cache"].StartingExploit);
     }
 
-    /// <summary>Таблицы по числу фракций заданы для каждого N от 2 до MaxFactions.</summary>
+    /// <summary>Карта забега: размеры в разумных границах, кластеры не сливаются, цель есть и достижима по дистанции.</summary>
     [Fact]
-    public void PerFactionTablesCoverAllCounts()
+    public void MapSizeIsSane()
     {
-        for (int n = 2; n <= _real.Core.MaxFactions; n++)
-        {
-            VictoryDef victory = _real.VictoryFor(n);
-            MapSizeDef size = _real.MapSizeFor(n);
-            Assert.InRange(victory.DominationShare, 0.3f, 0.7f);
-            Assert.True(victory.TurnLimit >= 60);
-            Assert.True(size.Width * size.Height > 0);
-            Assert.True(size.Clusters >= 2 * n, $"enough clusters for {n} factions");
-        }
-        Assert.Throws<ArgumentOutOfRangeException>(() => _real.VictoryFor(1));
-        Assert.Throws<ArgumentOutOfRangeException>(() => _real.MapSizeFor(_real.Core.MaxFactions + 1));
+        MapSizeDef size = _real.MapGen.Size;
+        MapGenDef gen = _real.MapGen;
+        Assert.InRange(size.Width, 12, 40);
+        Assert.InRange(size.Height, 10, 30);
+        Assert.InRange(size.Clusters, 3, 12);
+        Assert.True(size.Datacenters >= 1);
+        Assert.True(gen.ClusterRadiusMin <= gen.ClusterRadiusMax);
+        Assert.True(gen.MinCenterDist >= 2 * gen.ClusterRadiusMax + 2, "clusters need a gap of at least two hexes for a corridor");
+        Assert.True(size.MinTargetDist < size.Width, "target distance must fit the map");
     }
 
     /// <summary>События: пять штук, у расписания патчей фазы идут по возрастанию хода.</summary>
@@ -184,31 +172,42 @@ public class RulesTest
         Assert.Contains(_real.Exploits.Keys.First(), ex.Message);
     }
 
-    /// <summary>Битая ссылка (Requires на несуществующий модификатор) — ошибка загрузки с указанием Id.</summary>
+    /// <summary>Битая ссылка (StartingExploit на несуществующий эксплойт) — ошибка загрузки с указанием Id.</summary>
     [Fact]
     public void DanglingReferenceIsRejected()
     {
         using TempData data = new();
         data.Edit("modifiers.json", root =>
         {
-            JsonObject wide = root.AsArray().Select(n => n!.AsObject()).Single(o => o["id"]!.GetValue<string>() == "wide_slots");
-            wide["requires"] = new JsonArray("ghost");
+            JsonObject cache = root.AsArray().Select(n => n!.AsObject()).Single(o => o["id"]!.GetValue<string>() == "zero_day_cache");
+            cache["startingExploit"] = "ghost";
         });
 
         InvalidDataException ex = Assert.Throws<InvalidDataException>(() => Rules.Load(data.Dir));
         Assert.Contains("ghost", ex.Message);
     }
 
-    /// <summary>Цикл в Requires (hive ↔ wide_slots) — ошибка загрузки.</summary>
+    /// <summary>Мутатор с нулевой ценой — ошибка загрузки: бесплатных мутаторов нет.</summary>
     [Fact]
-    public void RequiresCycleIsRejected()
+    public void FreeMutatorIsRejected()
     {
         using TempData data = new();
         data.Edit("modifiers.json", root =>
         {
-            JsonObject hive = root.AsArray().Select(n => n!.AsObject()).Single(o => o["id"]!.GetValue<string>() == "hive");
-            hive["requires"] = new JsonArray("wide_slots");
+            JsonObject miner = root.AsArray().Select(n => n!.AsObject()).Single(o => o["id"]!.GetValue<string>() == "miner");
+            miner["mutatorCost"] = 0;
         });
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => Rules.Load(data.Dir));
+        Assert.Contains("miner", ex.Message);
+    }
+
+    /// <summary>Карта без датацентра — ошибка загрузки: забегу нужна цель.</summary>
+    [Fact]
+    public void MapWithoutDatacenterIsRejected()
+    {
+        using TempData data = new();
+        data.Edit("mapgen.json", root => root["size"]!["datacenters"] = 0);
 
         Assert.Throws<InvalidDataException>(() => Rules.Load(data.Dir));
     }
@@ -218,10 +217,10 @@ public class RulesTest
     public void MissingFileIsReported()
     {
         using TempData data = new();
-        File.Delete(Path.Combine(data.Dir, "ai.json"));
+        File.Delete(Path.Combine(data.Dir, "events.json"));
 
         Exception ex = Assert.ThrowsAny<Exception>(() => Rules.Load(data.Dir));
-        Assert.Contains("ai.json", ex.Message);
+        Assert.Contains("events.json", ex.Message);
     }
 
     /// <summary>Загрузка — детерминированная: дважды прочитанные данные равны по ключам и числам.</summary>
@@ -232,7 +231,7 @@ public class RulesTest
 
         Assert.Equal(_real.Exploits.Keys.OrderBy(k => k), again.Exploits.Keys.OrderBy(k => k));
         Assert.Equal(_real.Modifiers.Count, again.Modifiers.Count);
-        Assert.Equal(_real.Core.MaxFactions, again.Core.MaxFactions);
+        Assert.Equal(_real.Core.DawnTurn, again.Core.DawnTurn);
         Assert.Equal(_real.Core.StartingExploits, again.Core.StartingExploits);
         Assert.Equal(_real.NodeTypes.Values.Select(n => n.BasePatch), again.NodeTypes.Values.Select(n => n.BasePatch));
     }

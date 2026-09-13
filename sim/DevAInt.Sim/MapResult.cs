@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace DevAInt.Sim;
 
 
@@ -7,6 +5,7 @@ namespace DevAInt.Sim;
 /// Результат генерации карты.
 /// </summary>
 /// <param name="World">Инфа о мире.</param>
-/// <param name="Starts">Стартовые гексы по фракциям: <c>Starts[i]</c> — старт фракции i.</param>
+/// <param name="Start">Стартовый гекс daemon'а (Home в центре жилого кластера).</param>
+/// <param name="Target">Цель забега — сервер в центре датацентра.</param>
 /// <param name="SeedUsed">Сид, с которого карта реально сгенерировалась (после повторов).</param>
-public sealed record MapResult(World World, IReadOnlyList<Hex> Starts, int SeedUsed);
+public sealed record MapResult(World World, Hex Start, Hex Target, int SeedUsed);

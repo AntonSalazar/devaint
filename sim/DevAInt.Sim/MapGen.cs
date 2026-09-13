@@ -60,21 +60,20 @@ public static class MapGen
     /// </summary>
     /// <param name="rules">Правила игры.</param>
     /// <param name="seed">Сид.</param>
-    /// <param name="factions">Количество фракций.</param>
     /// <returns>Вернет сгенерированную карту.</returns>
-    public static MapResult Generate(Rules rules, int seed, int factions)
+    public static MapResult Generate(Rules rules, int seed)
     {
-        MapSizeDef size = rules.MapSizeFor(factions);
+        MapSizeDef size = rules.MapGen.Size;
         for (int retry = 0; retry < MaxRetries; retry++)
         {
-            MapResult? result = TryGenerate(rules, size, seed + retry, factions);
+            MapResult? result = TryGenerate(rules, size, seed + retry);
             if (result is not null)
             {
                 return result;
             }
         }
 
-        throw new InvalidOperationException($"no valid map for seed {seed} and {factions} factions after {MaxRetries} retries");
+        throw new InvalidOperationException($"no valid map for seed {seed} after {MaxRetries} retries");
     }
 
 
@@ -82,9 +81,10 @@ public static class MapGen
     /// Метод возврата дампа карты в виде текста.
     /// </summary>
     /// <param name="world">Инфа о мире.</param>
-    /// <param name="starts">Стартовые гексы.</param>
+    /// <param name="start">Стартовый гекс.</param>
+    /// <param name="target">Гекс цели.</param>
     /// <returns>Вернет карту символами, строка на ряд.</returns>
-    public static string Dump(World world, IReadOnlyList<Hex> starts)
+    public static string Dump(World world, Hex start, Hex target)
     {
         StringBuilder sb = new();
         for (int row = 0; row < world.Height; row++)
@@ -97,7 +97,7 @@ public static class MapGen
             for (int col = 0; col < world.Width; col++)
             {
                 Hex hex = Hex.FromOffset(col, row);
-                char glyph = starts.Contains(hex) ? '*' : Glyph(world.Type[hex]);
+                char glyph = hex == start ? '*' : hex == target ? '$' : Glyph(world.Type[hex]);
                 if (col > 0)
                 {
                     sb.Append(' ');
@@ -223,7 +223,7 @@ public static class MapGen
 
             world.Type[hex] = type;
             world.Os[hex] = PickWeighted(rng, def.OsWeights);
-            world.Patch[hex] = Math.Clamp(patch, 0, 5);
+            world.Patch[hex] = Math.Clamp(patch, 0, rules.Core.PatchMax);
             world.Name[hex] = $"{rng.Pick(profile.NamePool)} {nameIndex++}";
         }
     }
@@ -375,12 +375,11 @@ public static class MapGen
     /// <param name="rules">Правила игры.</param>
     /// <param name="size">Параметры карты для этого числа фракций.</param>
     /// <param name="seed">Сид попытки.</param>
-    /// <param name="factions">Количество фракций.</param>
     /// <returns>Вернет карту или null, если центры не разместились или валидация не прошла.</returns>
-    private static MapResult? TryGenerate(Rules rules, MapSizeDef size, int seed, int factions)
+    private static MapResult? TryGenerate(Rules rules, MapSizeDef size, int seed)
     {
         Rng rng = new(seed);
-        World world = new(size.Width, size.Height, factions);
+        World world = new(size.Width, size.Height, factions: 1);
 
         // Центры кластеров. Не влезли - пробуем другой сид.
         List<Hex> centers;
@@ -393,8 +392,8 @@ public static class MapGen
             return null;
         }
 
-        // Роли кластеров: старты уходят в начало списка центров.
-        string[] roles = AssignRoles(rng, size, centers, factions);
+        // Роли кластеров: старт — centers[0], датацентр-цель — centers[1].
+        string[] roles = AssignRoles(rng, size, centers);
 
         // Заливка.
         int radiusSpan = rules.MapGen.ClusterRadiusMax - rules.MapGen.ClusterRadiusMin + 1;
@@ -413,60 +412,50 @@ public static class MapGen
         // Линки.
         AddLinks(world, rng, size.Links);
 
-        // Старты - гарантированный Home с базовой защитой.
-        List<Hex> starts = [.. centers.Take(factions)];
+        // Старт - гарантированный Home с базовой защитой.
+        Hex start = centers[0];
         NodeTypeDef home = rules.NodeTypes[NodeType.Home];
-        foreach (Hex start in starts)
-        {
-            world.Type[start] = NodeType.Home;
-            world.Os[start] = PickWeighted(rng, home.OsWeights);
-            world.Patch[start] = home.BasePatch;
-        }
+        world.Type[start] = NodeType.Home;
+        world.Os[start] = PickWeighted(rng, home.OsWeights);
+        world.Patch[start] = home.BasePatch;
+
+        // Цель - центр датацентра, FillCluster уже поставил туда Server с бонусом к Patch.
+        Hex target = centers[1];
 
         // Вернем карту, если она прошла валидацию.
-        return IsValid(world, starts, size) ? new MapResult(world, starts, seed) : null;
+        return IsValid(world, start, target, size) ? new MapResult(world, start, target, seed) : null;
     }
 
 
     /// <summary>
     /// Метод назначения ролей кластерам.
-    /// Старты - farthest-point (каждый следующий максимально далек от уже выбранных),
-    /// датацентры - максимально далеки от всех стартов, остальное - случайно.
-    /// Стартовые центры переставляются в начало <paramref name="centers"/>.
+    /// Старт - случайный кластер, датацентры - максимально далеко от старта
+    /// (первый из них - цель забега), заводы - случайно, остальное - офисы
+    /// и жилые по очереди. Старт и цель переставляются в начало <paramref name="centers"/>.
     /// </summary>
     /// <param name="rng">Экземпляр генератора.</param>
     /// <param name="size">Параметры карты.</param>
     /// <param name="centers">Центры кластеров; порядок меняется.</param>
-    /// <param name="factions">Количество фракций.</param>
     /// <returns>Вернет Id профиля для каждого центра в новом порядке.</returns>
-    private static string[] AssignRoles(Rng rng, MapSizeDef size, List<Hex> centers, int factions)
+    private static string[] AssignRoles(Rng rng, MapSizeDef size, List<Hex> centers)
     {
         List<int> free = [.. Enumerable.Range(0, centers.Count)];
 
-        // Старты.
-        List<int> starts = [TakeRandom(rng, free)];
-        while (starts.Count < factions)
-        {
-            int best = free.MaxBy(i => starts.Min(s => centers[i].DistanceTo(centers[s])));
-            starts.Add(best);
-            free.Remove(best);
-        }
+        // Старт.
+        int start = TakeRandom(rng, free);
 
-        // Датацентры - спорные, подальше от всех стартов.
+        // Датацентры - подальше от старта; первый из них - цель.
         List<int> datacenters = [];
         while (datacenters.Count < size.Datacenters && free.Count > 0)
         {
-            int best = free.MaxBy(i => starts.Min(s => centers[i].DistanceTo(centers[s])));
+            int best = free.MaxBy(i => centers[i].DistanceTo(centers[start]));
             datacenters.Add(best);
             free.Remove(best);
         }
 
         // Раздаем роли.
         string[] roles = new string[centers.Count];
-        foreach (int i in starts)
-        {
-            roles[i] = ResidentialProfile;
-        }
+        roles[start] = ResidentialProfile;
         foreach (int i in datacenters)
         {
             roles[i] = DatacenterProfile;
@@ -475,17 +464,17 @@ public static class MapGen
         {
             roles[TakeRandom(rng, free)] = FactoryProfile;
         }
-        for (int k = 0; k < factions && free.Count > 0; k++)
-        {
-            roles[TakeRandom(rng, free)] = OfficeProfile;
-        }
+
+        // Остальное - офис, жилой, офис, жилой… Офисы первыми: без них негде компилировать.
+        bool office = true;
         while (free.Count > 0)
         {
-            roles[TakeRandom(rng, free)] = rng.Chance(0.5f) ? ResidentialProfile : OfficeProfile;
+            roles[TakeRandom(rng, free)] = office ? OfficeProfile : ResidentialProfile;
+            office = !office;
         }
 
-        // Старты - в начало, чтобы Starts[i] была фракция i.
-        int[] order = [.. starts, .. Enumerable.Range(0, centers.Count).Where(i => !starts.Contains(i))];
+        // Старт и цель - в начало: centers[0] старт, centers[1] цель.
+        int[] order = [start, .. datacenters, .. Enumerable.Range(0, centers.Count).Where(i => i != start && !datacenters.Contains(i))];
         List<Hex> reorderedCenters = [.. order.Select(i => centers[i])];
         string[] reorderedRoles = [.. order.Select(i => roles[i])];
         centers.Clear();
@@ -596,34 +585,30 @@ public static class MapGen
 
 
     /// <summary>
-    /// Метод валидации карты: все узлы связаны, старты не ближе минимальной дистанции.
+    /// Метод валидации карты: все узлы связаны, цель не ближе минимальной дистанции от старта.
     /// </summary>
     /// <param name="world">Инфа о мире.</param>
-    /// <param name="starts">Стартовые гексы.</param>
+    /// <param name="start">Стартовый гекс.</param>
+    /// <param name="target">Гекс цели.</param>
     /// <param name="size">Параметры карты.</param>
     /// <returns>Флаг, годится ли карта.</returns>
-    private static bool IsValid(World world, List<Hex> starts, MapSizeDef size)
+    private static bool IsValid(World world, Hex start, Hex target, MapSizeDef size)
     {
-        // Волна от первого старта должна накрыть все узлы.
+        // Цель должна быть сервером: центр датацентра.
+        if (world.Type[target] != NodeType.Server)
+        {
+            return false;
+        }
+
+        // Волна от старта должна накрыть все узлы.
         int nodes = world.Nodes().Count();
-        int reached = Search.Bfs(starts[0], h => world.Neighbors(h).Where(world.IsNode)).Count();
+        int reached = Search.Bfs(start, h => world.Neighbors(h).Where(world.IsNode)).Count();
         if (reached != nodes)
         {
             return false;
         }
 
-        // Старты не ближе минимальной дистанции.
-        for (int i = 0; i < starts.Count; i++)
-        {
-            for (int j = i + 1; j < starts.Count; j++)
-            {
-                if (starts[i].DistanceTo(starts[j]) < size.MinStartDist)
-                {
-                    return false;
-                }
-            }
-        }
-
-        return true;
+        // Цель не ближе минимальной дистанции.
+        return start.DistanceTo(target) >= size.MinTargetDist;
     }
 }
