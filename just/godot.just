@@ -30,6 +30,10 @@ test-sim:
 map seed="42":
     dotnet run --project sim/DevAInt.Sim.Tool/ -- map project/data {{seed}}
 
+# Play: забег в терминале от сида, мутаторы через пробел: `just play 42 miner optic`
+play seed="42" *mutators="":
+    dotnet run --project sim/DevAInt.Sim.Tool/ -- play project/data {{seed}} {{mutators}}
+
 # Format: поправить стиль C# по .editorconfig
 format:
     dotnet format project/DevAInt.sln

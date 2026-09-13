@@ -8,7 +8,7 @@ namespace DevAInt.Sim.Tool;
 
 /// <summary>
 /// Точка входа консольных инструментов симуляции.
-/// Использование: <c>map &lt;data-dir&gt; &lt;seed&gt;</c>.
+/// Использование: <c>map &lt;data-dir&gt; &lt;seed&gt;</c> или <c>play &lt;data-dir&gt; &lt;seed&gt; [mutator…]</c>.
 /// </summary>
 public static class Program
 {
@@ -24,8 +24,12 @@ public static class Program
             DumpMap(args[1], int.Parse(args[2]));
             return 0;
         }
+        if (args.Length >= 3 && args[0] == "play")
+        {
+            return Play.Run(args[1], int.Parse(args[2]), args[3..]);
+        }
 
-        Console.Error.WriteLine("usage: map <data-dir> <seed>");
+        Console.Error.WriteLine("usage: map <data-dir> <seed> | play <data-dir> <seed> [mutator...]");
         return 1;
     }
 

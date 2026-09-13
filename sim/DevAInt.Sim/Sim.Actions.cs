@@ -37,7 +37,7 @@ public static partial class Sim
             Lurk => CheckLurk(rules, state),
             Exploit exploit => CheckExploit(rules, state, exploit),
             Compile compile => CheckCompile(rules, state, compile),
-            EndTurn => Verdict.No("not implemented yet"),
+            EndTurn => Verdict.Yes,
             _ => Verdict.No($"unknown action {action}"),
         };
     }
@@ -77,6 +77,9 @@ public static partial class Sim
                 break;
             case Compile compile:
                 ApplyCompile(rules, state, compile, events);
+                break;
+            case EndTurn:
+                ApplyEndTurn(rules, state, events);
                 break;
             default:
                 throw new InvalidOperationException($"unknown action {action}");

@@ -21,6 +21,15 @@ public sealed class Rng(int seed)
 
 
     /// <summary>
+    /// Статичный метод восстановления генератора из сохранённого состояния.
+    /// Сид тут не важен: состояние сразу перезаписывается.
+    /// </summary>
+    /// <param name="state">Сохранённое состояние.</param>
+    /// <returns>Вернет генератор, продолжающий ту же последовательность.</returns>
+    public static Rng FromState(ulong state) => new(0) { State = state };
+
+
+    /// <summary>
     /// Метод генерации следующего сырого числа.
     /// Алгоритм xorshift64*.
     /// </summary>
