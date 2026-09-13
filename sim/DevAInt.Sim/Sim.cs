@@ -103,6 +103,42 @@ public static partial class Sim
 
 
     /// <summary>
+    /// Метод завершения забега: записать исход и счёт, добавить событие.
+    /// После этого <see cref="Check"/> отклоняет любые действия.
+    /// </summary>
+    /// <param name="rules">Правила игры.</param>
+    /// <param name="state">Состояние забега.</param>
+    /// <param name="outcome">Чем закончился.</param>
+    /// <param name="events">Куда складывать события.</param>
+    public static void FinishRun(Rules rules, RunState state, Outcome outcome, List<SimEvent> events)
+    {
+        state.Outcome = outcome;
+        state.Score = Score(rules, state, outcome);
+        events.Add(new RunEnded(state.Turn, outcome, state.Score));
+    }
+
+
+    /// <summary>
+    /// Метод подсчёта счёта (<c>01-RULES.md §9</c>): при победе - за каждый ход до рассвета
+    /// и за каждый свой узел; при поражении - только за узлы.
+    /// </summary>
+    /// <param name="rules">Правила игры.</param>
+    /// <param name="state">Состояние забега.</param>
+    /// <param name="outcome">Исход.</param>
+    /// <returns>Вернет счёт.</returns>
+    public static int Score(Rules rules, RunState state, Outcome outcome)
+    {
+        int owned = state.World.Nodes().Count(h => state.World.Owner[h] == Player);
+        int score = owned * rules.Core.ScorePerNode;
+        if (outcome == Outcome.Won)
+        {
+            score += (rules.Core.DawnTurn - state.Turn) * rules.Core.ScorePerTurnLeft;
+        }
+        return score;
+    }
+
+
+    /// <summary>
     /// Метод проверки набора мутаторов: все существуют, без повторов, в бюджете.
     /// Бросает <see cref="ArgumentException"/> с понятным текстом - это ошибка вызывающего, не правило игры.
     /// </summary>

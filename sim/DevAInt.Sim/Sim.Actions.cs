@@ -35,8 +35,8 @@ public static partial class Sim
             Move move => CheckMove(rules, state, move),
             Scan => CheckScan(rules, state),
             Lurk => CheckLurk(rules, state),
-            Exploit => Verdict.No("not implemented yet"),
-            Compile => Verdict.No("not implemented yet"),
+            Exploit exploit => CheckExploit(rules, state, exploit),
+            Compile compile => CheckCompile(rules, state, compile),
             EndTurn => Verdict.No("not implemented yet"),
             _ => Verdict.No($"unknown action {action}"),
         };
@@ -59,7 +59,7 @@ public static partial class Sim
             throw new InvalidOperationException($"illegal action {action}: {verdict.Reason}");
         }
 
-        // Move, Scan и Lurk событий не рождают; список пригодится Exploit, Compile и EndTurn.
+        // Move, Scan и Lurk событий не рождают; Exploit, Compile и EndTurn кладут сюда свои.
         List<SimEvent> events = [];
         switch (action)
         {
@@ -71,6 +71,12 @@ public static partial class Sim
                 break;
             case Lurk:
                 ApplyLurk(rules, state);
+                break;
+            case Exploit exploit:
+                ApplyExploit(rules, state, exploit, events);
+                break;
+            case Compile compile:
+                ApplyCompile(rules, state, compile, events);
                 break;
             default:
                 throw new InvalidOperationException($"unknown action {action}");
