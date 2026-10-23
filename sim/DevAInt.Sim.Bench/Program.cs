@@ -1,14 +1,16 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using DevAInt.Sim.Grid;
 using DevAInt.Sim.Logging;
 using DevAInt.Sim.Lua;
 using DevAInt.Sim.Mods;
+using DevAInt.Sim.Motion;
 using DevAInt.Sim.Stats;
 
 namespace DevAInt.Sim.Bench;
 
-/// <summary>Замеры тика sim на 1000 сущностей: только статы, хук tick с чтением статов, 1000 вызовов хука за тик.</summary>
+/// <summary>Замеры тика sim на 1000 сущностей: статы, хук tick, движение со стенами, 1000 вызовов хука за тик.</summary>
 internal static class Program
 {
     /// <summary>Число сущностей.</summary>
@@ -39,6 +41,7 @@ internal static class Program
                   for id = 1, {{Entities}} do sum = sum + stats.get(id, "core:hunger") end
                 end)
                 """);
+            MeasureWalking(temp);
             MeasureHookCalls(temp);
             return 0;
         }
@@ -59,6 +62,22 @@ internal static class Program
         }
 
         Measure(title, sim.Tick);
+    }
+
+    /// <summary>Все сущности идут по двору стартовой комнаты и упираются в стены.</summary>
+    private static void MeasureWalking(string mods)
+    {
+        File.WriteAllText(Path.Combine(mods, "bench", "scripts", "main.lua"), string.Empty);
+        Simulation sim = new(Load(mods), new ConsoleLog(), "core:starter_room");
+        for (int i = 0; i < Entities; i++)
+        {
+            // Разные стартовые точки и направления по двору, чтобы часть упиралась в стены
+            WorldPos start = new(2.5 + (i % 10), 2.5 + (i / 10 % 2), 0);
+            long id = sim.CreateEntity(start);
+            sim.Entity(id).Input = new MoveInput(Math.Cos(i), Math.Sin(i));
+        }
+
+        Measure("all entities walk with wall collisions", sim.Tick);
     }
 
     /// <summary>Худший случай: хук stat_threshold вызывается для каждой сущности каждый тик.</summary>

@@ -6,6 +6,9 @@ public sealed class GameClock(double minutesPerTick = GameClock.DefaultMinutesPe
     /// <summary>Тиков в реальную секунду.</summary>
     public const int TicksPerSecond = 10;
 
+    /// <summary>Реальных секунд за тик, в них считается движение.</summary>
+    public const double SecondsPerTick = 1.0 / TicksPerSecond;
+
     /// <summary>Игровых минут за тик по умолчанию: игровые сутки за реальный час, как в Zomboid.</summary>
     public const double DefaultMinutesPerTick = 24.0 * 60.0 / (60.0 * 60.0 * TicksPerSecond);
 

@@ -20,12 +20,12 @@ public class LuaTest
             end)
             """);
         long entity = run.Sim.CreateEntity();
-        run.Sim.EntityStats(entity).SetValue(run.Sim.StatTable.StatIndex("core:hunger"), 45);
+        run.Sim.Entity(entity).Stats.SetValue(run.Sim.StatTable.StatIndex("core:hunger"), 45);
 
         run.Sim.Tick();
 
         Assert.Equal(["[alpha] core:hungry 0->1"], run.Log.Infos);
-        Assert.Equal(50, run.Sim.EntityStats(entity).Value(run.Sim.StatTable.StatIndex("core:thirst")));
+        Assert.Equal(50, run.Sim.Entity(entity).Stats.Value(run.Sim.StatTable.StatIndex("core:thirst")));
     }
 
     /// <summary>Хук tick вызывается каждый тик, stats.get и stats.moodle читают сущность.</summary>
@@ -40,7 +40,7 @@ public class LuaTest
             end)
             """);
         run.Sim.CreateEntity();
-        run.Sim.EntityStats(1).SetValue(run.Sim.StatTable.StatIndex("core:hunger"), 75);
+        run.Sim.Entity(1).Stats.SetValue(run.Sim.StatTable.StatIndex("core:hunger"), 75);
 
         run.Sim.Tick();
         run.Sim.Tick();
