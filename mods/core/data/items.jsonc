@@ -1,0 +1,17 @@
+// Действия и предметы. Что делает предмет, описано в его применении: длительность в секундах симуляции,
+// тратится ли он и как меняются статы.
+{
+  "actions": [
+    { "id": "core:eat", "interruptOnMove": true },
+  ],
+  "items": [
+    {
+      "id": "core:apple",
+      "color": "#c0392b",
+      "uses": [
+        { "action": "core:eat", "seconds": 4, "consume": true,
+          "stats": [ { "stat": "core:hunger", "add": -25 } ] },
+      ],
+    },
+  ],
+}

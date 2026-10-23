@@ -59,13 +59,34 @@ public class ProtocolTest
         Assert.Equal([0f, 41.5f, 100f], Assert.IsType<OwnStatsMessage>(read.Messages[2]).Values);
     }
 
-    /// <summary>Ввод клиента туда и обратно.</summary>
+    /// <summary>Каждое сообщение клиента туда и обратно.</summary>
     [Fact]
-    public void InputRoundTrips()
+    public void ClientMessagesRoundTrip()
     {
-        InputMessage input = new(uint.MaxValue, -0.5f, 1f);
+        ClientMessage[] messages = [new InputMessage(uint.MaxValue, -0.5f, 1f), new StartActionMessage(123_456_789, 3), new CancelActionMessage()];
 
-        Assert.Equal(input, Protocol.ReadInput(Protocol.Write(input)));
+        foreach (ClientMessage message in messages)
+        {
+            Assert.Equal(message, Protocol.ReadClientMessage(Protocol.Write(message)));
+        }
+    }
+
+    /// <summary>Инвентарь и действия туда и обратно.</summary>
+    [Fact]
+    public void InventoryAndActionMessagesRoundTrip()
+    {
+        ServerFrame frame = new(7,
+        [
+            new OwnInventoryMessage([new ItemData(1, 0), new ItemData(500_000, 2)]),
+            new ActionStartedMessage(4, 1, 1_000_000, 40),
+            new ActionEndedMessage(4, true),
+        ]);
+
+        ServerFrame read = Protocol.ReadServerFrame(Protocol.Write(frame));
+
+        Assert.Equal([new ItemData(1, 0), new ItemData(500_000, 2)], Assert.IsType<OwnInventoryMessage>(read.Messages[0]).Items);
+        Assert.Equal(frame.Messages[1], read.Messages[1]);
+        Assert.Equal(frame.Messages[2], read.Messages[2]);
     }
 
     /// <summary>Неизвестный тип, лишние байты и обрезанный пакет - ProtocolException.</summary>
@@ -77,6 +98,8 @@ public class ProtocolTest
         Assert.Throws<ProtocolException>(() => Protocol.ReadServerFrame([2, 1, 99]));
         Assert.Throws<ProtocolException>(() => Protocol.ReadServerFrame([.. valid, 0]));
         Assert.Throws<ProtocolException>(() => Protocol.ReadServerFrame(valid[..^1]));
-        Assert.Throws<ProtocolException>(() => Protocol.ReadInput([1, 2]));
+        Assert.Throws<ProtocolException>(() => Protocol.ReadClientMessage([1, 2]));
+        Assert.Throws<ProtocolException>(() => Protocol.ReadClientMessage([99]));
+        Assert.Throws<ProtocolException>(() => Protocol.ReadClientMessage([3, 0]));
     }
 }

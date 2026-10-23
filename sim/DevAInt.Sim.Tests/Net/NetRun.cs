@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Net;
@@ -42,7 +43,7 @@ public sealed class NetRun
     public GameServer Server { get; }
 
     /// <summary>Новый клиент; сервер увидит его на следующем тике.</summary>
-    public GameClient Connect() => new(_transport.Connect(), Sim.StatTable);
+    public GameClient Connect() => new(_transport.Connect(), Sim.StatTable, Sim.ItemTable);
 
     /// <summary>Голое подключение без клиента, чтобы слать серверу что угодно.</summary>
     public IConnection ConnectRaw() => _transport.Connect();
@@ -75,9 +76,13 @@ public sealed class NetRun
             {
                 Assert.Equal(entity.Stats.MoodleLevel(i), seen.MoodleLevels[i]);
             }
+
+            Assert.Equal(entity.Action?.StartTick, seen.Action?.StartTick);
+            Assert.Equal(entity.Action?.DurationTicks, seen.Action?.DurationTicks);
         }
 
         Entity own = Sim.Entity(replica.OwnEntityId);
+        Assert.Equal(own.Inventory.Items.Select(item => new ItemData(item.Id, Sim.ItemTable.ItemIndex(item.Def.Id))), replica.Inventory);
         for (int i = 0; i < Sim.StatTable.StatCount; i++)
         {
             Assert.Equal((float)own.Stats.Value(i), replica.OwnStats[i]);

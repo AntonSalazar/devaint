@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using DevAInt.Sim.Grid;
+using DevAInt.Sim.Items;
 using DevAInt.Sim.Stats;
 
 namespace DevAInt.Sim.Net;
@@ -23,11 +24,24 @@ public sealed class ReplicaEntity(long id, float x, float y, int z, int[] moodle
 
     /// <summary>Уровни мудлов по номерам из StatTable.</summary>
     public int[] MoodleLevels { get; } = moodleLevels;
+
+    /// <summary>Идущее действие или null.</summary>
+    public ReplicaAction? Action { get; internal set; }
+}
+
+/// <summary>Действие в реплике: номер действия из ItemTable, тик начала и длительность в тиках.</summary>
+public sealed record ReplicaAction(int Action, long StartTick, int DurationTicks)
+{
+    /// <summary>Доля выполнения от 0 до 1 на тике tick: прогресс считается по тикам, без сообщений каждый тик.</summary>
+    public float Progress(long tick) => Math.Clamp((float)(tick - StartTick) / DurationTicks, 0f, 1f);
 }
 
 /// <summary>Копия мира на клиенте: применяет пакеты сервера и сообщает об изменениях событиями.</summary>
-public sealed class Replica(StatTable stats)
+public sealed class Replica(StatTable stats, ItemTable items)
 {
+    /// <summary>Свои предметы.</summary>
+    private readonly List<ItemData> _inventory = [];
+
     /// <summary>Сущности по id.</summary>
     private readonly Dictionary<long, ReplicaEntity> _entities = [];
 
@@ -58,6 +72,15 @@ public sealed class Replica(StatTable stats)
     /// <summary>Статы своей сущности изменились.</summary>
     public event Action? OwnStatsChanged;
 
+    /// <summary>Свой инвентарь изменился.</summary>
+    public event Action? InventoryChanged;
+
+    /// <summary>Сущность начала действие.</summary>
+    public event Action<ReplicaEntity>? ActionStarted;
+
+    /// <summary>Действие сущности закончилось: сущность и выполнено ли оно.</summary>
+    public event Action<ReplicaEntity, bool>? ActionEnded;
+
     /// <summary>Пол клетки изменился.</summary>
     public event Action<CellPos>? FloorChanged;
 
@@ -75,6 +98,9 @@ public sealed class Replica(StatTable stats)
 
     /// <summary>Значения статов своей сущности по номерам из StatTable.</summary>
     public float[] OwnStats { get; } = new float[stats.StatCount];
+
+    /// <summary>Свои предметы: id и номер определения из ItemTable.</summary>
+    public IReadOnlyList<ItemData> Inventory => _inventory;
 
     /// <summary>Сущности, которые клиент сейчас видит.</summary>
     public IReadOnlyCollection<ReplicaEntity> Entities => _entities.Values;
@@ -107,6 +133,15 @@ public sealed class Replica(StatTable stats)
     {
         CellPos cell = new WorldPos(entity.X, entity.Y, entity.Z).Cell;
         return (cell.X / World.ChunkSize, cell.Y / World.ChunkSize);
+    }
+
+    /// <summary>Номер из таблицы в её пределах или ProtocolException.</summary>
+    private static void RequireIndex(int index, int count, string what)
+    {
+        if (index < 0 || index >= count)
+        {
+            throw new ProtocolException($"{what} {index} is out of range");
+        }
     }
 
     /// <summary>Номер чанка внутри хранения мира.</summary>
@@ -166,6 +201,27 @@ public sealed class Replica(StatTable stats)
 
                 ownStats.Values.ToArray().CopyTo(OwnStats, 0);
                 OwnStatsChanged?.Invoke();
+                break;
+            case OwnInventoryMessage inventory:
+                foreach (ItemData item in inventory.Items)
+                {
+                    RequireIndex(item.Item, items.ItemCount, "item");
+                }
+
+                _inventory.Clear();
+                _inventory.AddRange(inventory.Items);
+                InventoryChanged?.Invoke();
+                break;
+            case ActionStartedMessage started:
+                RequireIndex(started.Action, items.ActionCount, "action");
+                ReplicaEntity actor = Existing(started.Entity);
+                actor.Action = new ReplicaAction(started.Action, started.StartTick, Math.Max(1, started.DurationTicks));
+                ActionStarted?.Invoke(actor);
+                break;
+            case ActionEndedMessage ended:
+                ReplicaEntity finished = Existing(ended.Entity);
+                finished.Action = null;
+                ActionEnded?.Invoke(finished, ended.Completed);
                 break;
             case FloorChangeMessage floor:
                 RequireWorld().SetFloor(floor.Cell, floor.Floor);

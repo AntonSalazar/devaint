@@ -14,6 +14,8 @@ internal sealed class DefFile
         ["floors"] = typeof(FloorDef),
         ["walls"] = typeof(WallDef),
         ["maps"] = typeof(MapDef),
+        ["actions"] = typeof(ActionDef),
+        ["items"] = typeof(ItemDef),
     };
 
     /// <summary>Статы.</summary>
@@ -27,6 +29,12 @@ internal sealed class DefFile
 
     /// <summary>Карты.</summary>
     public List<MapDef?>? Maps { get; init; }
+
+    /// <summary>Действия.</summary>
+    public List<ActionDef?>? Actions { get; init; }
+
+    /// <summary>Предметы.</summary>
+    public List<ItemDef?>? Items { get; init; }
 
     /// <summary>Патчи определений этого и других модов.</summary>
     public List<PatchDef?>? Patches { get; init; }

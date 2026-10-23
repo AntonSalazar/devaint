@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using DevAInt.Sim.Grid;
+using DevAInt.Sim.Items;
 using DevAInt.Sim.Logging;
 using DevAInt.Sim.Motion;
 
@@ -40,7 +41,7 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
     {
         while (_transport.TryAccept(out IConnection connection))
         {
-            _clients.Add(new ClientSession(connection, _sim.CreateEntity(_sim.Spawn)));
+            _clients.Add(new ClientSession(connection, _sim.SpawnPlayer()));
         }
 
         foreach (ClientSession client in _clients)
@@ -99,16 +100,14 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
         return new ChunkSnapshotMessage(chunk.X, chunk.Y, levels);
     }
 
-    /// <summary>Применение всех пришедших вводов клиента; неверный пакет разрывает подключение.</summary>
+    /// <summary>Применение всех пришедших сообщений клиента; неверный пакет разрывает подключение.</summary>
     private void ReceiveInputs(ClientSession client)
     {
         while (client.Connection.TryReceive(out byte[] packet))
         {
             try
             {
-                InputMessage input = Protocol.ReadInput(packet);
-                _sim.Entity(client.EntityId).Input = new MoveInput(input.X, input.Y);
-                client.LastInput = input.Sequence;
+                Apply(client, Protocol.ReadClientMessage(packet));
             }
             catch (ProtocolException error)
             {
@@ -116,6 +115,29 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
                 client.Connection.Disconnect();
                 return;
             }
+        }
+    }
+
+    /// <summary>Одно сообщение клиента; на отказ начать действие клиент просто не увидит начала.</summary>
+    private void Apply(ClientSession client, ClientMessage message)
+    {
+        switch (message)
+        {
+            case InputMessage input:
+                _sim.Entity(client.EntityId).Input = new MoveInput(input.X, input.Y);
+                client.LastInput = input.Sequence;
+                break;
+            case StartActionMessage start:
+                if (start.Action >= _sim.ItemTable.ActionCount)
+                {
+                    throw new ProtocolException($"action {start.Action} is out of range");
+                }
+
+                _sim.StartAction(client.EntityId, start.ItemId, _sim.ItemTable.Action(start.Action).Id);
+                break;
+            case CancelActionMessage:
+                _sim.CancelAction(client.EntityId);
+                break;
         }
     }
 
@@ -160,6 +182,13 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
 
         AddEntityMessages(client, messages);
 
+        if (client.InventoryVersion != own.Inventory.Version)
+        {
+            ItemData[] items = [.. own.Inventory.Items.Select(item => new ItemData(item.Id, _sim.ItemTable.ItemIndex(item.Def.Id)))];
+            messages.Add(new OwnInventoryMessage(items));
+            client.InventoryVersion = own.Inventory.Version;
+        }
+
         float[] stats = [.. Enumerable.Range(0, _sim.StatTable.StatCount).Select(stat => (float)own.Stats.Value(stat))];
         if (client.Stats is null || !stats.AsSpan().SequenceEqual(client.Stats))
         {
@@ -190,7 +219,9 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
             {
                 int[] moodles = [.. Enumerable.Range(0, _sim.StatTable.MoodleCount).Select(entity.Stats.MoodleLevel)];
                 messages.Add(new EntitySpawnMessage(entity.Id, x, y, z, moodles));
-                client.Known[entity.Id] = new KnownEntity { X = x, Y = y, Z = z, Moodles = moodles, Chunk = chunk };
+                known = new KnownEntity { X = x, Y = y, Z = z, Moodles = moodles, Chunk = chunk };
+                client.Known[entity.Id] = known;
+                AddActionMessages(entity, known, messages);
                 continue;
             }
 
@@ -199,6 +230,8 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
                 messages.Add(new EntityMoveMessage(entity.Id, x, y, z));
                 (known.X, known.Y, known.Z, known.Chunk) = (x, y, z, chunk);
             }
+
+            AddActionMessages(entity, known, messages);
 
             // Сравнение на месте: массив уровней на каждую сущность каждый тик был главным источником мусора
             for (int i = 0; i < known.Moodles.Length; i++)
@@ -217,6 +250,28 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
             messages.Add(new EntityRemoveMessage(id));
             client.Known.Remove(id);
         }
+    }
+
+    /// <summary>Начало и конец действия относительно того, что клиент знает; прогресс клиент считает сам по тикам.</summary>
+    private void AddActionMessages(Entity entity, KnownEntity known, List<ServerMessage> messages)
+    {
+        long? start = entity.Action?.StartTick;
+        if (start == known.ActionStart)
+        {
+            return;
+        }
+
+        if (known.ActionStart is not null)
+        {
+            messages.Add(new ActionEndedMessage(entity.Id, entity.LastActionEnd == ActionEnd.Completed));
+        }
+
+        if (entity.Action is ActionState action)
+        {
+            messages.Add(new ActionStartedMessage(entity.Id, _sim.ItemTable.ActionIndex(action.Action.Id), action.StartTick, action.DurationTicks));
+        }
+
+        known.ActionStart = start;
     }
 
     /// <summary>Чанки в квадрате радиуса вокруг центра, обрезанные по хранению мира.</summary>
@@ -251,6 +306,9 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
 
         /// <summary>Чанк по отправленной позиции.</summary>
         public (int X, int Y) Chunk { get; set; }
+
+        /// <summary>Тик начала отправленного действия, null если клиент не знает о действии.</summary>
+        public long? ActionStart { get; set; }
     }
 
     /// <summary>Подключённый клиент и то, что он уже знает.</summary>
@@ -279,5 +337,8 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
 
         /// <summary>Размер последнего пакета в байтах.</summary>
         public int LastFrameBytes { get; set; }
+
+        /// <summary>Отправленный номер изменения инвентаря, -1 до первой отправки.</summary>
+        public int InventoryVersion { get; set; } = -1;
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 /// <summary>HUD поверх мира: полосы статов и список мудлов своего персонажа.</summary>
@@ -10,23 +11,17 @@ public partial class Hud : CanvasLayer
     /// <summary>Колонка мудлов.</summary>
     private readonly VBoxContainer _moodles = new() { Name = "Moodles" };
 
+    /// <summary>Колонка предметов.</summary>
+    private readonly VBoxContainer _items = new() { Name = "Items" };
+
     /// <summary>Данные HUD.</summary>
     private HudModel? _model;
 
     /// <summary>Строки мудлов, для тестов.</summary>
-    public IReadOnlyList<string> MoodleLines
-    {
-        get
-        {
-            List<string> lines = [];
-            foreach (Node child in _moodles.GetChildren())
-            {
-                lines.Add(((Label)child).Text);
-            }
+    public IReadOnlyList<string> MoodleLines => Lines(_moodles);
 
-            return lines;
-        }
-    }
+    /// <summary>Строки предметов, для тестов.</summary>
+    public IReadOnlyList<string> ItemLines => Lines(_items);
 
     /// <summary>Доли полос статов, для тестов.</summary>
     public IReadOnlyList<double> BarValues => _rows.ConvertAll(row => row.Bar.Value);
@@ -51,6 +46,8 @@ public partial class Hud : CanvasLayer
         }
 
         column.AddChild(_moodles);
+        column.AddChild(new HSeparator());
+        column.AddChild(_items);
         Refresh();
     }
 
@@ -69,39 +66,39 @@ public partial class Hud : CanvasLayer
             _rows[i].Bar.Value = bars[i].Fraction;
         }
 
-        IReadOnlyList<string> moodles = _model.Moodles();
-        if (!SameLines(moodles))
-        {
-            foreach (Node child in _moodles.GetChildren())
-            {
-                _moodles.RemoveChild(child);
-                child.QueueFree();
-            }
-
-            foreach (string line in moodles)
-            {
-                _moodles.AddChild(new Label { Text = line, Modulate = new Color(1f, 0.8f, 0.4f) });
-            }
-        }
+        ShowLines(_moodles, _model.Moodles(), new Color(1f, 0.8f, 0.4f));
+        ShowLines(_items, _model.Items(), Colors.White);
     }
 
-    /// <summary>Совпадают ли строки мудлов с показанными, чтобы не пересоздавать подписи каждый кадр.</summary>
-    private bool SameLines(IReadOnlyList<string> moodles)
+    /// <summary>Тексты подписей колонки.</summary>
+    private static List<string> Lines(VBoxContainer column)
     {
-        IReadOnlyList<string> shown = MoodleLines;
-        if (shown.Count != moodles.Count)
+        List<string> lines = [];
+        foreach (Node child in column.GetChildren())
         {
-            return false;
+            lines.Add(((Label)child).Text);
         }
 
-        for (int i = 0; i < moodles.Count; i++)
+        return lines;
+    }
+
+    /// <summary>Подписи колонки по строкам; пересоздаются только при изменении, а не каждый кадр.</summary>
+    private static void ShowLines(VBoxContainer column, IReadOnlyList<string> lines, Color color)
+    {
+        if (Lines(column).SequenceEqual(lines))
         {
-            if (shown[i] != moodles[i])
-            {
-                return false;
-            }
+            return;
         }
 
-        return true;
+        foreach (Node child in column.GetChildren())
+        {
+            column.RemoveChild(child);
+            child.QueueFree();
+        }
+
+        foreach (string line in lines)
+        {
+            column.AddChild(new Label { Text = line, Modulate = color });
+        }
     }
 }

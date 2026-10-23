@@ -17,7 +17,7 @@ public class HudTest : TestCase
     public override void BeforeEach()
     {
         _game = new GameFixture();
-        _model = new HudModel(_game.Sim.StatTable, _game.Client.Replica);
+        _model = new HudModel(_game.Sim.StatTable, _game.Sim.ItemTable, _game.Client.Replica);
         _game.Tick();
     }
 
@@ -63,6 +63,21 @@ public class HudTest : TestCase
 
         CheckEqual("thirsty III", hud.MoodleLines.Single(), "moodle line");
         CheckNear(0.95, hud.BarValues.Max(), Tolerance, "thirst bar");
+        hud.Free();
+    }
+
+    /// <summary>Предметы по видам: игрок появляется с тремя яблоками, после еды их два.</summary>
+    public void TestItemsAreGrouped()
+    {
+        Hud hud = new();
+        hud.Init(_model);
+        CheckEqual("apple x3", _model.Items().Single(), "start");
+
+        _game.Client.SendStartAction(_game.Client.Replica.Inventory[0].Id, _game.Sim.ItemTable.ActionIndex("core:eat"));
+        _game.Tick(42);
+        hud.Refresh();
+
+        CheckEqual("apple x2", hud.ItemLines.Single(), "after eating");
         hud.Free();
     }
 

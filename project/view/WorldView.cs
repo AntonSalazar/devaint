@@ -45,12 +45,17 @@ public partial class WorldView : Node3D
     /// <summary>Узел сущности или null.</summary>
     public EntityView? Entity(long id) => _entities.GetValueOrDefault(id);
 
-    /// <summary>Интерполяция всех сущностей на delta секунд.</summary>
-    public void Advance(double delta)
+    /// <summary>Интерполяция всех сущностей на delta секунд и полосы действий; tickFraction - доля пути до следующего тика.</summary>
+    public void Advance(double delta, double tickFraction = 0)
     {
         foreach (EntityView entity in _entities.Values)
         {
             entity.Advance(delta);
+            ReplicaAction? action = _replica!.Entity(entity.EntityId)?.Action;
+
+            // Между тиками прогресс досчитывается по доле времени, чтобы полоса шла плавно
+            float? progress = action is null ? null : Mathf.Clamp((float)((_replica.Tick + tickFraction - action.StartTick) / action.DurationTicks), 0f, 1f);
+            entity.SetActionProgress(progress);
         }
     }
 

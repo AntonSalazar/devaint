@@ -29,6 +29,17 @@ public static class Protocol
         OwnStats,
         FloorChange,
         EdgeChange,
+        OwnInventory,
+        ActionStarted,
+        ActionEnded,
+    }
+
+    /// <summary>Типы сообщений клиента.</summary>
+    private enum ClientType : byte
+    {
+        Input = 1,
+        StartAction,
+        CancelAction,
     }
 
     /// <summary>Пакет сервера в байты.</summary>
@@ -61,29 +72,47 @@ public static class Protocol
         return new ServerFrame(tick, messages);
     }
 
-    /// <summary>Ввод клиента в байты.</summary>
-    public static byte[] Write(InputMessage input)
+    /// <summary>Сообщение клиента в байты: тип одним байтом, дальше его поля.</summary>
+    public static byte[] Write(ClientMessage message)
     {
         PacketWriter writer = new();
-        writer.WriteVarUInt(input.Sequence);
-        writer.WriteFloat(input.X);
-        writer.WriteFloat(input.Y);
+        switch (message)
+        {
+            case InputMessage input:
+                writer.WriteByte((byte)ClientType.Input);
+                writer.WriteVarUInt(input.Sequence);
+                writer.WriteFloat(input.X);
+                writer.WriteFloat(input.Y);
+                break;
+            case StartActionMessage start:
+                writer.WriteByte((byte)ClientType.StartAction);
+                writer.WriteVarInt(start.ItemId);
+                writer.WriteVarUInt((ulong)start.Action);
+                break;
+            case CancelActionMessage:
+                writer.WriteByte((byte)ClientType.CancelAction);
+                break;
+            default:
+                throw new ArgumentException($"unknown client message {message.GetType().Name}", nameof(message));
+        }
+
         return writer.ToArray();
     }
 
-    /// <summary>Ввод клиента из байт.</summary>
-    public static InputMessage ReadInput(byte[] data)
+    /// <summary>Сообщение клиента из байт.</summary>
+    public static ClientMessage ReadClientMessage(byte[] data)
     {
         PacketReader reader = new(data);
-        ulong sequence = reader.ReadVarUInt();
-        if (sequence > uint.MaxValue)
+        byte type = reader.ReadByte();
+        ClientMessage message = (ClientType)type switch
         {
-            throw new ProtocolException("input sequence is too large");
-        }
-
-        InputMessage input = new((uint)sequence, reader.ReadFloat(), reader.ReadFloat());
+            ClientType.Input => ReadInput(reader),
+            ClientType.StartAction => new StartActionMessage(reader.ReadVarInt(), reader.ReadCount(MaxList)),
+            ClientType.CancelAction => new CancelActionMessage(),
+            _ => throw new ProtocolException($"unknown client message type {type}"),
+        };
         RequireEnd(reader);
-        return input;
+        return message;
     }
 
     /// <summary>Одно сообщение сервера с типом.</summary>
@@ -162,6 +191,28 @@ public static class Protocol
                 writer.WriteVarUInt(edge.Edge.Wall);
                 writer.WriteBool(edge.Edge.Open);
                 break;
+            case OwnInventoryMessage inventory:
+                writer.WriteByte((byte)ServerType.OwnInventory);
+                writer.WriteVarUInt((ulong)inventory.Items.Count);
+                foreach (ItemData item in inventory.Items)
+                {
+                    writer.WriteVarInt(item.Id);
+                    writer.WriteVarUInt((ulong)item.Item);
+                }
+
+                break;
+            case ActionStartedMessage started:
+                writer.WriteByte((byte)ServerType.ActionStarted);
+                writer.WriteVarInt(started.Entity);
+                writer.WriteVarUInt((ulong)started.Action);
+                writer.WriteVarInt(started.StartTick);
+                writer.WriteVarUInt((ulong)started.DurationTicks);
+                break;
+            case ActionEndedMessage ended:
+                writer.WriteByte((byte)ServerType.ActionEnded);
+                writer.WriteVarInt(ended.Entity);
+                writer.WriteBool(ended.Completed);
+                break;
             default:
                 throw new ArgumentException($"unknown server message {message.GetType().Name}", nameof(message));
         }
@@ -183,6 +234,9 @@ public static class Protocol
             ServerType.OwnStats => ReadOwnStats(reader),
             ServerType.FloorChange => new FloorChangeMessage(ReadCell(reader), ReadUShort(reader)),
             ServerType.EdgeChange => new EdgeChangeMessage(ReadCell(reader), reader.ReadBool(), new Edge(ReadUShort(reader), reader.ReadBool())),
+            ServerType.OwnInventory => ReadInventory(reader),
+            ServerType.ActionStarted => new ActionStartedMessage(reader.ReadVarInt(), reader.ReadCount(MaxList), reader.ReadVarInt(), reader.ReadCount(int.MaxValue)),
+            ServerType.ActionEnded => new ActionEndedMessage(reader.ReadVarInt(), reader.ReadBool()),
             _ => throw new ProtocolException($"unknown server message type {type}"),
         };
     }
@@ -223,6 +277,31 @@ public static class Protocol
         }
 
         return new EntitySpawnMessage(id, x, y, z, levels);
+    }
+
+    /// <summary>Ввод движения после байта типа.</summary>
+    private static InputMessage ReadInput(PacketReader reader)
+    {
+        ulong sequence = reader.ReadVarUInt();
+        if (sequence > uint.MaxValue)
+        {
+            throw new ProtocolException("input sequence is too large");
+        }
+
+        return new InputMessage((uint)sequence, reader.ReadFloat(), reader.ReadFloat());
+    }
+
+    /// <summary>Свой инвентарь.</summary>
+    private static OwnInventoryMessage ReadInventory(PacketReader reader)
+    {
+        int count = reader.ReadCount(MaxList);
+        ItemData[] items = new ItemData[count];
+        for (int i = 0; i < count; i++)
+        {
+            items[i] = new ItemData(reader.ReadVarInt(), reader.ReadCount(MaxList));
+        }
+
+        return new OwnInventoryMessage(items);
     }
 
     /// <summary>Статы своей сущности.</summary>

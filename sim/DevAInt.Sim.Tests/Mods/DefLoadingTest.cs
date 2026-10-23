@@ -71,7 +71,7 @@ public class DefLoadingTest
 
     /// <summary>Неизвестная категория и неизвестное поле - ошибки.</summary>
     [Theory]
-    [InlineData("""{ "items": [] }""")]
+    [InlineData("""{ "vehicles": [] }""")]
     [InlineData("""{ "stats": [ { "id": "alpha:s", "min": 0, "max": 1, "speed": 2 } ] }""")]
     public void UnknownFieldIsError(string text)
     {

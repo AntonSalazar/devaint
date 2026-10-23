@@ -3,6 +3,9 @@ using DevAInt.Sim.Grid;
 
 namespace DevAInt.Sim.Net;
 
+/// <summary>Предмет в сообщении: id экземпляра и номер определения.</summary>
+public readonly record struct ItemData(long Id, int Item);
+
 /// <summary>Сообщение сервера клиенту.</summary>
 public abstract record ServerMessage;
 
@@ -36,11 +39,29 @@ public sealed record FloorChangeMessage(CellPos Cell, ushort Floor) : ServerMess
 /// <summary>Северное или западное ребро клетки-владельца изменилось.</summary>
 public sealed record EdgeChangeMessage(CellPos Owner, bool North, Edge Edge) : ServerMessage;
 
+/// <summary>Свой инвентарь целиком: id предметов и номера их определений из ItemTable.</summary>
+public sealed record OwnInventoryMessage(IReadOnlyList<ItemData> Items) : ServerMessage;
+
+/// <summary>Сущность начала действие: номер действия из ItemTable, тик начала и длительность в тиках.</summary>
+public sealed record ActionStartedMessage(long Entity, int Action, long StartTick, int DurationTicks) : ServerMessage;
+
+/// <summary>Действие сущности закончилось: выполнено или прервано.</summary>
+public sealed record ActionEndedMessage(long Entity, bool Completed) : ServerMessage;
+
 /// <summary>Пакет сервера за тик: номер тика и сообщения по порядку.</summary>
 public sealed record ServerFrame(long Tick, IReadOnlyList<ServerMessage> Messages);
 
-/// <summary>Ввод клиента: номер по порядку и направление движения.</summary>
-public sealed record InputMessage(uint Sequence, float X, float Y);
+/// <summary>Сообщение клиента серверу.</summary>
+public abstract record ClientMessage;
+
+/// <summary>Ввод движения: номер по порядку и направление.</summary>
+public sealed record InputMessage(uint Sequence, float X, float Y) : ClientMessage;
+
+/// <summary>Просьба начать действие предметом: id предмета и номер действия из ItemTable.</summary>
+public sealed record StartActionMessage(long ItemId, int Action) : ClientMessage;
+
+/// <summary>Просьба прервать своё действие.</summary>
+public sealed record CancelActionMessage : ClientMessage;
 
 /// <summary>Один слой этажа чанка в снимке.</summary>
 public sealed record ChunkLevelData(int Z, ushort[] Floors, ushort[] NorthWalls, ushort[] WestWalls, ushort[] Flags);

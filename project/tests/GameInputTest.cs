@@ -36,6 +36,55 @@ public class GameInputTest : TestCase
     /// <summary>Без клавиш движения нет.</summary>
     public void TestNoKeysNoMove() => CheckEqual(MoveInput.None, GameInput.ToMoveInput(Vector2.Zero, Basis.Identity), "no keys");
 
+    /// <summary>Колёсико вверх - щелчок приближения, вниз - отдаления, другое событие - не зум.</summary>
+    public void TestWheelGivesZoomSteps()
+    {
+        GameInput.EnsureActions();
+
+        CheckEqual(1, GameInput.ZoomSteps(new InputEventMouseButton { ButtonIndex = MouseButton.WheelUp, Pressed = true }), "wheel up");
+        CheckEqual(-1, GameInput.ZoomSteps(new InputEventMouseButton { ButtonIndex = MouseButton.WheelDown, Pressed = true }), "wheel down");
+        CheckEqual(0, GameInput.ZoomSteps(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Pressed = true }), "left button");
+        CheckEqual(0, GameInput.ZoomSteps(new InputEventKey { PhysicalKeycode = Key.E, Pressed = true }), "key");
+    }
+
+    /// <summary>Esc - выход.</summary>
+    public void TestEscapeQuits()
+    {
+        GameInput.EnsureActions();
+
+        Check(new InputEventKey { PhysicalKeycode = Key.Escape, Pressed = true }.IsActionPressed(GameInput.Quit), "escape is quit");
+    }
+
+    /// <summary>Зум меняет кадр шагом и держится в пределах, где тени ещё не пропускают свет сквозь стены.</summary>
+    public void TestCameraZoomIsClamped()
+    {
+        IsoCamera camera = new();
+        camera.Init(Vector3.Zero);
+
+        camera.Zoom(1);
+        CheckNear(IsoCamera.DefaultSize / IsoCamera.ZoomStep, camera.Size, 1e-4, "one step in");
+        camera.Zoom(-2);
+        CheckNear(IsoCamera.DefaultSize * IsoCamera.ZoomStep, camera.Size, 1e-4, "one step out from start");
+        camera.Zoom(100);
+        CheckEqual(IsoCamera.MinSize, camera.Size, "closest");
+        camera.Zoom(-100);
+        CheckEqual(IsoCamera.MaxSize, camera.Size, "farthest");
+        camera.Free();
+    }
+
+    /// <summary>Первое применение: первое яблоко и действие core:eat; без предметов - ничего.</summary>
+    public void TestFirstUseIsEatingApple()
+    {
+        GameFixture game = new();
+        CheckEqual<(long, int)?>(null, GameInput.FirstUse(game.Client.Replica, game.Sim.ItemTable), "nothing before inventory arrives");
+        game.Tick();
+
+        (long ItemId, int Action)? use = GameInput.FirstUse(game.Client.Replica, game.Sim.ItemTable);
+
+        CheckEqual(game.Client.Replica.Inventory[0].Id, use?.ItemId ?? -1, "first apple");
+        CheckEqual(game.Sim.ItemTable.ActionIndex("core:eat"), use?.Action ?? -1, "eat action");
+    }
+
     /// <summary>Действия регистрируются один раз с клавишами WASD и стрелками.</summary>
     public void TestActionsAreRegistered()
     {
@@ -47,5 +96,7 @@ public class GameInputTest : TestCase
             Check(InputMap.HasAction(action), $"action {action} exists");
             CheckEqual(2, InputMap.ActionGetEvents(action).Count, $"keys of {action}");
         }
+
+        CheckEqual(1, InputMap.ActionGetEvents(GameInput.Use).Count, "use key");
     }
 }

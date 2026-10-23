@@ -74,6 +74,26 @@ public class WorldViewTest : TestCase
         Check(_view.Chunk(0, 0)!.Walls.Single(wall => wall.IsDoor).Open, "door is open in the view");
     }
 
+    /// <summary>Итог этапа 9: во время еды над капсулой растёт полоса прогресса, после еды она пропадает.</summary>
+    public void TestActionBarFollowsEating()
+    {
+        _game.Tick();
+        long own = _game.Client.Replica.OwnEntityId;
+        _game.Client.SendStartAction(_game.Client.Replica.Inventory[0].Id, _game.Sim.ItemTable.ActionIndex("core:eat"));
+
+        _game.Tick(10);
+        _view.Advance(0);
+        float early = _view.Entity(own)!.ActionProgress ?? -1;
+        _game.Tick(10);
+        _view.Advance(0, tickFraction: 0.5);
+        float later = _view.Entity(own)!.ActionProgress ?? -1;
+        _game.Tick(25);
+        _view.Advance(0);
+
+        Check(early > 0 && later > early, $"progress grows: {early} then {later}");
+        Check(!_view.Entity(own)!.ActionBarVisible, "bar is hidden after eating");
+    }
+
     /// <summary>Удалённая на сервере сущность пропадает из вида.</summary>
     public void TestRemovedEntityIsDropped()
     {

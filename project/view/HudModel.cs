@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using DevAInt.Sim.Defs;
+using DevAInt.Sim.Items;
 using DevAInt.Sim.Net;
 using DevAInt.Sim.Stats;
 
@@ -9,7 +11,7 @@ using DevAInt.Sim.Stats;
 public readonly record struct StatBar(string Name, float Value, float Fraction);
 
 /// <summary>Что показывает HUD своего персонажа: полосы статов и мудлы; данные только из реплики.</summary>
-public sealed class HudModel(StatTable table, Replica replica)
+public sealed class HudModel(StatTable table, ItemTable items, Replica replica)
 {
     /// <summary>Римские цифры уровней мудлов.</summary>
     private static readonly string[] _roman = ["I", "II", "III", "IV", "V"];
@@ -51,6 +53,18 @@ public sealed class HudModel(StatTable table, Replica replica)
         }
 
         return moodles;
+    }
+
+    /// <summary>Свои предметы по видам в порядке первого появления: apple x3.</summary>
+    public IReadOnlyList<string> Items()
+    {
+        List<string> lines = [];
+        foreach (IGrouping<int, ItemData> group in replica.Inventory.GroupBy(item => item.Item))
+        {
+            lines.Add($"{ShortName(items.Item(group.Key).Id)} x{group.Count()}");
+        }
+
+        return lines;
     }
 
     /// <summary>Уровень римской цифрой, после V - обычным числом.</summary>

@@ -157,6 +157,10 @@
 **Готово, когда:** съел яблоко — голод упал, яблоко исчезло из инвентаря; движение
 прерывает действие.
 
+**Статус:** готов 2026-10-23. Код в `sim/DevAInt.Sim/Items/`, действия в `Simulation`,
+сообщения в `sim/DevAInt.Sim/Net/`, в клиенте клавиша E, предметы в HUD и полоса
+прогресса `project/view/progress_bar.gdshader`.
+
 ### 10. Сеть
 
 - `EnetTransport` на `ENetMultiplayerPeer`.

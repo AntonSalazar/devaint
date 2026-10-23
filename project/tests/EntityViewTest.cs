@@ -14,6 +14,22 @@ public class EntityViewTest : TestCase
         Check(gap > 0.01, $"capsule surface stays {gap} m away from the wall face");
     }
 
+    /// <summary>Полоса прогресса видна во время действия и прячется без него.</summary>
+    public void TestActionBarShowsProgress()
+    {
+        EntityView view = new();
+        view.Init(1, own: true, Vector3.Zero);
+        Check(!view.ActionBarVisible, "hidden at start");
+
+        view.SetActionProgress(0.4f);
+        Check(view.ActionBarVisible, "visible during action");
+        CheckEqual(0.4f, view.ActionProgress, "progress");
+
+        view.SetActionProgress(null);
+        Check(!view.ActionBarVisible, "hidden after action");
+        view.Free();
+    }
+
     /// <summary>За полтика капсула проходит половину пути, за тик и дальше стоит в цели.</summary>
     public void TestInterpolatesOverOneTick()
     {

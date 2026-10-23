@@ -35,6 +35,14 @@ public sealed record MapDef : IDef
             yield return $"spawn {Spawn.X},{Spawn.Y},{Spawn.Z} is outside the map";
         }
 
+        foreach (string item in Spawn.Items)
+        {
+            if (!defs.TryGet<ItemDef>(item, out _))
+            {
+                yield return $"spawn: unknown item {item}";
+            }
+        }
+
         for (int i = 0; i < Build.Count; i++)
         {
             foreach (string problem in Build[i].Validate(this, defs))
@@ -56,6 +64,9 @@ public sealed record SpawnDef
 
     /// <summary>Этаж.</summary>
     public int Z { get; init; }
+
+    /// <summary>Предметы, с которыми появляется игрок.</summary>
+    public IReadOnlyList<string> Items { get; init; } = [];
 }
 
 /// <summary>Операция построения: ровно одно из floor, walls, door и прямоугольник или клетка.</summary>

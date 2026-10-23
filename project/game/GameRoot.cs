@@ -35,6 +35,9 @@ public partial class GameRoot : Node3D
     /// <summary>HUD своего персонажа.</summary>
     private Hud? _hud;
 
+    /// <summary>Предметы и действия по номерам.</summary>
+    private DevAInt.Sim.Items.ItemTable? _items;
+
     /// <summary>Накопленное время до следующего тика.</summary>
     private double _accumulator;
 
@@ -83,7 +86,7 @@ public partial class GameRoot : Node3D
 
         LoopbackTransport transport = new();
         _server = new GameServer(sim, transport, log);
-        _client = new GameClient(transport.Connect(), sim.StatTable);
+        _client = new GameClient(transport.Connect(), sim.StatTable, sim.ItemTable);
         GameInput.EnsureActions();
         _autoWalk = args.Contains("--autowalk");
 
@@ -96,8 +99,25 @@ public partial class GameRoot : Node3D
         _camera.Init(ViewMath.ToGodot((float)sim.Spawn.X, (float)sim.Spawn.Y, sim.Spawn.Z));
         AddChild(_camera);
         _hud = new Hud();
-        _hud.Init(new HudModel(sim.StatTable, _client.Replica));
+        _hud.Init(new HudModel(sim.StatTable, sim.ItemTable, _client.Replica));
+        _items = sim.ItemTable;
         AddChild(_hud);
+    }
+
+    /// <summary>Ввод, который не съел интерфейс: зум колёсиком и выход по Esc.</summary>
+    public override void _UnhandledInput(InputEvent input)
+    {
+        if (input.IsActionPressed(GameInput.Quit))
+        {
+            GetTree().Quit();
+            return;
+        }
+
+        int steps = GameInput.ZoomSteps(input);
+        if (steps != 0)
+        {
+            _camera?.Zoom(steps);
+        }
     }
 
     /// <summary>Кадр: тики по накопленному времени, интерполяция и камера.</summary>
@@ -118,7 +138,8 @@ public partial class GameRoot : Node3D
             _accumulator -= GameClock.RealSecondsPerTick;
         }
 
-        _view.Advance(delta);
+        UseItemOnKey();
+        _view.Advance(delta, _accumulator / GameClock.RealSecondsPerTick);
         if (_view.Entity(_client.Replica.OwnEntityId) is EntityView own)
         {
             _camera.Follow(own.Position, delta);
@@ -130,6 +151,22 @@ public partial class GameRoot : Node3D
         }
 
         _hud.Refresh();
+    }
+
+    /// <summary>По клавише E - первое применение первого подходящего предмета, если сейчас нет действия.</summary>
+    private void UseItemOnKey()
+    {
+        if (!Input.IsActionJustPressed(GameInput.Use) || _client is null || _items is null)
+        {
+            return;
+        }
+
+        Replica replica = _client.Replica;
+        bool busy = replica.Entity(replica.OwnEntityId)?.Action is not null;
+        if (!busy && GameInput.FirstUse(replica, _items) is (long item, int action))
+        {
+            _client.SendStartAction(item, action);
+        }
     }
 
     /// <summary>Ввод с клавиатуры или автоходьба по кругу.</summary>
