@@ -8,9 +8,9 @@ GODOT := env("GODOT", "godot-mono")
 build:
     dotnet build {{PROJECT_ROOT}}/DevAInt.sln
 
-# Run: запустить игру
-run: build
-    {{GODOT}} --path {{PROJECT_ROOT}}
+# Run: запустить игру; аргументы игры после имени: `just run --time-scale 200`
+run *args: build
+    {{GODOT}} --path {{PROJECT_ROOT}} -- {{args}}
 
 # Editor
 editor:
@@ -45,7 +45,7 @@ format:
 # Screenshot dir, кадры Movie Maker
 SHOT_DIR := env("SHOT_DIR", "/tmp/devaint-shots")
 
-# Screenshot: записать ~3 сек кадров в SHOT_DIR, персонаж сам ходит по кругу; последний кадр - снимок
+# Screenshot: ~3 сек кадров в SHOT_DIR, персонаж ходит по кругу; последний кадр - снимок
 shot: build
     rm -rf {{SHOT_DIR}} && mkdir -p {{SHOT_DIR}}
     {{GODOT}} --path {{PROJECT_ROOT}} --write-movie {{SHOT_DIR}}/frame.png --fixed-fps 10 --quit-after 30 --resolution 1280x720 -- --autowalk > /dev/null 2>&1

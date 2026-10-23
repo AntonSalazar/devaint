@@ -102,8 +102,8 @@ public sealed class Simulation
         Clock.Advance();
         foreach (Entity entity in _order)
         {
-            // Движение идёт в реальных секундах, статы - в игровых минутах
-            entity.Position = Movement.Step(World, entity.Position, entity.Input, GameClock.SecondsPerTick, MoveParams.Default);
+            // Движение идёт в секундах симуляции, статы - в игровых минутах; ускорение действует на оба
+            entity.Position = Movement.Step(World, entity.Position, entity.Input, Clock.SecondsPerTick, MoveParams.Default);
             entity.Stats.Tick(Clock.MinutesPerTick);
         }
 

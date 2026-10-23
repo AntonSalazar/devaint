@@ -17,6 +17,9 @@ public static class ChunkMesh
     /// <summary>Толщина стены.</summary>
     public const float WallThickness = 0.1f;
 
+    /// <summary>Толщина двери: тоньше стены, чтобы на стыке грани стены стояли перед гранями двери, а не в одной плоскости с ними.</summary>
+    public const float DoorThickness = 0.06f;
+
     /// <summary>Длина открытой двери, чтобы она не утыкалась в соседнюю стену.</summary>
     private const float OpenDoorLength = 0.9f;
 
@@ -90,21 +93,31 @@ public static class ChunkMesh
         // Северное ребро идёт вдоль X, западное - вдоль Z; открытая дверь поворачивается внутрь клетки
         Vector3 along = north ? Vector3.Right : Vector3.Back;
         Vector3 inside = north ? Vector3.Back : Vector3.Right;
+
+        // Стена длиннее ребра на толщину стены: соседние куски перекрываются, без стыков и щелей в углах.
+        // Дверь не удлиняется и тоньше стены: иначе её грани совпали бы с гранями соседних стен и мерцали
         float length = 1f;
-        if (isDoor && edge.Open)
+        float thickness = DoorThickness;
+        if (!isDoor)
+        {
+            length = 1f + WallThickness;
+            thickness = WallThickness;
+            start -= along * WallThickness / 2;
+        }
+        else if (edge.Open)
         {
             float angle = Mathf.DegToRad(OpenDoorAngle);
             along = ((along * Mathf.Cos(angle)) + (inside * Mathf.Sin(angle))).Normalized();
             length = OpenDoorLength;
         }
 
-        walls.Add(new WallInstance(Segment(start, along, length), Color.FromHtml(wall.Color), isDoor, edge.Open));
+        walls.Add(new WallInstance(Segment(start, along, length, thickness), Color.FromHtml(wall.Color), isDoor, edge.Open));
     }
 
-    /// <summary>Положение единичного бокса, растянутого вдоль direction на length от start.</summary>
-    private static Transform3D Segment(Vector3 start, Vector3 direction, float length)
+    /// <summary>Положение единичного бокса, растянутого вдоль direction на length от start, толщиной thickness.</summary>
+    private static Transform3D Segment(Vector3 start, Vector3 direction, float length, float thickness)
     {
-        Basis basis = new(direction * length, Vector3.Up * WallHeight, direction.Cross(Vector3.Up) * WallThickness);
+        Basis basis = new(direction * length, Vector3.Up * WallHeight, direction.Cross(Vector3.Up) * thickness);
         Vector3 center = start + (direction * length / 2) + (Vector3.Up * WallHeight / 2);
         return new Transform3D(basis, center);
     }

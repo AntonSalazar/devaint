@@ -9,8 +9,8 @@ public partial class IsoCamera : Camera3D
     /// <summary>Поворот вокруг вертикали.</summary>
     public const float Yaw = 45f;
 
-    /// <summary>Расстояние до точки, достаточно далеко, чтобы стены не обрезались.</summary>
-    private const float Distance = 40f;
+    /// <summary>Расстояние до точки: на картинку ортографической камеры не влияет, но чем ближе, тем меньше объём для теней и точнее тени.</summary>
+    public const float Distance = 20f;
 
     /// <summary>Скорость догона цели, доля пути в секунду.</summary>
     private const float FollowSpeed = 8f;

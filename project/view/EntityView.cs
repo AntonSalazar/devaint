@@ -4,8 +4,12 @@ using Godot;
 /// <summary>Капсула сущности; позиция плавно идёт от прошлой к новой за один тик sim.</summary>
 public partial class EntityView : Node3D
 {
+    /// <summary>Радиус капсулы: тело sim минус половина толщины стены и зазор, чтобы капсула не входила в стену и не ловила свет снаружи.</summary>
+    public const float Radius = 0.3f - (ChunkMesh.WallThickness / 2) - 0.02f;
+
     /// <summary>Рост капсулы.</summary>
     private const float Height = 1.7f;
+
 
     /// <summary>Откуда идёт интерполяция.</summary>
     private Vector3 _from;
@@ -28,7 +32,7 @@ public partial class EntityView : Node3D
         AddChild(new MeshInstance3D
         {
             Name = "Body",
-            Mesh = new CapsuleMesh { Radius = 0.3f, Height = Height },
+            Mesh = new CapsuleMesh { Radius = Radius, Height = Height },
             MaterialOverride = new StandardMaterial3D { AlbedoColor = color },
             Position = Vector3.Up * Height / 2,
         });
@@ -46,7 +50,7 @@ public partial class EntityView : Node3D
     /// <summary>Шаг интерполяции на delta секунд.</summary>
     public void Advance(double delta)
     {
-        _progress = Mathf.Min(1, _progress + (float)(delta / GameClock.SecondsPerTick));
+        _progress = Mathf.Min(1, _progress + (float)(delta / GameClock.RealSecondsPerTick));
         Position = _from.Lerp(_to, _progress);
     }
 }

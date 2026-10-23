@@ -11,9 +11,6 @@ public partial class ChunkView : Node3D
     /// <summary>Узел полов.</summary>
     private readonly MeshInstance3D _floors = new() { Name = "Floors", MaterialOverride = _material };
 
-    /// <summary>Узел стен и дверей.</summary>
-    private readonly MultiMeshInstance3D _walls = new() { Name = "Walls", MaterialOverride = _material };
-
     /// <summary>Чанк по x.</summary>
     public int ChunkX { get; private set; }
 
@@ -26,13 +23,30 @@ public partial class ChunkView : Node3D
     /// <summary>Есть ли полы в последней постройке.</summary>
     public bool HasFloors => _floors.Mesh is not null;
 
+    /// <summary>Видимые стены, для тестов.</summary>
+    public MultiMeshInstance3D VisibleWalls { get; } = new()
+    {
+        Name = "Walls",
+        MaterialOverride = Cutaway.Material,
+        CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+    };
+
+    /// <summary>Стены для теней, для тестов.</summary>
+    public MultiMeshInstance3D ShadowWalls { get; } = new()
+    {
+        Name = "WallShadows",
+        MaterialOverride = _material,
+        CastShadow = GeometryInstance3D.ShadowCastingSetting.ShadowsOnly,
+    };
+
     /// <summary>Настройка на чанк; вызывается сразу после создания.</summary>
     public void Init(int chunkX, int chunkY)
     {
         (ChunkX, ChunkY) = (chunkX, chunkY);
         Name = $"Chunk_{chunkX}_{chunkY}";
         AddChild(_floors);
-        AddChild(_walls);
+        AddChild(VisibleWalls);
+        AddChild(ShadowWalls);
     }
 
     /// <summary>Перестройка полов и стен по текущему миру реплики.</summary>
@@ -53,6 +67,7 @@ public partial class ChunkView : Node3D
             multi.SetInstanceColor(i, Walls[i].Color);
         }
 
-        _walls.Multimesh = multi;
+        VisibleWalls.Multimesh = multi;
+        ShadowWalls.Multimesh = multi;
     }
 }

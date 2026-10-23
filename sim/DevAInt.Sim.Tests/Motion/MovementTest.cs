@@ -99,7 +99,7 @@ public class MovementTest
         // На каждом тике тело не ближе радиуса к углам проёма, то есть не залезает в косяк
         for (int i = 0; i < 20; i++)
         {
-            position = Movement.Step(world, position, new MoveInput(0, 1), GameClock.SecondsPerTick, MoveParams.Default);
+            position = Movement.Step(world, position, new MoveInput(0, 1), GameClock.RealSecondsPerTick, MoveParams.Default);
             Assert.True(Distance(position, 6, 9) >= _radius - 1e-9, $"inside the west door frame at {position}");
             Assert.True(Distance(position, 7, 9) >= _radius - 1e-9, $"inside the east door frame at {position}");
         }
@@ -113,7 +113,7 @@ public class MovementTest
     {
         MoveParams fast = MoveParams.Default with { Speed = 100 };
 
-        WorldPos end = Movement.Step(Room(), new WorldPos(5.5, 6.5, 0), new MoveInput(1, 0), GameClock.SecondsPerTick, fast);
+        WorldPos end = Movement.Step(Room(), new WorldPos(5.5, 6.5, 0), new MoveInput(1, 0), GameClock.RealSecondsPerTick, fast);
 
         Assert.Equal(10 - _radius, end.X, Precision);
     }
@@ -133,7 +133,7 @@ public class MovementTest
     {
         WorldPos start = new(5.5, 6.5, 0);
 
-        Assert.Equal(start, Movement.Step(Room(), start, MoveInput.None, GameClock.SecondsPerTick, MoveParams.Default));
+        Assert.Equal(start, Movement.Step(Room(), start, MoveInput.None, GameClock.RealSecondsPerTick, MoveParams.Default));
     }
 
     /// <summary>Одинаковые данные дают одинаковый результат, мир не меняется.</summary>
@@ -158,10 +158,10 @@ public class MovementTest
     private static WorldPos Walk(World world, WorldPos from, MoveInput input, double seconds)
     {
         WorldPos position = from;
-        int ticks = (int)Math.Round(seconds / GameClock.SecondsPerTick);
+        int ticks = (int)Math.Round(seconds / GameClock.RealSecondsPerTick);
         for (int i = 0; i < ticks; i++)
         {
-            position = Movement.Step(world, position, input, GameClock.SecondsPerTick, MoveParams.Default);
+            position = Movement.Step(world, position, input, GameClock.RealSecondsPerTick, MoveParams.Default);
         }
 
         return position;

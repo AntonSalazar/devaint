@@ -6,6 +6,14 @@ public class EntityViewTest : TestCase
     /// <summary>Допуск координат.</summary>
     private const double Tolerance = 1e-4;
 
+    /// <summary>Капсула тоньше тела sim настолько, что не входит в стену: иначе она ловит свет снаружи.</summary>
+    public void TestCapsuleFitsBesideWall()
+    {
+        double gap = DevAInt.Sim.Motion.MoveParams.Default.Radius - (ChunkMesh.WallThickness / 2) - EntityView.Radius;
+
+        Check(gap > 0.01, $"capsule surface stays {gap} m away from the wall face");
+    }
+
     /// <summary>За полтика капсула проходит половину пути, за тик и дальше стоит в цели.</summary>
     public void TestInterpolatesOverOneTick()
     {

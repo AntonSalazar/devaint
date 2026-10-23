@@ -49,6 +49,25 @@ public class ChunkMeshTest : TestCase
         CheckNear(ChunkMesh.WallHeight / 2, door.Transform.Origin.Y, Tolerance, "door height center");
     }
 
+    /// <summary>Закрытые куски стен длиннее ребра на толщину стены: соседи перекрываются, щелей в углах нет.</summary>
+    public void TestWallPiecesOverlap()
+    {
+        foreach (WallInstance wall in ChunkMesh.BuildWalls(_world, _table, 0, 0).Where(wall => !wall.IsDoor))
+        {
+            CheckNear(1 + ChunkMesh.WallThickness, wall.Transform.Basis.X.Length(), Tolerance, $"wall piece at {wall.Transform.Origin}");
+        }
+    }
+
+    /// <summary>Дверь ровно на ребро и тоньше стены: на стыке её грани не совпадают с гранями соседних стен.</summary>
+    public void TestDoorIsThinnerThanWalls()
+    {
+        WallInstance door = ChunkMesh.BuildWalls(_world, _table, 0, 0).Single(wall => wall.IsDoor);
+
+        CheckNear(1, door.Transform.Basis.X.Length(), Tolerance, "door length");
+        CheckNear(ChunkMesh.DoorThickness, door.Transform.Basis.Z.Length(), Tolerance, "door thickness");
+        Check(ChunkMesh.DoorThickness < ChunkMesh.WallThickness, "door is thinner than walls");
+    }
+
     /// <summary>Открытая дверь повёрнута вокруг петли внутрь клетки и короче ребра.</summary>
     public void TestOpenDoorIsRotated()
     {

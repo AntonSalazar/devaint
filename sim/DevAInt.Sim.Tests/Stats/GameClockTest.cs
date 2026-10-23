@@ -22,15 +22,18 @@ public class GameClockTest
         Assert.Equal(24 * 60, clock.Minutes, precision: 6);
     }
 
-    /// <summary>Скорость времени задаётся при создании.</summary>
+    /// <summary>Ускорение умножает и игровые минуты, и секунды симуляции за тик; реальный тик не меняется.</summary>
     [Fact]
-    public void MinutesFollowSpeed()
+    public void TimeScaleSpeedsUpEverything()
     {
-        GameClock clock = new(minutesPerTick: 2);
+        GameClock clock = new(timeScale: 50);
 
         clock.Advance();
         clock.Advance();
 
-        Assert.Equal(4, clock.Minutes);
+        Assert.Equal(2, clock.MinutesPerTick, precision: 9);
+        Assert.Equal(5, clock.SecondsPerTick, precision: 9);
+        Assert.Equal(4, clock.Minutes, precision: 9);
+        Assert.Equal(0.1, GameClock.RealSecondsPerTick);
     }
 }
