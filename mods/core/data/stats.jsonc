@@ -1,13 +1,45 @@
-// Статы тела персонажа.
+// Статы тела персонажа. Скорости - в игровую минуту, черновые, настроим по игре.
 {
   "stats": [
     {
       "id": "core:hunger",
       "min": 0,
       "max": 100,
-      "rate": 0.05, // в игровую минуту
+      "rate": 0.05,
       "moodles": [
-        { "id": "core:hungry", "levels": [40, 70, 90] },
+        {
+          "id": "core:hungry",
+          "levels": [
+            { "at": 40 },
+            // Голод замедляет восстановление сил: усталость растёт быстрее
+            { "at": 70, "effects": [ { "stat": "core:fatigue", "kind": "multiply", "value": 1.5 } ] },
+            { "at": 90, "effects": [ { "stat": "core:fatigue", "kind": "multiply", "value": 2 } ] },
+          ],
+        },
+      ],
+    },
+    {
+      "id": "core:thirst",
+      "min": 0,
+      "max": 100,
+      "rate": 0.08,
+      "moodles": [
+        {
+          "id": "core:thirsty",
+          "levels": [ { "at": 40 }, { "at": 70 }, { "at": 90 } ],
+        },
+      ],
+    },
+    {
+      "id": "core:fatigue",
+      "min": 0,
+      "max": 100,
+      "rate": 0.04,
+      "moodles": [
+        {
+          "id": "core:tired",
+          "levels": [ { "at": 50 }, { "at": 80 }, { "at": 95 } ],
+        },
       ],
     },
   ],

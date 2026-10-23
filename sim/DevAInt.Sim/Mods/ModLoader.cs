@@ -44,6 +44,15 @@ public static class ModLoader
             database.Add((IDef)JsonSerializer.Deserialize(entry.Node, entry.Type, Jsonc.Options)!);
         }
 
+        // Смысловые проверки идут после всех модов и патчей: ссылки на другие определения уже разрешимы
+        foreach ((string id, DefEntry entry) in defs)
+        {
+            foreach (string problem in database.Get<IDef>(id).Validate(database))
+            {
+                errors.Add(new ModError(entry.File, null, id, problem));
+            }
+        }
+
         return new ModLoadResult(ordered, database, errors);
     }
 

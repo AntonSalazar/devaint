@@ -11,7 +11,7 @@ public class PatchTest
     /// <summary>Исходный стат мода alpha.</summary>
     private const string BaseStats = """
         { "stats": [ { "id": "alpha:hunger", "min": 0, "max": 100, "rate": 0.05,
-          "moodles": [ { "id": "alpha:hungry", "levels": [40, 70] }, { "id": "alpha:starving", "levels": [95] } ] } ] }
+          "moodles": [ { "id": "alpha:hungry", "levels": [{ "at": 40 }, { "at": 70 }] }, { "id": "alpha:starving", "levels": [{ "at": 95 }] } ] } ] }
         """;
 
     /// <summary>set заменяет поле.</summary>
@@ -20,32 +20,32 @@ public class PatchTest
     {
         StatDef hunger = Patched("""{ "op": "set", "target": "alpha:hunger", "path": "rate", "value": 0.02 }""");
 
-        Assert.Equal(0.02f, hunger.Rate);
+        Assert.Equal(0.02, hunger.Rate);
     }
 
     /// <summary>set находит элемент списка по id.</summary>
     [Fact]
     public void SetFindsListItemById()
     {
-        StatDef hunger = Patched("""{ "op": "set", "target": "alpha:hunger", "path": "moodles.alpha:hungry.levels", "value": [30, 60] }""");
+        StatDef hunger = Patched("""{ "op": "set", "target": "alpha:hunger", "path": "moodles.alpha:hungry.levels", "value": [{ "at": 30 }, { "at": 60 }] }""");
 
-        Assert.Equal([30f, 60f], hunger.Moodles[0].Levels);
+        Assert.Equal([30.0, 60.0], hunger.Moodles[0].Levels.Select(level => level.At));
     }
 
     /// <summary>set находит элемент списка по номеру.</summary>
     [Fact]
     public void SetFindsListItemByIndex()
     {
-        StatDef hunger = Patched("""{ "op": "set", "target": "alpha:hunger", "path": "moodles.1.levels.0", "value": 99 }""");
+        StatDef hunger = Patched("""{ "op": "set", "target": "alpha:hunger", "path": "moodles.1.levels.0.at", "value": 99 }""");
 
-        Assert.Equal([99f], hunger.Moodles[1].Levels);
+        Assert.Equal(99.0, Assert.Single(hunger.Moodles[1].Levels).At);
     }
 
     /// <summary>add добавляет элемент в конец списка.</summary>
     [Fact]
     public void AddAppendsToList()
     {
-        StatDef hunger = Patched("""{ "op": "add", "target": "alpha:hunger", "path": "moodles", "value": { "id": "beta:sparks", "levels": [50] } }""");
+        StatDef hunger = Patched("""{ "op": "add", "target": "alpha:hunger", "path": "moodles", "value": { "id": "beta:sparks", "levels": [{ "at": 50 }] } }""");
 
         Assert.Equal(["alpha:hungry", "alpha:starving", "beta:sparks"], hunger.Moodles.Select(moodle => moodle.Id));
     }
@@ -65,7 +65,7 @@ public class PatchTest
     {
         StatDef hunger = Patched("""{ "op": "remove", "target": "alpha:hunger", "path": "rate" }""");
 
-        Assert.Equal(0f, hunger.Rate);
+        Assert.Equal(0.0, hunger.Rate);
     }
 
     /// <summary>remove без пути удаляет определение целиком.</summary>
@@ -84,16 +84,16 @@ public class PatchTest
     {
         StatDef hunger = Patched(
             """{ "op": "set", "target": "alpha:hunger", "path": "rate", "value": 1 }""",
-            """{ "op": "set", "target": "alpha:hunger", "path": "max", "value": 50 }""");
+            """{ "op": "set", "target": "alpha:hunger", "path": "max", "value": 120 }""");
 
-        Assert.Equal(1f, hunger.Rate);
-        Assert.Equal(50f, hunger.Max);
+        Assert.Equal(1.0, hunger.Rate);
+        Assert.Equal(120.0, hunger.Max);
     }
 
     /// <summary>Ошибочные патчи дают ошибку с путём патча и не меняют определение.</summary>
     [Theory]
     [InlineData("""{ "op": "set", "target": "alpha:hungerr", "path": "rate", "value": 1 }""", "target alpha:hungerr not found")]
-    [InlineData("""{ "op": "set", "target": "alpha:hunger", "path": "moodles.alpha:nope.levels", "value": [1] }""", "no element alpha:nope")]
+    [InlineData("""{ "op": "set", "target": "alpha:hunger", "path": "moodles.alpha:nope.levels", "value": [] }""", "no element alpha:nope")]
     [InlineData("""{ "op": "add", "target": "alpha:hunger", "path": "rate", "value": 1 }""", "rate is not a list")]
     [InlineData("""{ "op": "set", "target": "alpha:hunger", "path": "rate.x", "value": 1 }""", "value is neither an object nor a list")]
     [InlineData("""{ "op": "set", "target": "alpha:hunger", "path": "rate", "value": "fast" }""", "alpha:hunger is invalid after patch")]
@@ -109,7 +109,7 @@ public class PatchTest
         Assert.Equal("mods/beta/data/patches.jsonc", error.File);
         Assert.Equal("$.patches[0]", error.JsonPath);
         Assert.Contains(message, error.Message);
-        Assert.Equal(0.05f, result.Defs.Get<StatDef>("alpha:hunger").Rate);
+        Assert.Equal(0.05, result.Defs.Get<StatDef>("alpha:hunger").Rate);
     }
 
     /// <summary>Неизвестная операция - ошибка со строкой.</summary>

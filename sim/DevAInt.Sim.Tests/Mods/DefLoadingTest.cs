@@ -16,7 +16,7 @@ public class DefLoadingTest
         mods.Manifest("alpha").Write("alpha/data/stats.jsonc", """
             // комментарий
             { "stats": [ { "id": "alpha:hunger", "min": 0, "max": 100, "rate": 0.5,
-                           "moodles": [ { "id": "alpha:hungry", "levels": [40, 70] }, ] } ] }
+                           "moodles": [ { "id": "alpha:hungry", "levels": [{ "at": 40 }, { "at": 70 }] }, ] } ] }
             """);
 
         ModLoadResult result = mods.Load("alpha");
@@ -24,8 +24,8 @@ public class DefLoadingTest
         Assert.True(result.Ok, string.Join("\n", result.Errors));
         StatDef hunger = result.Defs.Get<StatDef>("alpha:hunger");
         Assert.Equal(100, hunger.Max);
-        Assert.Equal(0.5f, hunger.Rate);
-        Assert.Equal([40f, 70f], Assert.Single(hunger.Moodles).Levels);
+        Assert.Equal(0.5, hunger.Rate);
+        Assert.Equal([40.0, 70.0], Assert.Single(hunger.Moodles).Levels.Select(level => level.At));
     }
 
     /// <summary>Id чужого пространства имён - ошибка.</summary>
