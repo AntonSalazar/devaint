@@ -6,6 +6,7 @@ using DevAInt.Sim.Logging;
 using DevAInt.Sim.Lua;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Motion;
+using DevAInt.Sim.Net;
 using DevAInt.Sim.Stats;
 
 namespace DevAInt.Sim.Bench;
@@ -42,6 +43,7 @@ internal static class Program
                 end)
                 """);
             MeasureWalking(temp);
+            MeasureServer(temp);
             MeasureHookCalls(temp);
             return 0;
         }
@@ -78,6 +80,40 @@ internal static class Program
         }
 
         Measure("all entities walk with wall collisions", sim.Tick);
+    }
+
+    /// <summary>Сервер с одним клиентом, который видит 1000 идущих сущностей: тик sim и сборка пакета.</summary>
+    private static void MeasureServer(string mods)
+    {
+        File.WriteAllText(Path.Combine(mods, "bench", "scripts", "main.lua"), string.Empty);
+        Simulation sim = new(Load(mods), new ConsoleLog(), "core:starter_room");
+        for (int i = 0; i < Entities; i++)
+        {
+            long id = sim.CreateEntity(new WorldPos(2.5 + (i % 10), 2.5 + (i / 10 % 2), 0));
+            sim.Entity(id).Input = new MoveInput(Math.Cos(i), Math.Sin(i));
+        }
+
+        LoopbackTransport transport = new();
+        GameServer server = new(sim, transport, new ConsoleLog());
+        IConnection client = transport.Connect();
+        int ticks = 0;
+        Measure("server tick, 1 client sees all entities", () =>
+        {
+            // Разворот каждые 3 секунды, чтобы сущности не стояли у стен и двигались всегда
+            if (++ticks % 30 == 0)
+            {
+                foreach (Entity entity in sim.Entities)
+                {
+                    entity.Input = new MoveInput(-entity.Input.X, -entity.Input.Y);
+                }
+            }
+
+            server.Tick();
+            while (client.TryReceive(out _))
+            {
+            }
+        });
+        Console.WriteLine($"  {"last packet",-45} {server.LastFrameBytes(0),9} bytes");
     }
 
     /// <summary>Худший случай: хук stat_threshold вызывается для каждой сущности каждый тик.</summary>

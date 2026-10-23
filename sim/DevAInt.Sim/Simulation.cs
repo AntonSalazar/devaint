@@ -34,7 +34,12 @@ public sealed class Simulation
         StatTable = new StatTable(mods.Defs);
         WorldTable = new WorldTable(mods.Defs);
         _hasMap = mapId is not null;
-        World = mapId is null ? new World(1, 1) : MapBuilder.Build(mods.Defs.Get<MapDef>(mapId), WorldTable);
+        MapDef? map = mapId is null ? null : mods.Defs.Get<MapDef>(mapId);
+        World = map is null ? new World(1, 1) : MapBuilder.Build(map, WorldTable);
+        Spawn = map is null ? WorldPos.CenterOf(new CellPos(0, 0, 0)) : WorldPos.CenterOf(new CellPos(map.Spawn.X, map.Spawn.Y, map.Spawn.Z));
+
+        // Постройка карты - не изменения для клиентов: они получат мир снимками чанков
+        World.ClearChanges();
         Clock = clock ?? new GameClock();
         _lua = new LuaHost(StatTable, FindStats, log);
         ScriptErrors = _lua.Load(mods.Mods);
@@ -55,6 +60,12 @@ public sealed class Simulation
     /// <summary>Ошибки загрузки Lua-скриптов модов.</summary>
     public IReadOnlyList<ModError> ScriptErrors { get; }
 
+    /// <summary>Точка появления игроков: центр клетки spawn карты.</summary>
+    public WorldPos Spawn { get; }
+
+    /// <summary>Сущности в порядке создания.</summary>
+    internal IReadOnlyList<Entity> Entities => _order;
+
     /// <summary>Новая сущность со статами на минимуме; на карте позиция должна быть на полу.</summary>
     public long CreateEntity(WorldPos? at = null)
     {
@@ -72,6 +83,18 @@ public sealed class Simulation
 
     /// <summary>Сущность по id, исключение если её нет.</summary>
     public Entity Entity(long id) => _entities[id];
+
+    /// <summary>Удаление сущности, false если её нет.</summary>
+    public bool RemoveEntity(long id)
+    {
+        if (!_entities.Remove(id, out Entity? entity))
+        {
+            return false;
+        }
+
+        _order.Remove(entity);
+        return true;
+    }
 
     /// <summary>Тик: время, движение, статы всех сущностей, хуки stat_threshold по сменам мудлов, хуки tick.</summary>
     public void Tick()

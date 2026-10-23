@@ -6,6 +6,7 @@
       "id": "core:starter_room",
       "width": 32,
       "height": 32,
+      "spawn": { "x": 6, "y": 6 },
       "build": [
         { "floor": "core:wood_floor", "x": 2, "y": 2, "w": 10, "h": 10 },
         { "walls": "core:wood_wall", "x": 4, "y": 4, "w": 6, "h": 5 },

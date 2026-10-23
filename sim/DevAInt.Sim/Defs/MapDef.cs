@@ -18,6 +18,9 @@ public sealed record MapDef : IDef
     /// <summary>Операции построения, применяются по порядку.</summary>
     public IReadOnlyList<MapOpDef> Build { get; init; } = [];
 
+    /// <summary>Клетка появления игроков.</summary>
+    public SpawnDef Spawn { get; init; } = new();
+
     /// <inheritdoc/>
     public IEnumerable<string> Validate(DefDatabase defs)
     {
@@ -25,6 +28,11 @@ public sealed record MapDef : IDef
         {
             yield return $"size {Width}x{Height} must be within 1..{World.MaxSize}";
             yield break;
+        }
+
+        if (Spawn.X < 0 || Spawn.Y < 0 || Spawn.X >= Width || Spawn.Y >= Height || Spawn.Z < World.MinLevel || Spawn.Z > World.MaxLevel)
+        {
+            yield return $"spawn {Spawn.X},{Spawn.Y},{Spawn.Z} is outside the map";
         }
 
         for (int i = 0; i < Build.Count; i++)
@@ -35,6 +43,19 @@ public sealed record MapDef : IDef
             }
         }
     }
+}
+
+/// <summary>Клетка появления игроков на карте.</summary>
+public sealed record SpawnDef
+{
+    /// <summary>Клетка по x.</summary>
+    public int X { get; init; }
+
+    /// <summary>Клетка по y.</summary>
+    public int Y { get; init; }
+
+    /// <summary>Этаж.</summary>
+    public int Z { get; init; }
 }
 
 /// <summary>Операция построения: ровно одно из floor, walls, door и прямоугольник или клетка.</summary>
