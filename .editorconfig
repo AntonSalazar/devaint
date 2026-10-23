@@ -51,3 +51,8 @@ dotnet_naming_symbols.private_fields.applicable_accessibilities = private
 dotnet_naming_style.pascal_case_style.capitalization = pascal_case
 dotnet_naming_style.underscore_camel_style.capitalization = camel_case
 dotnet_naming_style.underscore_camel_style.required_prefix = _
+# Не помечать строки с JSON в тестах комментарием lang=json
+dotnet_diagnostic.JSON002.severity = none
+# Не дописывать недостающие ветки switch заглушками NotImplementedException: это ломает рабочий код
+dotnet_diagnostic.IDE0072.severity = none
+dotnet_diagnostic.IDE0010.severity = none
