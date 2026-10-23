@@ -45,8 +45,8 @@ format:
 # Screenshot dir, кадры Movie Maker
 SHOT_DIR := env("SHOT_DIR", "/tmp/devaint-shots")
 
-# Screenshot: записать ~2 сек кадров в SHOT_DIR, последний кадр - снимок
+# Screenshot: записать ~3 сек кадров в SHOT_DIR, персонаж сам ходит по кругу; последний кадр - снимок
 shot: build
     rm -rf {{SHOT_DIR}} && mkdir -p {{SHOT_DIR}}
-    {{GODOT}} --path {{PROJECT_ROOT}} --write-movie {{SHOT_DIR}}/frame.png --fixed-fps 10 --quit-after 20 --resolution 1280x720 > /dev/null 2>&1
+    {{GODOT}} --path {{PROJECT_ROOT}} --write-movie {{SHOT_DIR}}/frame.png --fixed-fps 10 --quit-after 30 --resolution 1280x720 -- --autowalk > /dev/null 2>&1
     @ls {{SHOT_DIR}}/*.png | tail -1

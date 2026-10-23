@@ -1,10 +1,10 @@
-// Полы, стены и двери.
+// Полы, стены и двери. Цвет - пока моделей и текстур нет.
 {
   "floors": [
-    { "id": "core:wood_floor" },
+    { "id": "core:wood_floor", "color": "#8b6b4a" },
   ],
   "walls": [
-    { "id": "core:wood_wall", "kind": "wall" },
-    { "id": "core:wood_door", "kind": "door" },
+    { "id": "core:wood_wall", "kind": "wall", "color": "#c8b89a" },
+    { "id": "core:wood_door", "kind": "door", "color": "#6b3f22" },
   ],
 }

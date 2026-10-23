@@ -55,6 +55,21 @@ public class MapValidationTest
         Assert.Equal("size 5000x8 must be within 1..4096", Assert.Single(mods.Load("alpha").Errors).Message);
     }
 
+    /// <summary>Цвет пола и стены только в виде #rrggbb.</summary>
+    [Theory]
+    [InlineData("""{ "floors": [ { "id": "alpha:f", "color": "brown" } ] }""", "alpha:f")]
+    [InlineData("""{ "walls": [ { "id": "alpha:w", "kind": "wall", "color": "#12345" } ] }""", "alpha:w")]
+    public void BadColorIsError(string data, string id)
+    {
+        using TempMods mods = new();
+        mods.Manifest("alpha").Write("alpha/data/world.jsonc", data);
+
+        ModError error = Assert.Single(mods.Load("alpha").Errors);
+
+        Assert.Equal(id, error.JsonPath);
+        Assert.Contains("must look like #rrggbb", error.Message);
+    }
+
     /// <summary>Мод alpha с картой 8 на 8 и операциями build.</summary>
     private static ModLoadResult Load(string ops)
     {

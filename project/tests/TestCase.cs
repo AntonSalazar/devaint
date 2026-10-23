@@ -36,6 +36,13 @@ public abstract class TestCase
         }
     }
 
+    /// <summary>Проверка, что числа равны с допуском tolerance.</summary>
+    protected void CheckNear(double expected, double actual, double tolerance, string message)
+    {
+        bool near = System.Math.Abs(expected - actual) <= tolerance;
+        Check(near, $"{message}: expected {expected} +- {tolerance}, got {actual}");
+    }
+
     /// <summary>Проверка, что значения равны.</summary>
     protected void CheckEqual<T>(T expected, T actual, string message)
     {

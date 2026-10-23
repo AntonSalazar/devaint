@@ -21,6 +21,9 @@ public sealed record WallDef : IDef
     /// <summary>Вид: стена или дверь.</summary>
     public required WallKind Kind { get; init; }
 
+    /// <summary>Цвет в виде #rrggbb, пока моделей и текстур нет.</summary>
+    public string Color { get; init; } = "#a0a0a0";
+
     /// <inheritdoc/>
-    public IEnumerable<string> Validate(DefDatabase defs) => [];
+    public IEnumerable<string> Validate(DefDatabase defs) => DefColor.Validate(Color);
 }
