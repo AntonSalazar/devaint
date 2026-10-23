@@ -29,10 +29,14 @@
 
 ### 0. Скелет
 
-- Решение (`.sln`) с проектами: `sim/` (библиотека на чистом C#), `sim.Tests/` (xUnit),
-  `project/` (Godot C#, ссылается на sim).
-- `justfile`: `test`, `format`, `build`, `run`, `server`.
+- Решение `project/DevAInt.sln` с проектами: `sim/DevAInt.Sim/` (библиотека на чистом
+  C#), `sim/DevAInt.Sim.Tests/` (xUnit), `project/` (Godot C#, ссылается на sim).
+- `justfile`: `build`, `run`, `editor`, `server`, `test`, `test-sim`, `format`, `shot`.
 - Стиль из `.editorconfig`, `dotnet format --verify-no-changes` в `just test`.
+- Тесты Godot-части: свой маленький раннер на C# в `project/tests/` (`TestCase`,
+  `TestRunner.tscn`), выход с кодом 0 или 1.
+
+**Статус:** готов 2026-10-23.
 
 **Готово, когда:** `just test` зелёный, пустая сцена Godot запускается.
 
