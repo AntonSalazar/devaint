@@ -34,6 +34,10 @@ test-sim:
 bench:
     dotnet run -c Release --project sim/DevAInt.Sim.Bench/ -- mods
 
+# Map: ASCII-дамп этажа карты из модов, без Godot: `just map core:starter_room 0`
+map id="core:starter_room" z="0":
+    dotnet run --project sim/DevAInt.Sim.Tool/ -- map mods {{id}} {{z}}
+
 # Format: поправить стиль C# по .editorconfig
 format:
     dotnet format {{PROJECT_ROOT}}/DevAInt.sln

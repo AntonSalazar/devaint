@@ -1,0 +1,10 @@
+// Полы, стены и двери.
+{
+  "floors": [
+    { "id": "core:wood_floor" },
+  ],
+  "walls": [
+    { "id": "core:wood_wall", "kind": "wall" },
+    { "id": "core:wood_door", "kind": "door" },
+  ],
+}
