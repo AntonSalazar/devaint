@@ -9,8 +9,11 @@
   <ItemGroup>
     <!-- Тесты видят internal-члены, чтобы проверять части sim, не делая их публичным API. -->
     <InternalsVisibleTo Include="DevAInt.Sim.Tests" />
+    <InternalsVisibleTo Include="DevAInt.Sim.Bench" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556" PrivateAssets="all" />
+    <!-- Lua для скриптов модов: интерпретатор на чистом C#, без нативных библиотек. -->
+    <PackageReference Include="MoonSharp" Version="2.0.0" />
   </ItemGroup>
 </Project>

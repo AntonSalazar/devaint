@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DevAInt.Sim", "..\sim\DevAI
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DevAInt.Sim.Tests", "..\sim\DevAInt.Sim.Tests\DevAInt.Sim.Tests.csproj", "{A7551BF2-30A3-4FC4-BAFB-4740D1E86524}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DevAInt.Sim.Bench", "..\sim\DevAInt.Sim.Bench\DevAInt.Sim.Bench.csproj", "{CC07A9FC-7A7E-4D32-B5AA-2AD6AB52E186}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -55,6 +57,18 @@ Global
 		{A7551BF2-30A3-4FC4-BAFB-4740D1E86524}.Release|x64.Build.0 = Release|Any CPU
 		{A7551BF2-30A3-4FC4-BAFB-4740D1E86524}.Release|x86.ActiveCfg = Release|Any CPU
 		{A7551BF2-30A3-4FC4-BAFB-4740D1E86524}.Release|x86.Build.0 = Release|Any CPU
+		{CC07A9FC-7A7E-4D32-B5AA-2AD6AB52E186}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CC07A9FC-7A7E-4D32-B5AA-2AD6AB52E186}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CC07A9FC-7A7E-4D32-B5AA-2AD6AB52E186}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{CC07A9FC-7A7E-4D32-B5AA-2AD6AB52E186}.Debug|x64.Build.0 = Debug|Any CPU
+		{CC07A9FC-7A7E-4D32-B5AA-2AD6AB52E186}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{CC07A9FC-7A7E-4D32-B5AA-2AD6AB52E186}.Debug|x86.Build.0 = Debug|Any CPU
+		{CC07A9FC-7A7E-4D32-B5AA-2AD6AB52E186}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CC07A9FC-7A7E-4D32-B5AA-2AD6AB52E186}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CC07A9FC-7A7E-4D32-B5AA-2AD6AB52E186}.Release|x64.ActiveCfg = Release|Any CPU
+		{CC07A9FC-7A7E-4D32-B5AA-2AD6AB52E186}.Release|x64.Build.0 = Release|Any CPU
+		{CC07A9FC-7A7E-4D32-B5AA-2AD6AB52E186}.Release|x86.ActiveCfg = Release|Any CPU
+		{CC07A9FC-7A7E-4D32-B5AA-2AD6AB52E186}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

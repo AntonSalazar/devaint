@@ -30,6 +30,10 @@ test: build test-sim
 test-sim:
     dotnet test sim/DevAInt.Sim.Tests/
 
+# Bench: замеры тика sim на 1000 сущностей, Release-сборка
+bench:
+    dotnet run -c Release --project sim/DevAInt.Sim.Bench/ -- mods
+
 # Format: поправить стиль C# по .editorconfig
 format:
     dotnet format {{PROJECT_ROOT}}/DevAInt.sln

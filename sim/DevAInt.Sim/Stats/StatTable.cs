@@ -64,6 +64,12 @@ public sealed class StatTable
     /// <summary>Номер мудла по id, исключение если его нет.</summary>
     public int MoodleIndex(string id) => _moodleIndex[id];
 
+    /// <summary>Номер стата по id, false если его нет.</summary>
+    public bool TryStatIndex(string id, out int index) => _statIndex.TryGetValue(id, out index);
+
+    /// <summary>Номер мудла по id, false если его нет.</summary>
+    public bool TryMoodleIndex(string id, out int index) => _moodleIndex.TryGetValue(id, out index);
+
     /// <summary>Эффекты уровня с номерами статов.</summary>
     private IReadOnlyList<ResolvedEffect> Resolve(IReadOnlyList<EffectDef> effects) => [.. effects.Select(ToResolved)];
 
