@@ -1,25 +1,52 @@
 using Godot;
 
-/// <summary>Общий материал стен со срезом вокруг своего персонажа.</summary>
+/// <summary>Общий материал стен со срезом и проверка, закрывает ли кусок стены персонажа.</summary>
 public static class Cutaway
 {
     /// <summary>Путь шейдера среза.</summary>
     public const string ShaderPath = "res://view/wall_cutaway.gdshader";
 
-    /// <summary>Высота центра тела над полом, туда смотрит срез.</summary>
-    public const float BodyCenter = 0.85f;
+    /// <summary>Высота тела, которую должна закрыть стена, чтобы её резать.</summary>
+    public const float BodyHeight = 1.7f;
 
-    /// <summary>Материал стен, один на все чанки, поэтому фокус задаётся один раз за кадр.</summary>
+    /// <summary>Полуширина тела поперёк взгляда: лучи к камере идут от центра и от обоих краёв.</summary>
+    public const float BodyRadius = 0.25f;
+
+    /// <summary>Насколько персонаж должен отойти от плоскости куска, чтобы считаться за ним: в дверном проёме срез не мигает.</summary>
+    public const float SideEpsilon = 0.05f;
+
+    /// <summary>Материал стен, один на все чанки; какие куски опущены, задают данные экземпляров.</summary>
     public static ShaderMaterial Material { get; } = new() { Shader = GD.Load<Shader>(ShaderPath) };
 
-    /// <summary>Фокус среза: точка на полу под персонажем.</summary>
-    public static void SetFocus(Vector3 feet)
+    /// <summary>Закрывает ли кусок стены тело персонажа от камеры: хоть один из лучей от центра и краёв тела к камере проходит через кусок.</summary>
+    public static bool Occludes(Transform3D piece, Vector3 feet, Vector3 back)
     {
-        Material.SetShaderParameter("focus", feet + (Vector3.Up * BodyCenter));
-        Material.SetShaderParameter("floor_y", feet.Y);
-        Material.SetShaderParameter("enabled", true);
+        // Лучи к камере от центра тела и от его краёв поперёк взгляда: кусок режется, если хоть один
+        // луч проходит через него. Запас вдоль стены тут не годится: конец куска рядом с телом
+        // бывает позади него, и тогда тело он не закрывает
+        Vector3 side = new Vector3(back.Z, 0, -back.X).Normalized() * BodyRadius;
+        return Hits(piece, feet, back) || Hits(piece, feet + side, back) || Hits(piece, feet - side, back);
     }
 
-    /// <summary>Срез выключен: своего персонажа нет.</summary>
-    public static void Disable() => Material.SetShaderParameter("enabled", false);
+    /// <summary>Проходит ли луч к камере от точки на полу через кусок стены, считая рост тела над ней.</summary>
+    private static bool Hits(Transform3D piece, Vector3 feet, Vector3 back)
+    {
+        // Кусок - единичный бокс, растянутый матрицей: X - длина, Y - высота, Z - толщина, начало - центр.
+        // Луч от макушки идёт выше луча от ног на рост: подъём вдоль стены не меняет расстояние до её плоскости
+        Vector3 length = piece.Basis.X;
+        Vector3 height = piece.Basis.Y;
+        Vector3 normal = piece.Basis.Z.Normalized();
+        float toward = back.Dot(normal);
+        float distance = (piece.Origin - feet).Dot(normal);
+        if (Mathf.Abs(toward) < 1e-5f || Mathf.Abs(distance) < SideEpsilon || distance / toward <= 0)
+        {
+            return false;
+        }
+
+        Vector3 hit = feet + (back * (distance / toward)) - piece.Origin;
+        float along = Mathf.Abs(hit.Dot(length) / length.Length());
+        float up = hit.Dot(height) / height.Length();
+        float half = height.Length() / 2;
+        return along <= length.Length() / 2 && up <= half && up + BodyHeight >= -half;
+    }
 }

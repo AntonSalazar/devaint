@@ -288,7 +288,7 @@ public partial class GameRoot : Node3D
     {
         if (_view!.Entity(_client!.Replica.OwnEntityId) is not EntityView own)
         {
-            Cutaway.Disable();
+            _view.UpdateCutaway(null, _camera!.Basis.Z);
             return;
         }
 
@@ -299,7 +299,7 @@ public partial class GameRoot : Node3D
         }
 
         _camera!.Follow(own.Position, delta);
-        Cutaway.SetFocus(own.Position);
+        _view.UpdateCutaway(own.Position, _camera.Basis.Z);
     }
 
     /// <summary>Точка под курсором на земле своего этажа в координатах sim; null без своей сущности.</summary>

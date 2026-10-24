@@ -6,7 +6,10 @@ using Godot;
 using Side = DevAInt.Sim.Grid.Side;
 
 /// <summary>Стена или дверь чанка: положение бокса, цвет и вид.</summary>
-public readonly record struct WallInstance(Transform3D Transform, Color Color, bool IsDoor, bool Open);
+public readonly record struct WallInstance(Transform3D Transform, Color Color, bool IsDoor, bool Open, WallKey Key);
+
+/// <summary>Ребро клетки, на котором стоит кусок стены: клетка-владелец и северное ли это ребро.</summary>
+public readonly record struct WallKey(CellPos Owner, bool North);
 
 /// <summary>Геометрия чанка из данных мира: квады полов и боксы стен.</summary>
 public static class ChunkMesh
@@ -111,7 +114,7 @@ public static class ChunkMesh
             length = OpenDoorLength;
         }
 
-        walls.Add(new WallInstance(Segment(start, along, length, thickness), Color.FromHtml(wall.Color), isDoor, edge.Open));
+        walls.Add(new WallInstance(Segment(start, along, length, thickness), Color.FromHtml(wall.Color), isDoor, edge.Open, new WallKey(cell, north)));
     }
 
     /// <summary>Положение единичного бокса, растянутого вдоль direction на length от start, толщиной thickness.</summary>

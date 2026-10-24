@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using DevAInt.Sim.Creatures;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Motion;
@@ -22,6 +23,9 @@ public partial class WorldView : Node3D
 
     /// <summary>Виды существ по номерам, для цветов капсул.</summary>
     private CreatureTable? _creatures;
+
+    /// <summary>Опущенные сейчас куски стен.</summary>
+    private HashSet<WallKey> _cut = [];
 
     /// <summary>Число узлов чанков.</summary>
     public int ChunkCount => _chunks.Count;
@@ -51,6 +55,24 @@ public partial class WorldView : Node3D
 
     /// <summary>Узел сущности или null.</summary>
     public EntityView? Entity(long id) => _entities.GetValueOrDefault(id);
+
+    /// <summary>Срез стен под ноги своего персонажа feet при взгляде камеры против back; null - персонажа нет, все стены целые.</summary>
+    public void UpdateCutaway(Vector3? feet, Vector3 back)
+    {
+        HashSet<WallKey> cut = feet is Vector3 at && _replica?.World is World world
+            ? CutawayPlan.Compute(world, at, back, _chunks.Values.SelectMany(chunk => chunk.Walls))
+            : [];
+
+        // Данные экземпляров пишутся, только когда план поменялся: персонаж чаще стоит или идёт вдоль комнаты
+        if (!cut.SetEquals(_cut))
+        {
+            _cut = cut;
+            ApplyCut();
+        }
+    }
+
+    /// <summary>Опущено ли ребро сейчас, для тестов.</summary>
+    public bool IsCut(WallKey key) => _cut.Contains(key);
 
     /// <summary>Своя капсула смотрит по вводу движения; без ввода взгляд прежний.</summary>
     public void FaceOwn(MoveInput input) => Entity(_replica!.OwnEntityId)?.SetFacing(new Vector3((float)input.X, 0, (float)input.Y));
@@ -105,6 +127,16 @@ public partial class WorldView : Node3D
         AddChild(chunk);
         _chunks[(chunkX, chunkY)] = chunk;
         chunk.Rebuild(_replica!.World!, _table!);
+        chunk.ApplyCut(_cut);
+    }
+
+    /// <summary>Текущий срез во все чанки.</summary>
+    private void ApplyCut()
+    {
+        foreach (ChunkView chunk in _chunks.Values)
+        {
+            chunk.ApplyCut(_cut);
+        }
     }
 
     /// <summary>Чанк вышел из зоны.</summary>
@@ -117,7 +149,14 @@ public partial class WorldView : Node3D
     }
 
     /// <summary>Пол изменился: перестройка его чанка.</summary>
-    private void OnCellChanged(CellPos cell) => Chunk(cell.X / World.ChunkSize, cell.Y / World.ChunkSize)?.Rebuild(_replica!.World!, _table!);
+    private void OnCellChanged(CellPos cell)
+    {
+        if (Chunk(cell.X / World.ChunkSize, cell.Y / World.ChunkSize) is ChunkView chunk)
+        {
+            chunk.Rebuild(_replica!.World!, _table!);
+            chunk.ApplyCut(_cut);
+        }
+    }
 
     /// <summary>Ребро изменилось: перестройка чанка клетки-владельца.</summary>
     private void OnEdgeChanged(CellPos owner, bool north) => OnCellChanged(owner);
