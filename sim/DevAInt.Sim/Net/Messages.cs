@@ -68,6 +68,9 @@ public sealed record ServerFrame(long Tick, IReadOnlyList<ServerMessage> Message
 /// <summary>Сообщение клиента серверу.</summary>
 public abstract record ClientMessage;
 
+/// <summary>Первое сообщение клиента: кто играет; по id сервер возвращает сохранённого персонажа.</summary>
+public sealed record HelloMessage(string PlayerId) : ClientMessage;
+
 /// <summary>Ввод движения: номер по порядку и направление.</summary>
 public sealed record InputMessage(uint Sequence, float X, float Y) : ClientMessage;
 

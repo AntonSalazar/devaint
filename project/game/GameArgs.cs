@@ -7,6 +7,9 @@ public static class GameArgs
     /// <summary>Порт сервера по умолчанию.</summary>
     public const int DefaultPort = 7777;
 
+    /// <summary>Имя сохранения по умолчанию.</summary>
+    public const string DefaultSave = "world";
+
     /// <summary>Ускорение игрового времени из --time-scale N, по умолчанию 1.</summary>
     public static double TimeScale(string[] args) => Number(args, "--time-scale") is double scale && scale > 0 ? scale : 1;
 
@@ -35,6 +38,12 @@ public static class GameArgs
 
     /// <summary>Искусственная задержка сети туда-обратно в миллисекундах из --lag N, по умолчанию 0.</summary>
     public static double LagMs(string[] args) => Number(args, "--lag") is double lag && lag > 0 ? lag : 0;
+
+    /// <summary>Имя сохранения из --save NAME, по умолчанию DefaultSave; проверяет тот, кто открывает сохранение.</summary>
+    public static string SaveName(string[] args) => Value(args, "--save") ?? DefaultSave;
+
+    /// <summary>Id игрока из --player ID, null - взять свой постоянный id; нужен, чтобы запустить двух клиентов на одной машине.</summary>
+    public static string? Player(string[] args) => Value(args, "--player");
 
     /// <summary>Значение после имени аргумента или null.</summary>
     private static string? Value(string[] args, string name)

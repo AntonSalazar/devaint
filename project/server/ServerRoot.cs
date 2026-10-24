@@ -1,7 +1,9 @@
 using System;
+using System.Runtime.InteropServices;
 using DevAInt.Sim;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Net;
+using DevAInt.Sim.Saves;
 using DevAInt.Sim.Stats;
 using Godot;
 
@@ -26,8 +28,11 @@ public partial class ServerRoot : Node
     /// <summary>Сервер игры.</summary>
     private GameServer? _server;
 
-    /// <summary>Число клиентов на прошлом тике, для строки в логе при входе и выходе.</summary>
-    private int _clientCount;
+    /// <summary>Обработчики Ctrl+C и SIGTERM: без них Godot завершается сразу, не записав мир.</summary>
+    private PosixSignalRegistration[] _signals = [];
+
+    /// <summary>Пришёл сигнал остановки, флаг ставится из потока сигнала.</summary>
+    private volatile bool _stopRequested;
 
     /// <summary>Загрузка модов, запуск sim и ENet; при ошибке процесс завершается с кодом 1.</summary>
     public override void _Ready()
@@ -40,10 +45,10 @@ public partial class ServerRoot : Node
             return;
         }
 
-        Simulation sim = new(loaded, _log, GameRoot.MapId, new GameClock(GameArgs.TimeScale(args)));
-        foreach (ModError error in sim.ScriptErrors)
+        if (WorldStart.Open(loaded, _log, args, ModsPath.SavesRoot()) is not (Simulation sim, SaveGame save))
         {
-            _log.Error(error.ToString());
+            GetTree().Quit(1);
+            return;
         }
 
         int port = GameArgs.Port(args);
@@ -58,7 +63,8 @@ public partial class ServerRoot : Node
             return;
         }
 
-        _server = new GameServer(sim, _transport, _log);
+        _server = new GameServer(sim, _transport, _log, save);
+        _signals = [PosixSignalRegistration.Create(PosixSignal.SIGINT, RequestStop), PosixSignalRegistration.Create(PosixSignal.SIGTERM, RequestStop)];
         _log.Info($"server is listening on port {port}, time scale {sim.Clock.TimeScale}");
     }
 
@@ -70,19 +76,35 @@ public partial class ServerRoot : Node
             return;
         }
 
+        if (_stopRequested)
+        {
+            _log.Info("stopping the server");
+            GetTree().Quit();
+            return;
+        }
+
         _transport.Poll();
         for (int ticks = _timer.Advance(delta); ticks > 0; ticks--)
         {
             _server.Tick();
         }
+    }
 
-        if (_server.ClientCount != _clientCount)
+    /// <summary>Запись мира и остановка сети при выходе.</summary>
+    public override void _ExitTree()
+    {
+        _server?.Save();
+        _transport?.Close();
+        foreach (PosixSignalRegistration signal in _signals)
         {
-            _clientCount = _server.ClientCount;
-            _log.Info($"clients: {_clientCount}");
+            signal.Dispose();
         }
     }
 
-    /// <summary>Остановка сети при выходе.</summary>
-    public override void _ExitTree() => _transport?.Close();
+    /// <summary>Сигнал остановки: процесс не убивается, а выходит на следующем кадре с записью мира.</summary>
+    private void RequestStop(PosixSignalContext context)
+    {
+        context.Cancel = true;
+        _stopRequested = true;
+    }
 }

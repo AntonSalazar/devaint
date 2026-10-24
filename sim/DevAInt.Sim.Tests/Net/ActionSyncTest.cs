@@ -98,6 +98,7 @@ public class ActionSyncTest
     {
         NetRun run = new();
         IConnection raw = run.ConnectRaw();
+        raw.Send(Protocol.Write(new HelloMessage("anna")));
         run.Tick(1);
 
         raw.Send(Protocol.Write(new StartActionMessage(1, 99)));

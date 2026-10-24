@@ -1,17 +1,23 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Items;
 using DevAInt.Sim.Logging;
 using DevAInt.Sim.Motion;
+using DevAInt.Sim.Saves;
+using DevAInt.Sim.Stats;
 
 namespace DevAInt.Sim.Net;
 
 /// <summary>Сервер: подключения, ввод клиентов, тик sim и пакет изменений каждому клиенту.</summary>
 /// <remarks>Сервер над sim и транспортом.</remarks>
-public sealed class GameServer(Simulation sim, IServerTransport transport, ISimLog log, int subscribeRadius = GameServer.DefaultSubscribeRadius)
+public sealed class GameServer(Simulation sim, IServerTransport transport, ISimLog log, SaveGame? save = null, int subscribeRadius = GameServer.DefaultSubscribeRadius)
 {
+    /// <summary>Автосохранение раз в 5 минут реального времени.</summary>
+    public const int AutosaveTicks = 5 * 60 * GameClock.TicksPerSecond;
+
     /// <summary>Радиус подписки в чанках вокруг чанка своей сущности.</summary>
     public const int DefaultSubscribeRadius = 4;
 
@@ -30,11 +36,11 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
     /// <summary>Радиус подписки в чанках.</summary>
     private readonly int _radius = subscribeRadius;
 
+    /// <summary>Сохранение мира, null - игра без сохранения.</summary>
+    private readonly SaveGame? _save = save;
+
     /// <summary>Подключённые клиенты.</summary>
     private readonly List<ClientSession> _clients = [];
-
-    /// <summary>Сколько клиентов подключалось, для временных id игроков до опознания при входе.</summary>
-    private int _joined;
 
     /// <summary>Число подключённых клиентов.</summary>
     public int ClientCount => _clients.Count;
@@ -47,7 +53,7 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
     {
         while (_transport.TryAccept(out IConnection connection))
         {
-            _clients.Add(new ClientSession(connection, _sim.SpawnPlayer($"player-{++_joined}")));
+            _clients.Add(new ClientSession(connection));
         }
 
         foreach (ClientSession client in _clients)
@@ -60,11 +66,16 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
 
         foreach (ClientSession client in _clients.Where(client => !client.Connection.IsConnected).ToList())
         {
-            _sim.RemoveEntity(client.EntityId);
-            _clients.Remove(client);
+            Leave(client);
         }
 
-        foreach (ClientSession client in _clients)
+        if (_save is not null && _sim.Clock.Tick % AutosaveTicks == 0)
+        {
+            Save();
+        }
+
+        // Клиент без опознания ещё не в мире, пакеты ему не нужны
+        foreach (ClientSession client in _clients.Where(client => client.Joined))
         {
             byte[] packet = Protocol.Write(BuildFrame(client));
             client.LastFrameBytes = packet.Length;
@@ -72,6 +83,24 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
         }
 
         _sim.World.ClearChanges();
+    }
+
+    /// <summary>Запись мира и игроков; ошибка диска пишется в лог, сервер работает дальше.</summary>
+    public void Save()
+    {
+        if (_save is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _save.Save(_sim);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            _log.Error($"save to {_save.Directory} failed: {error.Message}");
+        }
     }
 
     /// <summary>Серверная сторона подключения клиента, для тестов.</summary>
@@ -111,7 +140,7 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
     {
         // Клиент предсказывает движение по вводу на каждый тик, поэтому сервер тоже тратит ровно один ввод за тик,
         // даже если по сети пришло несколько сразу
-        if (client.Inputs.TryDequeue(out InputMessage? input))
+        if (client.Joined && client.Inputs.TryDequeue(out InputMessage? input))
         {
             _sim.Entity(client.EntityId).Input = new MoveInput(input.X, input.Y);
             client.LastInput = input.Sequence;
@@ -129,7 +158,7 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
             }
             catch (ProtocolException error)
             {
-                _log.Error($"client {client.EntityId}: bad input packet, disconnecting: {error.Message}");
+                _log.Error($"client {client.PlayerId ?? "without hello"}: bad input packet, disconnecting: {error.Message}");
                 client.Connection.Disconnect();
                 return;
             }
@@ -139,6 +168,17 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
     /// <summary>Одно сообщение клиента; на отказ начать действие клиент просто не увидит начала.</summary>
     private void Apply(ClientSession client, ClientMessage message)
     {
+        if (message is HelloMessage hello)
+        {
+            Join(client, hello.PlayerId);
+            return;
+        }
+
+        if (!client.Joined)
+        {
+            throw new ProtocolException("the first message must be hello");
+        }
+
         switch (message)
         {
             case InputMessage input:
@@ -161,6 +201,60 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
                 _sim.CancelAction(client.EntityId);
                 break;
         }
+    }
+
+    /// <summary>Опознание клиента: сохранённый персонаж игрока или новый в точке появления.</summary>
+    private void Join(ClientSession client, string playerId)
+    {
+        if (client.Joined)
+        {
+            throw new ProtocolException("hello is sent twice");
+        }
+
+        if (!SaveGame.IsValidName(playerId))
+        {
+            throw new ProtocolException($"player id {playerId} is not valid");
+        }
+
+        // Один персонаж на игрока: второе подключение с тем же id получило бы ту же сущность
+        if (_clients.Any(other => other.PlayerId == playerId))
+        {
+            throw new ProtocolException($"player {playerId} is already connected");
+        }
+
+        try
+        {
+            client.EntityId = _save?.LoadPlayer(_sim, playerId, _log) ?? _sim.SpawnPlayer(playerId);
+        }
+        catch (SaveException error)
+        {
+            throw new ProtocolException(error.Message);
+        }
+
+        client.PlayerId = playerId;
+        _log.Info($"player {playerId} joined");
+    }
+
+    /// <summary>Клиент ушёл: его персонаж записывается и уходит из мира.</summary>
+    private void Leave(ClientSession client)
+    {
+        _clients.Remove(client);
+        if (!client.Joined)
+        {
+            return;
+        }
+
+        try
+        {
+            _save?.SavePlayer(_sim, _sim.Entity(client.EntityId));
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            _log.Error($"saving player {client.PlayerId} failed: {error.Message}");
+        }
+
+        _sim.RemoveEntity(client.EntityId);
+        _log.Info($"player {client.PlayerId} left");
     }
 
     /// <summary>Пакет клиенту: выгрузки, изменения мира, снимки, сущности, свои статы.</summary>
@@ -334,13 +428,19 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
     }
 
     /// <summary>Подключённый клиент и то, что он уже знает.</summary>
-    private sealed class ClientSession(IConnection connection, long entityId)
+    private sealed class ClientSession(IConnection connection)
     {
         /// <summary>Подключение.</summary>
         public IConnection Connection { get; } = connection;
 
-        /// <summary>Сущность клиента.</summary>
-        public long EntityId { get; } = entityId;
+        /// <summary>Сущность клиента, 0 до опознания.</summary>
+        public long EntityId { get; set; }
+
+        /// <summary>Id игрока, null до опознания.</summary>
+        public string? PlayerId { get; set; }
+
+        /// <summary>Клиент опознан и его персонаж в мире.</summary>
+        public bool Joined => PlayerId is not null;
 
         /// <summary>Отправлено ли приветствие.</summary>
         public bool Welcomed { get; set; }

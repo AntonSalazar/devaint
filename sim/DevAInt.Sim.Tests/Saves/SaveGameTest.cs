@@ -231,10 +231,10 @@ public sealed class SaveGameTest : IDisposable
     [Fact]
     public void PlayerIdIsChecked()
     {
-        Assert.True(SaveGame.IsValidPlayerId("anna_01-x"));
-        Assert.False(SaveGame.IsValidPlayerId("../anna"));
-        Assert.False(SaveGame.IsValidPlayerId(string.Empty));
-        Assert.False(SaveGame.IsValidPlayerId(new string('a', 65)));
+        Assert.True(SaveGame.IsValidName("anna_01-x"));
+        Assert.False(SaveGame.IsValidName("../anna"));
+        Assert.False(SaveGame.IsValidName(string.Empty));
+        Assert.False(SaveGame.IsValidName(new string('a', 65)));
 
         Simulation sim = NewSim();
         sim.SpawnPlayer("../escape");

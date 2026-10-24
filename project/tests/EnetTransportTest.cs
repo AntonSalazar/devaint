@@ -81,6 +81,22 @@ public class EnetTransportTest : TestCase
         CheckEqual("3", reply is null ? "none" : string.Join(",", reply), "reply");
     }
 
+    /// <summary>Пакеты, отправленные до подключения, доходят после него по порядку.</summary>
+    public void TestPacketsBeforeConnectArrive()
+    {
+        _client.Send([1]);
+        _client.Send([2]);
+        Check(_client.IsConnecting, "client is still connecting");
+
+        IConnection? accepted = null;
+        byte[]? first = null;
+        byte[]? second = null;
+        PollUntil(() => (accepted ??= Accept()) is not null && (first ??= Receive(accepted!)) is not null && (second ??= Receive(accepted!)) is not null, _server, _client);
+
+        CheckEqual("1", first is null ? "none" : string.Join(",", first), "first packet");
+        CheckEqual("2", second is null ? "none" : string.Join(",", second), "second packet");
+    }
+
     /// <summary>Отключение клиента сервер видит по IsConnected.</summary>
     public void TestClientDisconnectIsSeen()
     {
@@ -122,4 +138,7 @@ public class EnetTransportTest : TestCase
 
     /// <summary>Следующий пакет подключения или null.</summary>
     private static byte[]? Receive(IConnection connection) => connection.TryReceive(out byte[] packet) ? packet : null;
+
+    /// <summary>Новое подключение на сервере или null.</summary>
+    private IConnection? Accept() => _server.TryAccept(out IConnection connection) ? connection : null;
 }

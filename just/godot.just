@@ -8,7 +8,7 @@ GODOT := env("GODOT", "godot-mono")
 build:
     dotnet build {{PROJECT_ROOT}}/DevAInt.sln
 
-# Run: запустить игру; аргументы игры после имени: `just run --time-scale 200`, `just run --connect 127.0.0.1 --lag 100`
+# Run: запустить игру; аргументы игры после имени: `just run --save test`, `just run --connect 127.0.0.1 --player bob --lag 100`
 run *args: build
     {{GODOT}} --path {{PROJECT_ROOT}} -- {{args}}
 
@@ -16,7 +16,7 @@ run *args: build
 editor:
     {{GODOT}} --path {{PROJECT_ROOT}} --editor
 
-# Server: выделенный сервер без окна; аргументы после имени: `just server --port 7777 --time-scale 200`
+# Server: выделенный сервер без окна, мир в saves/; аргументы после имени: `just server --port 7777 --save world`; Ctrl+C сохраняет и выходит
 server *args: build
     {{GODOT}} --headless --path {{PROJECT_ROOT}} res://server/Server.tscn -- {{args}}
 
@@ -67,13 +67,13 @@ export-server: build
     {{GODOT}} --headless --path {{PROJECT_ROOT}} --export-release "Linux Server" ../{{SERVER_DIR}}/devaint-server.x86_64
     cp -r mods {{SERVER_DIR}}/mods
 
-# Deploy server: собрать и скопировать сервер на SERVER_HOST в ~/devaint-server, старая копия заменяется
+# Deploy server: собрать и скопировать сервер на SERVER_HOST в ~/devaint-server; старая сборка заменяется, saves/ остаётся
 deploy-server: _need-server-host export-server
     tar -czf builds/devaint-server.tar.gz -C {{SERVER_DIR}} .
     scp builds/devaint-server.tar.gz {{SERVER_HOST}}:/tmp/devaint-server.tar.gz
-    ssh {{SERVER_HOST}} 'rm -rf ~/devaint-server && mkdir ~/devaint-server && tar -xzf /tmp/devaint-server.tar.gz -C ~/devaint-server && rm /tmp/devaint-server.tar.gz'
+    ssh {{SERVER_HOST}} 'mkdir -p ~/devaint-server && find ~/devaint-server -mindepth 1 -maxdepth 1 ! -name saves -exec rm -rf {} + && tar -xzf /tmp/devaint-server.tar.gz -C ~/devaint-server && rm /tmp/devaint-server.tar.gz'
 
-# Remote server: запустить сервер на SERVER_HOST, лог здесь, Ctrl+C останавливает: `just remote-server --port 7777`
+# Remote server: запустить сервер на SERVER_HOST, лог здесь, Ctrl+C сохраняет мир и останавливает: `just remote-server --port 7777`
 remote-server *args: _need-server-host
     ssh -t {{SERVER_HOST}} '~/devaint-server/devaint-server.x86_64 -- {{args}}'
 

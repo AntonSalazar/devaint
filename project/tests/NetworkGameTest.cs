@@ -22,6 +22,9 @@ public class NetworkGameTest : TestCase
     /// <summary>Сервер.</summary>
     private GameServer _server = null!;
 
+    /// <summary>Сколько клиентов создано, для id игроков.</summary>
+    private int _players;
+
     /// <summary>Сеть первого клиента.</summary>
     private EnetClientConnection _netA = null!;
 
@@ -86,7 +89,7 @@ public class NetworkGameTest : TestCase
     }
 
     /// <summary>Клиент на подключении.</summary>
-    private GameClient Client(IConnection connection) => new(connection, _sim.StatTable, _sim.ItemTable, _sim.Mods);
+    private GameClient Client(IConnection connection) => new(connection, _sim.StatTable, _sim.ItemTable, _sim.Mods, $"player{++_players}");
 
     /// <summary>Тики сервера и приём клиентов, пока условие не выполнится; true - выполнилось.</summary>
     private bool Run(System.Func<bool> condition, params GameClient[] clients)

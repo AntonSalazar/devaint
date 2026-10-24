@@ -17,6 +17,9 @@ obj/
 # Local settings, e.g. DEVAINT_SERVER_HOST
 .env
 
+# Game saves
+saves/
+
 # Other
 *.DS_Store
 

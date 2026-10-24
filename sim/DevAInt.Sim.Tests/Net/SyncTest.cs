@@ -68,7 +68,7 @@ public class SyncTest
     {
         NetRun run = new();
         ModInfo stale = run.Sim.Mods[0] with { Hash = "stale" };
-        GameClient client = new(run.ConnectRaw(), run.Sim.StatTable, run.Sim.ItemTable, [stale]);
+        GameClient client = new(run.ConnectRaw(), run.Sim.StatTable, run.Sim.ItemTable, [stale], "anna");
         run.Server.Tick();
 
         ProtocolException error = Assert.Throws<ProtocolException>(client.Update);

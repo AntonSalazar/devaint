@@ -32,6 +32,15 @@ public class GameArgsTest : TestCase
         CheckEqual(null, GameArgs.Connect(["--connect"]), "no value");
     }
 
+    /// <summary>Имя сохранения из --save, по умолчанию world; id игрока из --player или null.</summary>
+    public void TestSaveAndPlayer()
+    {
+        CheckEqual("test-1", GameArgs.SaveName(["--save", "test-1"]), "save name");
+        CheckEqual(GameArgs.DefaultSave, GameArgs.SaveName([]), "default save");
+        CheckEqual("bob", GameArgs.Player(["--connect", "127.0.0.1", "--player", "bob"]), "player");
+        CheckEqual(null, GameArgs.Player([]), "no player");
+    }
+
     /// <summary>Задержка из --lag N в миллисекундах, неверная - 0.</summary>
     public void TestLag()
     {

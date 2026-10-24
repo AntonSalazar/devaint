@@ -1,7 +1,7 @@
 using System.IO;
 using Godot;
 
-/// <summary>Папка модов: в редакторе - mods рядом с project, в экспорте - mods рядом с исполняемым файлом.</summary>
+/// <summary>Папки модов и сохранений: в редакторе - рядом с project, в экспорте - рядом с исполняемым файлом.</summary>
 public static class ModsPath
 {
     /// <summary>Полный путь папки модов.</summary>
@@ -12,4 +12,7 @@ public static class ModsPath
             : Path.GetDirectoryName(OS.GetExecutablePath())!;
         return Path.GetFullPath(Path.Combine(root, "mods"));
     }
+
+    /// <summary>Папка сохранений рядом с папкой модов.</summary>
+    public static string SavesRoot() => Path.Combine(Path.GetDirectoryName(Find())!, "saves");
 }

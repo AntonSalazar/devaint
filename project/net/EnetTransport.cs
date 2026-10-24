@@ -125,6 +125,9 @@ public sealed class EnetClientConnection : IConnection
     /// <summary>Пришедшие пакеты сервера.</summary>
     private readonly Queue<byte[]> _incoming = new();
 
+    /// <summary>Пакеты, отправленные до подключения: уйдут сразу после него, первым - приветствие.</summary>
+    private readonly Queue<byte[]> _outbox = new();
+
     /// <summary>Начало подключения к серверу address:port; ошибка создания пира - InvalidOperationException.</summary>
     public EnetClientConnection(string address, int port)
     {
@@ -151,6 +154,11 @@ public sealed class EnetClientConnection : IConnection
         }
 
         _peer.Poll();
+        while (IsConnected && _outbox.TryDequeue(out byte[]? packet))
+        {
+            Put(packet);
+        }
+
         while (_peer.GetAvailablePacketCount() > 0)
         {
             _incoming.Enqueue(_peer.GetPacket());
@@ -160,15 +168,15 @@ public sealed class EnetClientConnection : IConnection
     /// <inheritdoc/>
     public void Send(byte[] packet)
     {
-        // До подключения пакеты некуда отправить, клиент шлёт ввод каждый тик и следующий дойдёт
-        if (!IsConnected)
+        // Подключение обещает доставку по порядку, поэтому до подключения пакеты копятся, а после разрыва теряются
+        if (IsConnecting || _outbox.Count > 0)
         {
-            return;
+            _outbox.Enqueue(packet);
         }
-
-        _peer.SetTargetPeer((int)MultiplayerPeer.TargetPeerServer);
-        _peer.TransferMode = MultiplayerPeer.TransferModeEnum.Reliable;
-        _peer.PutPacket(packet);
+        else if (IsConnected)
+        {
+            Put(packet);
+        }
     }
 
     /// <inheritdoc/>
@@ -176,4 +184,12 @@ public sealed class EnetClientConnection : IConnection
 
     /// <inheritdoc/>
     public void Disconnect() => _peer.Close();
+
+    /// <summary>Пакет серверу надёжным каналом.</summary>
+    private void Put(byte[] packet)
+    {
+        _peer.SetTargetPeer((int)MultiplayerPeer.TargetPeerServer);
+        _peer.TransferMode = MultiplayerPeer.TransferModeEnum.Reliable;
+        _peer.PutPacket(packet);
+    }
 }

@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using DevAInt.Sim.Logging;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Net;
 
@@ -40,26 +38,11 @@ public class GameRootTest : TestCase
         LoopbackTransport transport = new();
         GameServer server = new(game.Sim, transport, new GodotLog());
         ModInfo stale = game.Sim.Mods[0] with { Hash = "stale" };
-        GameClient client = new(transport.Connect(), game.Sim.StatTable, game.Sim.ItemTable, [stale]);
+        GameClient client = new(transport.Connect(), game.Sim.StatTable, game.Sim.ItemTable, [stale], "anna");
         ListLog log = new();
         server.Tick();
 
         Check(!GameRoot.TryUpdate(client, log), "update failed");
         CheckEqual("mods differ from the server: mod core 0.1.0 has different data", log.Errors.Count == 1 ? log.Errors[0] : "none", "error text");
-    }
-
-    /// <summary>Лог, который запоминает сообщения.</summary>
-    private sealed class ListLog : ISimLog
-    {
-        /// <summary>Ошибки по порядку.</summary>
-        public List<string> Errors { get; } = [];
-
-        /// <inheritdoc/>
-        public void Info(string message)
-        {
-        }
-
-        /// <inheritdoc/>
-        public void Error(string message) => Errors.Add(message);
     }
 }

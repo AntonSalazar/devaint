@@ -3,6 +3,7 @@ using System.Linq;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Net;
+using DevAInt.Sim.Saves;
 using DevAInt.Sim.Stats;
 using DevAInt.Sim.Tests.Lua;
 using DevAInt.Sim.Tests.Mods;
@@ -16,8 +17,11 @@ public sealed class NetRun
     /// <summary>Транспорт в памяти.</summary>
     private readonly LoopbackTransport _transport = new();
 
-    /// <summary>Сервер над sim с картой mapId; extraMod - мод с картой, если нужна не core.</summary>
-    public NetRun(string mapId = "core:starter_room", string? extraMod = null, int radius = GameServer.DefaultSubscribeRadius, double timeScale = 1)
+    /// <summary>Сколько клиентов создано, для id игроков.</summary>
+    private int _players;
+
+    /// <summary>Сервер над sim с картой mapId; extraMod - мод с картой, если нужна не core; save - сохранение сервера.</summary>
+    public NetRun(string mapId = "core:starter_room", string? extraMod = null, int radius = GameServer.DefaultSubscribeRadius, double timeScale = 1, SaveGame? save = null)
     {
         using TempMods mods = new();
         mods.CopyRepoMod("core");
@@ -31,7 +35,7 @@ public sealed class NetRun
         ModLoadResult result = mods.Load(ids);
         Assert.True(result.Ok, string.Join("\n", result.Errors));
         Sim = new Simulation(result, Log, mapId, new GameClock(timeScale));
-        Server = new GameServer(Sim, _transport, Log, radius);
+        Server = new GameServer(Sim, _transport, Log, save, radius);
     }
 
     /// <summary>Лог сервера.</summary>
@@ -43,8 +47,11 @@ public sealed class NetRun
     /// <summary>Сервер.</summary>
     public GameServer Server { get; }
 
-    /// <summary>Новый клиент; сервер увидит его на следующем тике.</summary>
-    public GameClient Connect() => new(_transport.Connect(), Sim.StatTable, Sim.ItemTable, Sim.Mods);
+    /// <summary>Новый клиент со своим id игрока по порядку; сервер увидит его на следующем тике.</summary>
+    public GameClient Connect() => Connect(_transport.Connect(), $"player{++_players}");
+
+    /// <summary>Клиент игрока playerId на готовом подключении.</summary>
+    public GameClient Connect(IConnection connection, string playerId) => new(connection, Sim.StatTable, Sim.ItemTable, Sim.Mods, playerId);
 
     /// <summary>Голое подключение без клиента, чтобы слать серверу что угодно.</summary>
     public IConnection ConnectRaw() => _transport.Connect();

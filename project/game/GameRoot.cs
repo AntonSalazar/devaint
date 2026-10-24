@@ -7,6 +7,7 @@ using DevAInt.Sim.Logging;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Motion;
 using DevAInt.Sim.Net;
+using DevAInt.Sim.Saves;
 using DevAInt.Sim.Stats;
 using Godot;
 
@@ -103,6 +104,12 @@ public partial class GameRoot : Node3D
         WorldTable world = new(loaded.Defs);
         _items = new ItemTable(loaded.Defs);
         IConnection? connection = GameArgs.Connect(args) is (string host, int port) ? ConnectTo(host, port) : StartLocalServer(loaded, args);
+        if (GameArgs.Player(args) is string player && !SaveGame.IsValidName(player))
+        {
+            _log.Error($"player id {player} must be 1-64 latin letters, digits, - or _");
+            connection = null;
+        }
+
         if (connection is null)
         {
             GetTree().Quit(1);
@@ -117,7 +124,8 @@ public partial class GameRoot : Node3D
             _log.Info($"artificial lag {lag} ms round trip");
         }
 
-        _client = new GameClient(connection, stats, _items, [.. loaded.Mods.Select(mod => mod.Info)]);
+        string playerId = GameArgs.Player(args) ?? PlayerIdentity.LoadOrCreate(ProjectSettings.GlobalizePath(PlayerIdentity.DefaultPath));
+        _client = new GameClient(connection, stats, _items, [.. loaded.Mods.Select(mod => mod.Info)], playerId);
         GameInput.EnsureActions();
         _autoWalk = args.Contains("--autowalk");
         BuildScene(stats, world);
@@ -181,8 +189,12 @@ public partial class GameRoot : Node3D
         _hud.Refresh();
     }
 
-    /// <summary>Отключение от сервера при выходе.</summary>
-    public override void _ExitTree() => _enet?.Disconnect();
+    /// <summary>Запись мира своего сервера и отключение от сетевого при выходе.</summary>
+    public override void _ExitTree()
+    {
+        _server?.Save();
+        _enet?.Disconnect();
+    }
 
     /// <summary>Подключение к серверу по сети или null, если пир не создался.</summary>
     private EnetClientConnection? ConnectTo(string host, int port)
@@ -201,16 +213,15 @@ public partial class GameRoot : Node3D
     }
 
     /// <summary>Сервер в этом же процессе и подключение к нему через loopback.</summary>
-    private IConnection StartLocalServer(ModLoadResult loaded, string[] args)
+    private IConnection? StartLocalServer(ModLoadResult loaded, string[] args)
     {
-        Simulation sim = new(loaded, _log, MapId, new GameClock(GameArgs.TimeScale(args)));
-        foreach (ModError error in sim.ScriptErrors)
+        if (WorldStart.Open(loaded, _log, args, ModsPath.SavesRoot()) is not (Simulation sim, SaveGame save))
         {
-            _log.Error(error.ToString());
+            return null;
         }
 
         LoopbackTransport transport = new();
-        _server = new GameServer(sim, transport, _log);
+        _server = new GameServer(sim, transport, _log, save);
         return transport.Connect();
     }
 

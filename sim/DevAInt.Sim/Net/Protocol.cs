@@ -44,6 +44,7 @@ public static class Protocol
         Input = 1,
         StartAction,
         CancelAction,
+        Hello,
     }
 
     /// <summary>Пакет сервера в байты.</summary>
@@ -98,6 +99,10 @@ public static class Protocol
             case CancelActionMessage:
                 writer.WriteByte((byte)ClientType.CancelAction);
                 break;
+            case HelloMessage hello:
+                writer.WriteByte((byte)ClientType.Hello);
+                writer.WriteString(hello.PlayerId);
+                break;
             default:
                 throw new ArgumentException($"unknown client message {message.GetType().Name}", nameof(message));
         }
@@ -115,6 +120,7 @@ public static class Protocol
             ClientType.Input => ReadInput(reader),
             ClientType.StartAction => new StartActionMessage(reader.ReadVarInt(), reader.ReadCount(MaxList)),
             ClientType.CancelAction => new CancelActionMessage(),
+            ClientType.Hello => new HelloMessage(reader.ReadString(MaxText)),
             _ => throw new ProtocolException($"unknown client message type {type}"),
         };
         RequireEnd(reader);

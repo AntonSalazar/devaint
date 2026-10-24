@@ -48,8 +48,11 @@ public sealed partial class SaveGame(string directory)
     /// <summary>Путь меты.</summary>
     private string MetaPath => Path.Combine(Directory, MetaName);
 
-    /// <summary>Подходит ли id игрока: он становится именем файла, поэтому только латиница, цифры, - и _.</summary>
-    public static bool IsValidPlayerId(string id) => PlayerIdRegex().IsMatch(id);
+    /// <summary>Подходит ли имя сохранения или id игрока: оно становится именем файла, поэтому только латиница, цифры, - и _.</summary>
+    public static bool IsValidName(string id) => PlayerIdRegex().IsMatch(id);
+
+    /// <summary>Sim из сохранения в папке или новый на карте mapId, если сохранения ещё нет.</summary>
+    public Simulation LoadOrCreate(ModLoadResult mods, ISimLog log, string mapId, double timeScale = 1) => Exists ? Load(mods, log, timeScale) : new Simulation(mods, log, mapId, new Stats.GameClock(timeScale));
 
     /// <summary>Запись изменённых регионов, персонажей игроков в мире и меты.</summary>
     public void Save(Simulation sim)
@@ -73,9 +76,7 @@ public sealed partial class SaveGame(string directory)
 
         foreach (Entity player in sim.Entities.Where(entity => entity.PlayerId is not null))
         {
-            PacketWriter writer = new();
-            EntityCodec.Write(writer, player, _ids, sim.StatTable);
-            SaveFile.WriteBinary(PlayerPath(player.PlayerId!), PlayerMagic, writer.ToArray());
+            WritePlayer(sim, player);
         }
 
         sim.World.ClearDirtyRegions();
@@ -118,6 +119,15 @@ public sealed partial class SaveGame(string directory)
         sim.World.ClearChanges();
         _entityRegions = [.. regions.Entities.Select(entity => World.RegionOf(entity.Position.Cell))];
         return sim;
+    }
+
+    /// <summary>Запись одного персонажа игрока, например когда игрок вышел; мета пишется первой, как при полной записи.</summary>
+    public void SavePlayer(Simulation sim, Entity player)
+    {
+        string mapId = sim.MapId ?? throw new InvalidOperationException("a simulation without a map cannot be saved");
+        RegisterIds(sim);
+        WriteMeta(sim, mapId);
+        WritePlayer(sim, player.PlayerId is null ? throw new ArgumentException("entity is not a player", nameof(player)) : player);
     }
 
     /// <summary>Персонаж игрока из сохранения в мир, id сущности; null если у игрока ещё нет персонажа.</summary>
@@ -253,6 +263,14 @@ public sealed partial class SaveGame(string directory)
         SaveFile.WriteText(MetaPath, JsonSerializer.Serialize(meta, _json) + "\n");
     }
 
+    /// <summary>Файл персонажа игрока.</summary>
+    private void WritePlayer(Simulation sim, Entity player)
+    {
+        PacketWriter writer = new();
+        EntityCodec.Write(writer, player, _ids, sim.StatTable);
+        SaveFile.WriteBinary(PlayerPath(player.PlayerId!), PlayerMagic, writer.ToArray());
+    }
+
     /// <summary>Файл региона: чанки со слоями или сущностями; пустой регион пишется, только если его файл уже есть.</summary>
     private void WriteRegion(Simulation sim, (int X, int Y) region, List<Entity> entities, ushort[] floors, ushort[] walls)
     {
@@ -354,7 +372,7 @@ public sealed partial class SaveGame(string directory)
     /// <summary>Путь файла игрока; неверный id - ArgumentException, чтобы не выйти из папки сохранения.</summary>
     private string PlayerPath(string playerId)
     {
-        return IsValidPlayerId(playerId)
+        return IsValidName(playerId)
             ? Path.Combine(Directory, "players", playerId + ".bin")
             : throw new ArgumentException($"player id {playerId} must be 1-64 latin letters, digits, - or _", nameof(playerId));
     }
