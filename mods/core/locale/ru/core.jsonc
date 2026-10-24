@@ -1,0 +1,21 @@
+// Названия определений core по-русски.
+{
+  "$schema": "../../../../schemas/locale.schema.json",
+  "core:hunger": "Голод",
+  "core:thirst": "Жажда",
+  "core:fatigue": "Усталость",
+  "core:health": "Здоровье",
+  "core:hungry": "Голоден",
+  "core:thirsty": "Хочет пить",
+  "core:tired": "Устал",
+  "core:apple": "Яблоко",
+  "core:eat": "Съесть",
+  "core:human": "Человек",
+  "core:aim": "Прицелиться",
+  "core:attack": "Атаковать",
+  "core:use_item": "Применить предмет",
+  "core:wood_floor": "Деревянный пол",
+  "core:wood_wall": "Деревянная стена",
+  "core:wood_door": "Деревянная дверь",
+  "core:starter_room": "Стартовая комната",
+}

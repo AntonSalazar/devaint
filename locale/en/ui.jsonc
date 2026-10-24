@@ -1,0 +1,5 @@
+// Строки интерфейса игры, английский - язык по умолчанию.
+{
+  "$schema": "../../schemas/locale.schema.json",
+  "ui.you_died": "You died",
+}

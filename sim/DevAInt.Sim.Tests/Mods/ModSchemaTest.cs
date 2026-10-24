@@ -27,6 +27,7 @@ public class ModSchemaTest
 
         Assert.True(data == ModSchema.Data(), "schemas/data.schema.json is outdated, run just schema");
         Assert.True(manifest == ModSchema.Manifest(), "schemas/mod.schema.json is outdated, run just schema");
+        Assert.True(File.ReadAllText(Path.Combine(SchemasDir, ModSchema.LocaleFile)) == ModSchema.Locale(), "schemas/locale.schema.json is outdated, run just schema");
     }
 
     /// <summary>Все файлы мода core проходят свои схемы.</summary>
@@ -40,7 +41,13 @@ public class ModSchemaTest
             problems.AddRange(Problems(ModSchema.Data(), File.ReadAllText(file)).Select(problem => $"{Path.GetFileName(file)}: {problem}"));
         }
 
+        foreach (string file in Directory.GetFiles(Path.Combine(core, "locale"), "*.jsonc", SearchOption.AllDirectories))
+        {
+            problems.AddRange(Problems(ModSchema.Locale(), File.ReadAllText(file)).Select(problem => $"{Path.GetFileName(file)}: {problem}"));
+        }
+
         Assert.Empty(problems);
+        Assert.NotEmpty(Problems(ModSchema.Locale(), """{ "k:a": 5 }"""));
     }
 
     /// <summary>Каждый файл core ссылается на свою схему относительным путём.</summary>

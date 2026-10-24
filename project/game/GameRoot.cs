@@ -99,6 +99,7 @@ public partial class GameRoot : Node3D
         }
 
         string[] args = OS.GetCmdlineUserArgs();
+        GameLocale.Apply(GameLocale.Load(loaded, _log), GameArgs.Language(args));
         ClientTables tables = ClientTables.From(loaded);
         WorldTable world = new(loaded.Defs);
         IConnection? connection = GameArgs.Connect(args) is (string host, int port) ? ConnectTo(host, port) : StartLocalServer(loaded, args);

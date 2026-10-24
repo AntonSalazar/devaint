@@ -13,6 +13,9 @@ public static class ModsPath
         return Path.GetFullPath(Path.Combine(root, "mods"));
     }
 
+    /// <summary>Папка строк интерфейса рядом с папкой модов.</summary>
+    public static string LocaleRoot() => Path.Combine(Path.GetDirectoryName(Find())!, "locale");
+
     /// <summary>Папка сохранений рядом с папкой модов.</summary>
     public static string SavesRoot() => Path.Combine(Path.GetDirectoryName(Find())!, "saves");
 }

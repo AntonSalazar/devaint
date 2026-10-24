@@ -18,7 +18,10 @@ public partial class Hud : CanvasLayer
     private readonly Label _death = new()
     {
         Name = "Death",
-        Text = "You died",
+        Text = "ui.you_died",
+
+        // Текст переводится явно в Refresh, автоматический перевод Godot его бы повторил
+        AutoTranslateMode = AutoTranslateModeEnum.Disabled,
         Visible = false,
         HorizontalAlignment = HorizontalAlignment.Center,
         VerticalAlignment = VerticalAlignment.Center,
@@ -41,6 +44,9 @@ public partial class Hud : CanvasLayer
 
     /// <summary>Видна ли надпись о смерти.</summary>
     public bool DeathVisible => _death.Visible;
+
+    /// <summary>Текст надписи о смерти на текущем языке.</summary>
+    public string DeathText => _death.Text;
 
     /// <summary>Постройка панели по числу статов; вызывается сразу после создания.</summary>
     public void Init(HudModel model)
@@ -79,6 +85,7 @@ public partial class Hud : CanvasLayer
 
         _model.Advance(delta);
         _death.Visible = _model.DeathVisible;
+        _death.Text = GameLocale.Text("ui.you_died", "You died");
 
         IReadOnlyList<StatBar> bars = _model.Bars();
         for (int i = 0; i < _rows.Count; i++)

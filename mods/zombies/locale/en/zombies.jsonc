@@ -1,0 +1,5 @@
+// Названия определений zombies.
+{
+  "$schema": "../../../../schemas/locale.schema.json",
+  "zombies:zombie": "Zombie",
+}

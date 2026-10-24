@@ -1,0 +1,21 @@
+// Названия определений core: ключ - id определения.
+{
+  "$schema": "../../../../schemas/locale.schema.json",
+  "core:hunger": "Hunger",
+  "core:thirst": "Thirst",
+  "core:fatigue": "Fatigue",
+  "core:health": "Health",
+  "core:hungry": "Hungry",
+  "core:thirsty": "Thirsty",
+  "core:tired": "Tired",
+  "core:apple": "Apple",
+  "core:eat": "Eat",
+  "core:human": "Human",
+  "core:aim": "Aim",
+  "core:attack": "Attack",
+  "core:use_item": "Use item",
+  "core:wood_floor": "Wooden floor",
+  "core:wood_wall": "Wooden wall",
+  "core:wood_door": "Wooden door",
+  "core:starter_room": "Starter room",
+}

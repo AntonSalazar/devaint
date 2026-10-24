@@ -1,0 +1,5 @@
+// Строки интерфейса игры по-русски.
+{
+  "$schema": "../../schemas/locale.schema.json",
+  "ui.you_died": "Вы умерли",
+}

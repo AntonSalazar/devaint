@@ -1,0 +1,5 @@
+// Названия определений zombies по-русски.
+{
+  "$schema": "../../../../schemas/locale.schema.json",
+  "zombies:zombie": "Зомби",
+}

@@ -36,6 +36,7 @@ internal static class Program
         Directory.CreateDirectory(outDir);
         File.WriteAllText(Path.Combine(outDir, ModSchema.DataFile), ModSchema.Data());
         File.WriteAllText(Path.Combine(outDir, ModSchema.ManifestFileName), ModSchema.Manifest());
+        File.WriteAllText(Path.Combine(outDir, ModSchema.LocaleFile), ModSchema.Locale());
         Console.WriteLine($"schemas written to {outDir}");
         return 0;
     }

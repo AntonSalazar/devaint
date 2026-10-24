@@ -45,6 +45,9 @@ public static class GameArgs
     /// <summary>Id игрока из --player ID, null - взять свой постоянный id; нужен, чтобы запустить двух клиентов на одной машине.</summary>
     public static string? Player(string[] args) => Value(args, "--player");
 
+    /// <summary>Язык из --lang CODE, по умолчанию английский.</summary>
+    public static string Language(string[] args) => Value(args, "--lang") ?? GameLocale.DefaultLanguage;
+
     /// <summary>Значение после имени аргумента или null.</summary>
     private static string? Value(string[] args, string name)
     {

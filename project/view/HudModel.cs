@@ -46,6 +46,9 @@ public sealed class HudModel
     /// <summary>Имя из id до появления локализации: core:low_power - low power.</summary>
     public static string ShortName(string id) => id[(id.IndexOf(':') + 1)..].Replace('_', ' ');
 
+    /// <summary>Название определения на текущем языке; без перевода - короткое имя из id.</summary>
+    public static string Name(string id) => GameLocale.Text(id, ShortName(id));
+
     /// <summary>Ход времени надписи о смерти на delta секунд.</summary>
     public void Advance(double delta) => _deathLeft = Math.Max(0, _deathLeft - delta);
 
@@ -58,7 +61,7 @@ public sealed class HudModel
             StatDef stat = _table.Stat(i);
             float value = _replica.OwnStats[i];
             float fraction = (float)Math.Clamp((value - stat.Min) / (stat.Max - stat.Min), 0, 1);
-            bars.Add(new StatBar(ShortName(stat.Id), value, fraction));
+            bars.Add(new StatBar(Name(stat.Id), value, fraction));
         }
 
         return bars;
@@ -78,7 +81,7 @@ public sealed class HudModel
             int level = own.MoodleLevels[i];
             if (level > 0)
             {
-                moodles.Add($"{ShortName(_table.Moodle(i).Def.Id)} {Roman(level)}");
+                moodles.Add($"{Name(_table.Moodle(i).Def.Id)} {Roman(level)}");
             }
         }
 
@@ -91,7 +94,7 @@ public sealed class HudModel
         List<string> lines = [];
         foreach (IGrouping<int, ItemData> group in _replica.Inventory.GroupBy(item => item.Item))
         {
-            lines.Add($"{ShortName(_items.Item(group.Key).Id)} x{group.Count()}");
+            lines.Add($"{Name(_items.Item(group.Key).Id)} x{group.Count()}");
         }
 
         return lines;

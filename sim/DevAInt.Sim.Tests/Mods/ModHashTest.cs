@@ -22,7 +22,7 @@ public class ModHashTest
         Assert.Equal(Hash(unix), Hash(windows));
     }
 
-    /// <summary>Правка данных или манифеста меняет хеш, правка скрипта - нет.</summary>
+    /// <summary>Правка данных или манифеста меняет хеш, правка скрипта или перевода - нет.</summary>
     [Fact]
     public void DataChangesHashScriptsDoNot()
     {
@@ -30,7 +30,7 @@ public class ModHashTest
         mods.Write("test/mod.jsonc", Manifest).Write("test/data/a.jsonc", "{}").Write("test/scripts/a.lua", "x = 1");
         string before = Hash(mods);
 
-        mods.Write("test/scripts/a.lua", "x = 2");
+        mods.Write("test/scripts/a.lua", "x = 2").Write("test/locale/ru/a.jsonc", """{ "k": "v" }""");
         string afterScript = Hash(mods);
         mods.Write("test/data/a.jsonc", "{ }");
         string afterData = Hash(mods);

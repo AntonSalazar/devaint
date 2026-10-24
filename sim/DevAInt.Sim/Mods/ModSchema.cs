@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Schema;
@@ -14,6 +15,9 @@ public static class ModSchema
     /// <summary>Имя файла схемы mod.jsonc.</summary>
     public const string ManifestFileName = "mod.schema.json";
 
+    /// <summary>Имя файла схемы locale/язык/*.jsonc.</summary>
+    public const string LocaleFile = "locale.schema.json";
+
     /// <summary>Версия стандарта JSON Schema.</summary>
     public const string Dialect = "https://json-schema.org/draft/2020-12/schema";
 
@@ -22,6 +26,9 @@ public static class ModSchema
 
     /// <summary>Текст схемы mod.jsonc.</summary>
     public static string Manifest() => Build(typeof(ManifestFile), "DevAInt mod manifest");
+
+    /// <summary>Текст схемы файла перевода: ключ - строка.</summary>
+    public static string Locale() => Build(typeof(Dictionary<string, string>), "DevAInt locale file");
 
     /// <summary>Схема типа с версией стандарта и заголовком, отступы и концы строк LF.</summary>
     private static string Build(Type type, string title)
