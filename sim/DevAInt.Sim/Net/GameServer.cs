@@ -33,6 +33,9 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
     /// <summary>Подключённые клиенты.</summary>
     private readonly List<ClientSession> _clients = [];
 
+    /// <summary>Сколько клиентов подключалось, для временных id игроков до опознания при входе.</summary>
+    private int _joined;
+
     /// <summary>Число подключённых клиентов.</summary>
     public int ClientCount => _clients.Count;
 
@@ -44,7 +47,7 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
     {
         while (_transport.TryAccept(out IConnection connection))
         {
-            _clients.Add(new ClientSession(connection, _sim.SpawnPlayer()));
+            _clients.Add(new ClientSession(connection, _sim.SpawnPlayer($"player-{++_joined}")));
         }
 
         foreach (ClientSession client in _clients)
@@ -97,8 +100,7 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
         List<ChunkLevelData> levels = [];
         foreach ((int z, ChunkLevel level) in world.ChunkLevels(chunk.X, chunk.Y))
         {
-            ushort[] flags = [.. level.Flags.Select(flag => (ushort)flag)];
-            levels.Add(new ChunkLevelData(z, [.. level.Floors], [.. level.NorthWalls], [.. level.WestWalls], flags));
+            levels.Add(ChunkCodec.Copy(z, level));
         }
 
         return new ChunkSnapshotMessage(chunk.X, chunk.Y, levels);

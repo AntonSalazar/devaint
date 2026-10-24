@@ -104,7 +104,7 @@ public class ActionTest
     {
         (Simulation sim, Entity player) = Start();
         long apple = player.Inventory.Items[0].Id;
-        long other = sim.SpawnPlayer();
+        long other = sim.SpawnPlayer("other");
 
         Assert.Equal(ActionStart.NoItem, sim.StartAction(player.Id, sim.Entity(other).Inventory.Items[0].Id, "core:eat"));
         Assert.Equal(ActionStart.NoItem, sim.StartAction(player.Id, 999, "core:eat"));
@@ -132,7 +132,7 @@ public class ActionTest
         ModLoadResult result = ModLoader.Load(RepoMods.Root, ["core"]);
         Assert.True(result.Ok, string.Join("\n", result.Errors));
         Simulation sim = new(result, new ListLog(), "core:starter_room", new Sim.Stats.GameClock(timeScale));
-        return (sim, sim.Entity(sim.SpawnPlayer()));
+        return (sim, sim.Entity(sim.SpawnPlayer("player")));
     }
 
     /// <summary>Несколько тиков.</summary>

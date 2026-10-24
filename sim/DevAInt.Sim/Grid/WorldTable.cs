@@ -33,6 +33,12 @@ public sealed class WorldTable
         }
     }
 
+    /// <summary>Число полов, номера от 1 до FloorCount.</summary>
+    public int FloorCount => _floors.Count - 1;
+
+    /// <summary>Число стен, номера от 1 до WallCount.</summary>
+    public int WallCount => _walls.Count - 1;
+
     /// <summary>Пол по номеру.</summary>
     public FloorDef Floor(ushort index) => _floors[index]!;
 
@@ -44,6 +50,12 @@ public sealed class WorldTable
 
     /// <summary>Номер стены по id, исключение если её нет.</summary>
     public ushort WallIndex(string id) => _wallIndex[id];
+
+    /// <summary>Номер пола по id, false если его нет.</summary>
+    public bool TryFloorIndex(string id, out ushort index) => _floorIndex.TryGetValue(id, out index);
+
+    /// <summary>Номер стены по id, false если её нет.</summary>
+    public bool TryWallIndex(string id, out ushort index) => _wallIndex.TryGetValue(id, out index);
 
     /// <summary>Добавление в список, номер нового элемента.</summary>
     private static ushort Add<T>(List<T?> list, T item)

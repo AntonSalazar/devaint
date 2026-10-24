@@ -1,12 +1,15 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Text;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Logging;
 using DevAInt.Sim.Lua;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Motion;
 using DevAInt.Sim.Net;
+using DevAInt.Sim.Saves;
 using DevAInt.Sim.Stats;
 
 namespace DevAInt.Sim.Bench;
@@ -45,6 +48,9 @@ internal static class Program
             MeasureWalking(temp);
             MeasureServer(temp);
             MeasureHookCalls(temp);
+            MeasureSave(temp, "core:starter_room", entities: 0);
+            WriteHugeMap(temp);
+            MeasureSave(temp, "bench:huge", Entities);
             return 0;
         }
         finally
@@ -165,6 +171,59 @@ internal static class Program
         double kilobytes = (GC.GetAllocatedBytesForCurrentThread() - allocated) / 1024.0 / MeasuredTicks;
         double budget = microseconds / (10_000.0 / GameClock.TicksPerSecond);
         Console.WriteLine($"  {title,-45} {microseconds,9:F1} us/tick  {budget,6:F2}% of budget  {kilobytes,8:F1} KB/tick");
+    }
+
+    /// <summary>Карта 4096 на 4096 клеток: пол везде и комнаты 10 на 10 с дверью через каждые 32 клетки.</summary>
+    private static void WriteHugeMap(string mods)
+    {
+        StringBuilder build = new("""{ "floor": "core:wood_floor", "x": 0, "y": 0, "w": 4096, "h": 4096 }""");
+        for (int y = 0; y < 4096; y += 32)
+        {
+            for (int x = 0; x < 4096; x += 32)
+            {
+                build.Append($$""", { "walls": "core:wood_wall", "x": {{x + 4}}, "y": {{y + 4}}, "w": 10, "h": 10 }""");
+                build.Append($$""", { "door": "core:wood_door", "x": {{x + 8}}, "y": {{y + 13}}, "side": "south" }""");
+            }
+        }
+
+        string map = $$"""{ "maps": [ { "id": "bench:huge", "width": 4096, "height": 4096, "spawn": { "x": 1, "y": 1 }, "build": [ {{build}} ] } ] }""";
+        Directory.CreateDirectory(Path.Combine(mods, "bench", "data"));
+        File.WriteAllText(Path.Combine(mods, "bench", "data", "maps.jsonc"), map);
+    }
+
+    /// <summary>Сохранение и загрузка карты с сущностями: полная запись, запись после одной правки, загрузка, размер.</summary>
+    private static void MeasureSave(string mods, string mapId, int entities)
+    {
+        File.WriteAllText(Path.Combine(mods, "bench", "scripts", "main.lua"), string.Empty);
+        ModLoadResult loaded = Load(mods);
+        Simulation sim = new(loaded, new ConsoleLog(), mapId);
+        Random random = new(1);
+        for (int i = 0; i < entities; i++)
+        {
+            sim.CreateEntity(new WorldPos(random.Next(sim.World.Width) + 0.5, random.Next(sim.World.Height) + 0.5, 0));
+        }
+
+        string directory = Path.Combine(Path.GetDirectoryName(mods)!, "save-" + mapId.Replace(':', '-'));
+        SaveGame save = new(directory);
+        double full = Time(() => save.Save(sim));
+        sim.World.SetFloor(new CellPos(1, 1, 0), 0);
+        double one = Time(() => save.Save(sim));
+        double load = Time(() => new SaveGame(directory).Load(loaded, new ConsoleLog()));
+
+        string[] files = Directory.GetFiles(directory, "*", SearchOption.AllDirectories);
+        string[] regions = Directory.GetFiles(Path.Combine(directory, "regions"));
+        double size = files.Sum(file => new FileInfo(file).Length) / 1024.0;
+        double raw = regions.Sum(file => SaveFile.ReadBinary(file, "DVRG").Length) / 1024.0;
+        Console.WriteLine($"  save {mapId}, {entities} entities: {regions.Length} regions, {size:F0} KB on disk, {raw:F0} KB before zlib");
+        Console.WriteLine($"    full save {full:F0} ms, save after one change {one:F0} ms, load {load:F0} ms");
+    }
+
+    /// <summary>Время действия в миллисекундах.</summary>
+    private static double Time(Action action)
+    {
+        Stopwatch watch = Stopwatch.StartNew();
+        action();
+        return watch.Elapsed.TotalMilliseconds;
     }
 
     /// <summary>Загрузка core и bench, ошибки - исключение.</summary>

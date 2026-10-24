@@ -20,9 +20,6 @@ public static class Protocol
     /// <summary>Наибольшая длина строки в байтах: id, версия, хеш мода.</summary>
     private const int MaxText = 256;
 
-    /// <summary>Клеток в слое чанка.</summary>
-    private const int ChunkCells = World.ChunkSize * World.ChunkSize;
-
     /// <summary>Типы сообщений сервера.</summary>
     private enum ServerType : byte
     {
@@ -150,11 +147,7 @@ public static class Protocol
                 writer.WriteVarUInt((ulong)snapshot.Levels.Count);
                 foreach (ChunkLevelData level in snapshot.Levels)
                 {
-                    writer.WriteVarInt(level.Z);
-                    writer.WriteRuns(level.Floors);
-                    writer.WriteRuns(level.NorthWalls);
-                    writer.WriteRuns(level.WestWalls);
-                    writer.WriteRuns(level.Flags);
+                    ChunkCodec.Write(writer, level);
                 }
 
                 break;
@@ -289,13 +282,7 @@ public static class Protocol
         List<ChunkLevelData> levels = new(count);
         for (int i = 0; i < count; i++)
         {
-            int z = (int)reader.ReadVarInt();
-            ChunkLevelData level = new(z, new ushort[ChunkCells], new ushort[ChunkCells], new ushort[ChunkCells], new ushort[ChunkCells]);
-            reader.ReadRuns(level.Floors);
-            reader.ReadRuns(level.NorthWalls);
-            reader.ReadRuns(level.WestWalls);
-            reader.ReadRuns(level.Flags);
-            levels.Add(level);
+            levels.Add(ChunkCodec.Read(reader));
         }
 
         return new ChunkSnapshotMessage(chunkX, chunkY, levels);

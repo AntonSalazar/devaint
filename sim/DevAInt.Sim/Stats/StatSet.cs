@@ -106,6 +106,19 @@ public sealed class StatSet
         UpdateMoodles();
     }
 
+    /// <summary>Значения статов из сохранения; мудлы и их модификаторы пересчитываются без смен для хуков.</summary>
+    internal void Restore(IEnumerable<(int Stat, double Value)> values)
+    {
+        foreach ((int stat, double value) in values)
+        {
+            SetValue(stat, value);
+        }
+
+        // Мудлы однозначно следуют из значений, поэтому их не хранят; загрузка - не смена уровня
+        UpdateMoodles();
+        _changes.Clear();
+    }
+
     /// <summary>Наибольший уровень, порог которого достигнут, 0 если ни одного.</summary>
     private static int LevelFor(MoodleDef moodle, double value)
     {

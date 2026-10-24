@@ -51,4 +51,10 @@ public sealed class ItemTable
 
     /// <summary>Номер действия по id, исключение если его нет.</summary>
     public int ActionIndex(string id) => _actionIndex[id];
+
+    /// <summary>Номер предмета по id, false если его нет.</summary>
+    public bool TryItemIndex(string id, out int index) => _itemIndex.TryGetValue(id, out index);
+
+    /// <summary>Номер действия по id, false если его нет.</summary>
+    public bool TryActionIndex(string id, out int index) => _actionIndex.TryGetValue(id, out index);
 }

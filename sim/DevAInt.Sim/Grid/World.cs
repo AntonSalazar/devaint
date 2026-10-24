@@ -34,6 +34,9 @@ public sealed class World
     /// <summary>Число этажей.</summary>
     public const int LevelCount = MaxLevel - MinLevel + 1;
 
+    /// <summary>Сторона региона сохранения в чанках.</summary>
+    public const int RegionSize = 8;
+
     /// <summary>Наибольшая сторона карты в клетках.</summary>
     public const int MaxSize = 4096;
 
@@ -42,6 +45,9 @@ public sealed class World
 
     /// <summary>Изменения полов и рёбер с последней очистки, для рассылки клиентам.</summary>
     private readonly List<WorldChange> _changes = [];
+
+    /// <summary>Регионы, где менялись полы или рёбра с последнего сохранения.</summary>
+    private readonly HashSet<(int X, int Y)> _dirtyRegions = [];
 
     /// <summary>Пустой мир размером width на height клеток.</summary>
     public World(int width, int height)
@@ -76,6 +82,9 @@ public sealed class World
 
     /// <summary>Изменения полов и рёбер с последней очистки.</summary>
     internal IReadOnlyList<WorldChange> Changes => _changes;
+
+    /// <summary>Регионы, где менялись полы или рёбра с последнего сохранения.</summary>
+    internal IReadOnlyCollection<(int X, int Y)> DirtyRegions => _dirtyRegions;
 
     /// <summary>Число созданных слоев этажей во всех чанках, для проверки расхода памяти.</summary>
     internal int LevelsCreated
@@ -112,6 +121,7 @@ public sealed class World
         Require(Contains(cell), cell);
         GetOrCreateLevel(cell).Floors[LocalIndex(cell)] = floor;
         _changes.Add(new WorldChange(cell, WorldChangeKind.Floor));
+        _dirtyRegions.Add(RegionOf(cell));
     }
 
     /// <summary>Можно ли стоять на клетке: она в карте и на ней есть пол.</summary>
@@ -134,6 +144,9 @@ public sealed class World
 
     /// <summary>Можно ли перейти из клетки в соседнюю: сосед в карте, ребро проходимо, у соседа есть пол.</summary>
     public bool CanCross(CellPos cell, Side side) => GetEdge(cell, side).IsPassable && IsWalkable(cell.Neighbor(side));
+
+    /// <summary>Регион сохранения, в котором лежит клетка.</summary>
+    internal static (int X, int Y) RegionOf(CellPos cell) => (cell.X / ChunkSize / RegionSize, cell.Y / ChunkSize / RegionSize);
 
     /// <summary>Северное или западное ребро клетки-владельца из хранения.</summary>
     internal Edge GetOwnedEdge(CellPos owner, bool north)
@@ -159,10 +172,14 @@ public sealed class World
         (north ? level.NorthWalls : level.WestWalls)[index] = edge.Wall;
         level.Flags[index] = edge.Open ? (byte)(level.Flags[index] | flag) : (byte)(level.Flags[index] & ~flag);
         _changes.Add(new WorldChange(owner, north ? WorldChangeKind.NorthEdge : WorldChangeKind.WestEdge));
+        _dirtyRegions.Add(RegionOf(owner));
     }
 
     /// <summary>Очистка журнала изменений после рассылки.</summary>
     internal void ClearChanges() => _changes.Clear();
+
+    /// <summary>Очистка списка изменённых регионов после сохранения или загрузки.</summary>
+    internal void ClearDirtyRegions() => _dirtyRegions.Clear();
 
     /// <summary>Созданные слои этажей чанка по возрастанию z.</summary>
     internal IEnumerable<(int Z, ChunkLevel Level)> ChunkLevels(int chunkX, int chunkY)

@@ -30,22 +30,23 @@ public sealed class Simulation
     /// <summary>Задана ли карта: без неё мир пустой и позиции не проверяются.</summary>
     private readonly bool _hasMap;
 
-    /// <summary>Id следующей сущности.</summary>
-    private long _nextId = 1;
-
-    /// <summary>Id следующего предмета.</summary>
-    private long _nextItemId = 1;
-
     /// <summary>Sim по загруженным модам и карте mapId; без карты мир пустой 1 на 1. Ошибки скриптов в ScriptErrors.</summary>
     public Simulation(ModLoadResult mods, ISimLog log, string? mapId = null, GameClock? clock = null)
+        : this(mods, log, mapId, clock, world: null)
+    {
+    }
+
+    /// <summary>Sim с готовым миром из сохранения вместо постройки карты; карта нужна для точки появления.</summary>
+    internal Simulation(ModLoadResult mods, ISimLog log, string? mapId, GameClock? clock, World? world)
     {
         StatTable = new StatTable(mods.Defs);
         WorldTable = new WorldTable(mods.Defs);
         ItemTable = new ItemTable(mods.Defs);
         Mods = [.. mods.Mods.Select(mod => mod.Info)];
         _hasMap = mapId is not null;
+        MapId = mapId;
         MapDef? map = mapId is null ? null : mods.Defs.Get<MapDef>(mapId);
-        World = map is null ? new World(1, 1) : MapBuilder.Build(map, WorldTable);
+        World = world ?? (map is null ? new World(1, 1) : MapBuilder.Build(map, WorldTable));
         Spawn = map is null ? WorldPos.CenterOf(new CellPos(0, 0, 0)) : WorldPos.CenterOf(new CellPos(map.Spawn.X, map.Spawn.Y, map.Spawn.Z));
         SpawnItems = map is null ? [] : [.. map.Spawn.Items.Select(mods.Defs.Get<ItemDef>)];
 
@@ -55,6 +56,9 @@ public sealed class Simulation
         _lua = new LuaHost(StatTable, FindStats, log);
         ScriptErrors = _lua.Load(mods.Mods);
     }
+
+    /// <summary>Карта, из которой sim начат, null без карты.</summary>
+    public string? MapId { get; }
 
     /// <summary>Моды sim в порядке загрузки, для сверки с клиентами.</summary>
     public IReadOnlyList<ModInfo> Mods { get; }
@@ -86,6 +90,12 @@ public sealed class Simulation
     /// <summary>Сущности в порядке создания.</summary>
     internal IReadOnlyList<Entity> Entities => _order;
 
+    /// <summary>Id следующей сущности.</summary>
+    internal long NextEntityId { get; set; } = 1;
+
+    /// <summary>Id следующего предмета.</summary>
+    internal long NextItemId { get; set; } = 1;
+
     /// <summary>Новая сущность со статами на минимуме; на карте позиция должна быть на полу.</summary>
     public long CreateEntity(WorldPos? at = null)
     {
@@ -95,16 +105,17 @@ public sealed class Simulation
             throw new ArgumentException($"position {position} is not on a floor", nameof(at));
         }
 
-        Entity entity = new(_nextId++, new StatSet(StatTable), position);
+        Entity entity = new(NextEntityId++, new StatSet(StatTable), position);
         _entities[entity.Id] = entity;
         _order.Add(entity);
         return entity.Id;
     }
 
-    /// <summary>Игрок в точке появления со стартовыми предметами карты, его id.</summary>
-    public long SpawnPlayer()
+    /// <summary>Новый персонаж игрока playerId в точке появления со стартовыми предметами карты, id сущности.</summary>
+    public long SpawnPlayer(string playerId)
     {
         long id = CreateEntity(Spawn);
+        _entities[id].PlayerId = playerId;
         foreach (ItemDef item in SpawnItems)
         {
             GiveItem(id, item);
@@ -116,7 +127,7 @@ public sealed class Simulation
     /// <summary>Новый предмет в инвентарь сущности, его id.</summary>
     public long GiveItem(long entityId, ItemDef def)
     {
-        Item item = new(_nextItemId++, def);
+        Item item = new(NextItemId++, def);
         _entities[entityId].Inventory.Add(item);
         return item.Id;
     }
@@ -200,6 +211,18 @@ public sealed class Simulation
         }
 
         _lua.RaiseTick();
+    }
+
+    /// <summary>Сущность из сохранения со своим id; счётчики id сдвигаются за неё и её предметы.</summary>
+    internal void RestoreEntity(Entity entity)
+    {
+        _entities.Add(entity.Id, entity);
+        _order.Add(entity);
+        NextEntityId = Math.Max(NextEntityId, entity.Id + 1);
+        foreach (Item item in entity.Inventory.Items)
+        {
+            NextItemId = Math.Max(NextItemId, item.Id + 1);
+        }
     }
 
     /// <summary>Прерывание действия движением или его окончание: статы и трата предмета.</summary>

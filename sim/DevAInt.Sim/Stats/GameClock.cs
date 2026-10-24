@@ -1,7 +1,7 @@
 namespace DevAInt.Sim.Stats;
 
-/// <summary>Игровое время: номер тика и шаг тика с учётом ускорения всей симуляции.</summary>
-public sealed class GameClock(double timeScale = 1)
+/// <summary>Игровое время: номер тика и шаг тика с учётом ускорения всей симуляции; tick - тик начала, для загрузки.</summary>
+public sealed class GameClock(double timeScale = 1, long tick = 0)
 {
     /// <summary>Тиков в реальную секунду.</summary>
     public const int TicksPerSecond = 10;
@@ -13,7 +13,7 @@ public sealed class GameClock(double timeScale = 1)
     public const double DefaultMinutesPerTick = 24.0 * 60.0 / (60.0 * 60.0 * TicksPerSecond);
 
     /// <summary>Номер текущего тика.</summary>
-    public long Tick { get; private set; }
+    public long Tick { get; private set; } = tick;
 
     /// <summary>Ускорение всей симуляции: и статов, и движения; 1 - обычная скорость.</summary>
     public double TimeScale { get; } = timeScale;

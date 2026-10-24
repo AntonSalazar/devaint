@@ -11,6 +11,9 @@ public sealed class Entity(long id, StatSet stats, WorldPos position)
     /// <summary>Уникальный id.</summary>
     public long Id { get; } = id;
 
+    /// <summary>Игрок, которому принадлежит сущность, null у остальных сущностей.</summary>
+    public string? PlayerId { get; internal set; }
+
     /// <summary>Статы и мудлы.</summary>
     public StatSet Stats { get; } = stats;
 

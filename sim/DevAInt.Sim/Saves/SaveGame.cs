@@ -1,0 +1,472 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using DevAInt.Sim.Defs;
+using DevAInt.Sim.Grid;
+using DevAInt.Sim.Logging;
+using DevAInt.Sim.Mods;
+using DevAInt.Sim.Net;
+
+namespace DevAInt.Sim.Saves;
+
+/// <summary>Сохранение в папке: meta.json, регионы чанков с сущностями и персонажи игроков отдельными файлами.</summary>
+public sealed partial class SaveGame(string directory)
+{
+    /// <summary>Версия формата файлов сохранения.</summary>
+    public const byte FormatVersion = 1;
+
+    /// <summary>Имя файла меты.</summary>
+    private const string MetaName = "meta.json";
+
+    /// <summary>Метка файла региона.</summary>
+    private const string RegionMagic = "DVRG";
+
+    /// <summary>Метка файла игрока.</summary>
+    private const string PlayerMagic = "DVPL";
+
+    /// <summary>Наибольшее число сущностей в чанке, защита от мусора.</summary>
+    private const int MaxEntities = 1_000_000;
+
+    /// <summary>Настройки JSON меты.</summary>
+    private static readonly JsonSerializerOptions _json = new() { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+    /// <summary>Таблица id сохранения.</summary>
+    private SaveIds _ids = new();
+
+    /// <summary>Регионы, где лежали сущности при последней записи или загрузке: их нужно переписать, даже если сущности ушли.</summary>
+    private HashSet<(int X, int Y)> _entityRegions = [];
+
+    /// <summary>Папка сохранения.</summary>
+    public string Directory { get; } = directory;
+
+    /// <summary>Есть ли сохранение в папке.</summary>
+    public bool Exists => File.Exists(MetaPath);
+
+    /// <summary>Путь меты.</summary>
+    private string MetaPath => Path.Combine(Directory, MetaName);
+
+    /// <summary>Подходит ли id игрока: он становится именем файла, поэтому только латиница, цифры, - и _.</summary>
+    public static bool IsValidPlayerId(string id) => PlayerIdRegex().IsMatch(id);
+
+    /// <summary>Запись изменённых регионов, персонажей игроков в мире и меты.</summary>
+    public void Save(Simulation sim)
+    {
+        string mapId = sim.MapId ?? throw new InvalidOperationException("a simulation without a map cannot be saved");
+        ushort[] floors = ToSaveNumbers(sim.WorldTable.FloorCount, i => sim.WorldTable.Floor(i).Id, _ids.Floors);
+        ushort[] walls = ToSaveNumbers(sim.WorldTable.WallCount, i => sim.WorldTable.Wall(i).Id, _ids.Walls);
+        RegisterIds(sim);
+
+        // Мета первой и с полной таблицей id: если запись оборвётся дальше, старые и новые файлы
+        // читаются по этой таблице, а счётчики в ней не меньше id в любом файле
+        WriteMeta(sim, mapId);
+
+        // Сущности меняются каждый тик, поэтому их регионы переписываются всегда
+        Dictionary<(int X, int Y), List<Entity>> entities = EntitiesByRegion(sim);
+        HashSet<(int X, int Y)> regions = [.. sim.World.DirtyRegions, .. entities.Keys, .. _entityRegions];
+        foreach ((int X, int Y) region in regions)
+        {
+            WriteRegion(sim, region, entities.GetValueOrDefault(region) ?? [], floors, walls);
+        }
+
+        foreach (Entity player in sim.Entities.Where(entity => entity.PlayerId is not null))
+        {
+            PacketWriter writer = new();
+            EntityCodec.Write(writer, player, _ids, sim.StatTable);
+            SaveFile.WriteBinary(PlayerPath(player.PlayerId!), PlayerMagic, writer.ToArray());
+        }
+
+        sim.World.ClearDirtyRegions();
+        _entityRegions = [.. entities.Keys];
+    }
+
+    /// <summary>Sim из сохранения на текущих модах; повреждённые файлы или нужные id без модов - SaveException.</summary>
+    public Simulation Load(ModLoadResult mods, ISimLog log, double timeScale = 1)
+    {
+        SaveMeta meta = ReadMeta();
+        if (!mods.Defs.TryGet<MapDef>(meta.MapId, out _))
+        {
+            throw new SaveException($"{MetaName}: map {meta.MapId} is not in the loaded mods");
+        }
+
+        _ids = new SaveIds(meta.Ids);
+        Simulation sim = new(mods, log, meta.MapId, new Stats.GameClock(timeScale, meta.Tick), CreateWorld(meta));
+        SaveTables tables = new(sim.StatTable, sim.ItemTable, sim.WorldTable);
+        RegionReader regions = new(sim.World, _ids, tables, log);
+        foreach (string file in RegionFiles())
+        {
+            regions.Read(file, SaveFile.ReadBinary(file, RegionMagic));
+        }
+
+        if (regions.Missing.Count > 0)
+        {
+            throw new SaveException($"save needs ids missing from loaded mods: {string.Join(", ", regions.Missing.Order())}");
+        }
+
+        foreach (Entity entity in regions.Entities)
+        {
+            sim.RestoreEntity(entity);
+        }
+
+        // Мета пишется до файлов, поэтому её счётчики не меньше id в любом файле, в том числе у игроков не в сети
+        sim.NextEntityId = Math.Max(sim.NextEntityId, meta.NextEntityId);
+        sim.NextItemId = Math.Max(sim.NextItemId, meta.NextItemId);
+
+        sim.World.ClearDirtyRegions();
+        sim.World.ClearChanges();
+        _entityRegions = [.. regions.Entities.Select(entity => World.RegionOf(entity.Position.Cell))];
+        return sim;
+    }
+
+    /// <summary>Персонаж игрока из сохранения в мир, id сущности; null если у игрока ещё нет персонажа.</summary>
+    public long? LoadPlayer(Simulation sim, string playerId, ISimLog log)
+    {
+        string path = PlayerPath(playerId);
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        HashSet<string> missing = [];
+        Entity entity = ReadPlayer(path, new SaveTables(sim.StatTable, sim.ItemTable, sim.WorldTable), missing, log);
+        if (missing.Count > 0)
+        {
+            throw new SaveException($"player {playerId} needs ids missing from loaded mods: {string.Join(", ", missing.Order())}");
+        }
+
+        sim.RestoreEntity(entity);
+        return entity.Id;
+    }
+
+    /// <summary>Номера сохранения для номеров таблицы мира; 0 остаётся пустотой.</summary>
+    private static ushort[] ToSaveNumbers(int count, Func<ushort, string> idOf, SaveIdList ids)
+    {
+        ushort[] numbers = new ushort[count + 1];
+        for (int i = 1; i <= count; i++)
+        {
+            numbers[i] = checked((ushort)ids.NumberOf(idOf((ushort)i)));
+        }
+
+        return numbers;
+    }
+
+    /// <summary>Сущности не игроков по регионам их позиции.</summary>
+    private static Dictionary<(int X, int Y), List<Entity>> EntitiesByRegion(Simulation sim)
+    {
+        Dictionary<(int X, int Y), List<Entity>> regions = [];
+        foreach (Entity entity in sim.Entities.Where(entity => entity.PlayerId is null))
+        {
+            (int X, int Y) region = World.RegionOf(entity.Position.Cell);
+            if (!regions.TryGetValue(region, out List<Entity>? list))
+            {
+                regions[region] = list = [];
+            }
+
+            list.Add(entity);
+        }
+
+        return regions;
+    }
+
+    /// <summary>Пустой мир размера из меты.</summary>
+    private static World CreateWorld(SaveMeta meta)
+    {
+        try
+        {
+            return new World(meta.Width, meta.Height);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            throw new SaveException($"{MetaName}: world size {meta.Width}x{meta.Height} is not valid");
+        }
+    }
+
+    /// <summary>Чанк, в котором лежит позиция.</summary>
+    private static (int X, int Y) ChunkOf(Entity entity) => (entity.Position.Cell.X / World.ChunkSize, entity.Position.Cell.Y / World.ChunkSize);
+
+    /// <summary>Замена номеров по таблице перевода.</summary>
+    private static void Renumber(ushort[] values, ushort[] map)
+    {
+        for (int i = 0; i < values.Length; i++)
+        {
+            values[i] = map[values[i]];
+        }
+    }
+
+    /// <summary>Разбор данных файла целиком; ошибки чтения - SaveException с именем файла.</summary>
+    private static T Decode<T>(string path, byte[] payload, Func<PacketReader, T> read)
+    {
+        PacketReader reader = new(payload);
+        try
+        {
+            T result = read(reader);
+            return reader.AtEnd ? result : throw new ProtocolException("file has trailing bytes");
+        }
+        catch (ProtocolException error)
+        {
+            throw new SaveException($"{Path.GetFileName(path)}: {error.Message}");
+        }
+    }
+
+    [GeneratedRegex("^[A-Za-z0-9_-]{1,64}$")]
+    private static partial Regex PlayerIdRegex();
+
+    [GeneratedRegex(@"^r\.(\d+)\.(\d+)\.bin$")]
+    private static partial Regex RegionNameRegex();
+
+    /// <summary>Все id статов, предметов и действий текущих модов в таблицу сохранения до записи файлов.</summary>
+    private void RegisterIds(Simulation sim)
+    {
+        for (int i = 0; i < sim.StatTable.StatCount; i++)
+        {
+            _ids.Stats.NumberOf(sim.StatTable.Stat(i).Id);
+        }
+
+        for (int i = 0; i < sim.ItemTable.ItemCount; i++)
+        {
+            _ids.Items.NumberOf(sim.ItemTable.Item(i).Id);
+        }
+
+        for (int i = 0; i < sim.ItemTable.ActionCount; i++)
+        {
+            _ids.Actions.NumberOf(sim.ItemTable.Action(i).Id);
+        }
+    }
+
+    /// <summary>Мета: формат, карта, время, счётчики id, моды и таблица id.</summary>
+    private void WriteMeta(Simulation sim, string mapId)
+    {
+        SaveMeta meta = new()
+        {
+            Format = FormatVersion,
+            MapId = mapId,
+            Width = sim.World.Width,
+            Height = sim.World.Height,
+            Tick = sim.Clock.Tick,
+            NextEntityId = sim.NextEntityId,
+            NextItemId = sim.NextItemId,
+            Mods = [.. sim.Mods],
+            Ids = _ids.ToLists(),
+        };
+        SaveFile.WriteText(MetaPath, JsonSerializer.Serialize(meta, _json) + "\n");
+    }
+
+    /// <summary>Файл региона: чанки со слоями или сущностями; пустой регион пишется, только если его файл уже есть.</summary>
+    private void WriteRegion(Simulation sim, (int X, int Y) region, List<Entity> entities, ushort[] floors, ushort[] walls)
+    {
+        World world = sim.World;
+        List<((int X, int Y) Chunk, List<(int Z, ChunkLevel Level)> Levels, List<Entity> Entities)> chunks = [];
+        for (int y = region.Y * World.RegionSize; y < Math.Min((region.Y + 1) * World.RegionSize, world.ChunksY); y++)
+        {
+            for (int x = region.X * World.RegionSize; x < Math.Min((region.X + 1) * World.RegionSize, world.ChunksX); x++)
+            {
+                List<(int Z, ChunkLevel Level)> levels = [.. world.ChunkLevels(x, y)];
+                List<Entity> inside = [.. entities.Where(entity => ChunkOf(entity) == (x, y))];
+                if (levels.Count > 0 || inside.Count > 0)
+                {
+                    chunks.Add(((x, y), levels, inside));
+                }
+            }
+        }
+
+        string path = RegionPath(region);
+        if (chunks.Count == 0 && !File.Exists(path))
+        {
+            return;
+        }
+
+        PacketWriter writer = new();
+        writer.WriteVarUInt((ulong)chunks.Count);
+        foreach (((int X, int Y) chunk, List<(int Z, ChunkLevel Level)> levels, List<Entity> inside) in chunks)
+        {
+            writer.WriteVarUInt((ulong)chunk.X);
+            writer.WriteVarUInt((ulong)chunk.Y);
+            writer.WriteVarUInt((ulong)levels.Count);
+            foreach ((int z, ChunkLevel level) in levels)
+            {
+                ChunkLevelData data = ChunkCodec.Copy(z, level);
+                Renumber(data.Floors, floors);
+                Renumber(data.NorthWalls, walls);
+                Renumber(data.WestWalls, walls);
+                ChunkCodec.Write(writer, data);
+            }
+
+            writer.WriteVarUInt((ulong)inside.Count);
+            foreach (Entity entity in inside)
+            {
+                EntityCodec.Write(writer, entity, _ids, sim.StatTable);
+            }
+        }
+
+        SaveFile.WriteBinary(path, RegionMagic, writer.ToArray());
+    }
+
+    /// <summary>Мета из файла; нет файла, повреждённый JSON или другой формат - SaveException.</summary>
+    private SaveMeta ReadMeta()
+    {
+        if (!Exists)
+        {
+            throw new SaveException($"no save in {Directory}");
+        }
+
+        SaveMeta? meta;
+        try
+        {
+            meta = JsonSerializer.Deserialize<SaveMeta>(File.ReadAllText(MetaPath), _json);
+        }
+        catch (JsonException error)
+        {
+            throw new SaveException($"{MetaName}: {Jsonc.ShortMessage(error.Message)}");
+        }
+
+        if (meta is null)
+        {
+            throw new SaveException($"{MetaName}: file is empty");
+        }
+
+        return meta.Format == FormatVersion ? meta : throw new SaveException($"{MetaName}: save format {meta.Format} is not supported, expected {FormatVersion}");
+    }
+
+    /// <summary>Файлы регионов по имени.</summary>
+    private IEnumerable<string> RegionFiles()
+    {
+        string regions = Path.Combine(Directory, "regions");
+        if (!System.IO.Directory.Exists(regions))
+        {
+            return [];
+        }
+
+        return System.IO.Directory.GetFiles(regions, "r.*.bin").Where(file => RegionNameRegex().IsMatch(Path.GetFileName(file))).Order(StringComparer.Ordinal);
+    }
+
+    /// <summary>Персонаж из файла игрока.</summary>
+    private Entity ReadPlayer(string path, SaveTables tables, ISet<string> missing, ISimLog log)
+    {
+        byte[] payload = SaveFile.ReadBinary(path, PlayerMagic);
+        return Decode(path, payload, reader => EntityCodec.Read(reader, _ids, tables, missing, log));
+    }
+
+    /// <summary>Путь файла региона.</summary>
+    private string RegionPath((int X, int Y) region) => Path.Combine(Directory, "regions", $"r.{region.X}.{region.Y}.bin");
+
+    /// <summary>Путь файла игрока; неверный id - ArgumentException, чтобы не выйти из папки сохранения.</summary>
+    private string PlayerPath(string playerId)
+    {
+        return IsValidPlayerId(playerId)
+            ? Path.Combine(Directory, "players", playerId + ".bin")
+            : throw new ArgumentException($"player id {playerId} must be 1-64 latin letters, digits, - or _", nameof(playerId));
+    }
+
+    /// <summary>Чтение регионов в мир: слои чанков с переводом номеров, сущности и id, которых нет в модах.</summary>
+    private sealed class RegionReader(World world, SaveIds ids, SaveTables tables, ISimLog log)
+    {
+        /// <summary>Номера полов сохранения в номера текущих модов, -1 если пола нет в модах.</summary>
+        private readonly int[] _floors = FromSaveNumbers(ids.Floors, id => tables.World.TryFloorIndex(id, out ushort index) ? index : -1);
+
+        /// <summary>Номера стен сохранения в номера текущих модов, -1 если стены нет в модах.</summary>
+        private readonly int[] _walls = FromSaveNumbers(ids.Walls, id => tables.World.TryWallIndex(id, out ushort index) ? index : -1);
+
+        /// <summary>Id из сохранения, которых нет в модах.</summary>
+        public HashSet<string> Missing { get; } = [];
+
+        /// <summary>Сущности регионов.</summary>
+        public List<Entity> Entities { get; } = [];
+
+        /// <summary>Один файл региона.</summary>
+        public void Read(string path, byte[] payload)
+        {
+            Match name = RegionNameRegex().Match(Path.GetFileName(path));
+            (int X, int Y) region = (int.Parse(name.Groups[1].Value), int.Parse(name.Groups[2].Value));
+            Decode(path, payload, reader =>
+            {
+                int count = reader.ReadCount(World.RegionSize * World.RegionSize);
+                for (int i = 0; i < count; i++)
+                {
+                    ReadChunk(reader, region);
+                }
+
+                return true;
+            });
+        }
+
+        /// <summary>Перевод номеров сохранения в номера модов через id.</summary>
+        private static int[] FromSaveNumbers(SaveIdList ids, Func<string, int> current)
+        {
+            int[] numbers = new int[ids.Ids.Count + 1];
+            for (int i = 0; i < ids.Ids.Count; i++)
+            {
+                numbers[i + 1] = current(ids.Ids[i]);
+            }
+
+            return numbers;
+        }
+
+        /// <summary>Чанк: координаты внутри региона и мира, слои и сущности.</summary>
+        private void ReadChunk(PacketReader reader, (int X, int Y) region)
+        {
+            int chunkX = reader.ReadCount(World.MaxSize);
+            int chunkY = reader.ReadCount(World.MaxSize);
+            bool inside = chunkX / World.RegionSize == region.X && chunkY / World.RegionSize == region.Y;
+            if (!inside || chunkX >= world.ChunksX || chunkY >= world.ChunksY)
+            {
+                throw new ProtocolException($"chunk {chunkX},{chunkY} does not belong to this region");
+            }
+
+            int levels = reader.ReadCount(World.LevelCount);
+            for (int i = 0; i < levels; i++)
+            {
+                ReadLevel(ChunkCodec.Read(reader), chunkX, chunkY);
+            }
+
+            int entities = reader.ReadCount(MaxEntities);
+            for (int i = 0; i < entities; i++)
+            {
+                Entities.Add(EntityCodec.Read(reader, ids, tables, Missing, log));
+            }
+        }
+
+        /// <summary>Слой этажа в мир с переводом номеров полов и стен.</summary>
+        private void ReadLevel(ChunkLevelData data, int chunkX, int chunkY)
+        {
+            if (data.Z is < World.MinLevel or > World.MaxLevel)
+            {
+                throw new ProtocolException($"level {data.Z} is outside the world");
+            }
+
+            ChunkLevel level = world.LoadChunkLevel(chunkX, chunkY, data.Z);
+            for (int i = 0; i < data.Floors.Length; i++)
+            {
+                level.Floors[i] = Translate(data.Floors[i], _floors, ids.Floors);
+                level.NorthWalls[i] = Translate(data.NorthWalls[i], _walls, ids.Walls);
+                level.WestWalls[i] = Translate(data.WestWalls[i], _walls, ids.Walls);
+                level.Flags[i] = data.Flags[i] <= (ChunkLevel.NorthOpen | ChunkLevel.WestOpen)
+                    ? (byte)data.Flags[i]
+                    : throw new ProtocolException($"edge flags {data.Flags[i]} are not valid");
+            }
+        }
+
+        /// <summary>Номер мода для номера сохранения; id без мода записывается в Missing.</summary>
+        private ushort Translate(ushort number, int[] map, SaveIdList ids)
+        {
+            if (number == 0)
+            {
+                return 0;
+            }
+
+            if (number >= map.Length)
+            {
+                throw new ProtocolException($"id number {number} is not in the save id table");
+            }
+
+            if (map[number] < 0)
+            {
+                Missing.Add(ids.IdAt(number));
+                return 0;
+            }
+
+            return (ushort)map[number];
+        }
+    }
+}
