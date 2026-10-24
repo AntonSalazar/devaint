@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using DevAInt.Sim.Defs;
 
 namespace DevAInt.Sim.Mods;
@@ -17,6 +18,10 @@ internal sealed class DefFile
         ["actions"] = typeof(ActionDef),
         ["items"] = typeof(ItemDef),
     };
+
+    /// <summary>Путь к JSON Schema для редактора, загрузчик его пропускает.</summary>
+    [JsonPropertyName("$schema")]
+    public string? Schema { get; init; }
 
     /// <summary>Статы.</summary>
     public List<StatDef?>? Stats { get; init; }

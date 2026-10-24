@@ -3,6 +3,7 @@ using System.Linq;
 using DevAInt.Sim;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Items;
+using DevAInt.Sim.Logging;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Motion;
 using DevAInt.Sim.Net;
@@ -73,6 +74,21 @@ public partial class GameRoot : Node3D
         return wasConnected ? "lost connection to the server" : "cannot connect to the server: refused";
     }
 
+    /// <summary>Приём пакетов сервера; неверный пакет или чужие моды - ошибка в лог и false.</summary>
+    public static bool TryUpdate(GameClient client, ISimLog log)
+    {
+        try
+        {
+            client.Update();
+            return true;
+        }
+        catch (ProtocolException error)
+        {
+            log.Error(error.Message);
+            return false;
+        }
+    }
+
     /// <summary>Загрузка модов, запуск сервера или подключение к нему, постройка сцены.</summary>
     public override void _Ready()
     {
@@ -101,7 +117,7 @@ public partial class GameRoot : Node3D
             _log.Info($"artificial lag {lag} ms round trip");
         }
 
-        _client = new GameClient(connection, stats, _items);
+        _client = new GameClient(connection, stats, _items, [.. loaded.Mods.Select(mod => mod.Info)]);
         GameInput.EnsureActions();
         _autoWalk = args.Contains("--autowalk");
         BuildScene(stats, world);
@@ -142,7 +158,11 @@ public partial class GameRoot : Node3D
         {
             _client.SendInput(ReadInput(_camera));
             _server?.Tick();
-            _client.Update();
+            if (!UpdateClient(_client))
+            {
+                return;
+            }
+
             if (_client.OwnPosition is WorldPos own)
             {
                 _view.MoveOwn(own);
@@ -150,7 +170,11 @@ public partial class GameRoot : Node3D
         }
 
         // По сети пакеты приходят и между тиками: чужие сущности не должны ждать своего тика
-        _client.Update();
+        if (!UpdateClient(_client))
+        {
+            return;
+        }
+
         UseItemOnKey();
         _view.Advance(delta, _timer.Fraction);
         FollowOwn(delta);
@@ -204,6 +228,19 @@ public partial class GameRoot : Node3D
         _hud = new Hud();
         _hud.Init(new HudModel(stats, _items!, _client.Replica));
         AddChild(_hud);
+    }
+
+    /// <summary>Приём пакетов; при ошибке протокола игра выходит, результат false.</summary>
+    private bool UpdateClient(GameClient client)
+    {
+        if (TryUpdate(client, _log))
+        {
+            return true;
+        }
+
+        GetTree().Quit(1);
+        _client = null;
+        return false;
     }
 
     /// <summary>Проверка подключения по сети; при ошибке игра выходит, результат false.</summary>

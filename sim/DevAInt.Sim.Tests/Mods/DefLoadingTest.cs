@@ -115,7 +115,7 @@ public class DefLoadingTest
     {
         string[] properties = [.. typeof(DefFile).GetProperties()
             .Select(property => char.ToLowerInvariant(property.Name[0]) + property.Name[1..])
-            .Where(name => name != "patches")
+            .Where(name => name is not "patches" and not "schema")
             .Order()];
 
         Assert.Equal(DefFile.Categories.Keys.Order(), properties);

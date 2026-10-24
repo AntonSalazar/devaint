@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using DevAInt.Sim.Grid;
+using DevAInt.Sim.Mods;
 
 namespace DevAInt.Sim.Net;
 
@@ -12,6 +13,12 @@ public static class Protocol
 
     /// <summary>Наибольшее число значений в списке внутри сообщения.</summary>
     private const int MaxList = 65_536;
+
+    /// <summary>Наибольшее число модов в приветствии.</summary>
+    private const int MaxMods = 1000;
+
+    /// <summary>Наибольшая длина строки в байтах: id, версия, хеш мода.</summary>
+    private const int MaxText = 256;
 
     /// <summary>Клеток в слое чанка.</summary>
     private const int ChunkCells = World.ChunkSize * World.ChunkSize;
@@ -128,6 +135,13 @@ public static class Protocol
                 writer.WriteVarUInt((ulong)welcome.Width);
                 writer.WriteVarUInt((ulong)welcome.Height);
                 writer.WriteDouble(welcome.TimeScale);
+                writer.WriteVarUInt((ulong)welcome.Mods.Count);
+                foreach (ModInfo mod in welcome.Mods)
+                {
+                    writer.WriteString(mod.Id);
+                    writer.WriteString(mod.Version);
+                    writer.WriteString(mod.Hash);
+                }
                 break;
             case ChunkSnapshotMessage snapshot:
                 writer.WriteByte((byte)ServerType.ChunkSnapshot);
@@ -256,7 +270,14 @@ public static class Protocol
             throw new ProtocolException($"time scale {timeScale} is not positive");
         }
 
-        return new WelcomeMessage(entityId, width, height, timeScale);
+        int count = reader.ReadCount(MaxMods);
+        List<ModInfo> mods = new(count);
+        for (int i = 0; i < count; i++)
+        {
+            mods.Add(new ModInfo(reader.ReadString(MaxText), reader.ReadString(MaxText), reader.ReadString(MaxText)));
+        }
+
+        return new WelcomeMessage(entityId, width, height, timeScale, mods);
     }
 
     /// <summary>Снимок чанка со всеми слоями.</summary>

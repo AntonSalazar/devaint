@@ -1,5 +1,8 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using DevAInt.Sim.Grid;
+using DevAInt.Sim.Mods;
 
 namespace DevAInt.Sim.Net;
 
@@ -9,8 +12,19 @@ public readonly record struct ItemData(long Id, int Item);
 /// <summary>Сообщение сервера клиенту.</summary>
 public abstract record ServerMessage;
 
-/// <summary>Подключение принято: своя сущность, размер мира и ускорение времени сервера.</summary>
-public sealed record WelcomeMessage(long EntityId, int Width, int Height, double TimeScale) : ServerMessage;
+/// <summary>Подключение принято: своя сущность, размер мира, ускорение времени и моды сервера в порядке загрузки.</summary>
+public sealed record WelcomeMessage(long EntityId, int Width, int Height, double TimeScale, IReadOnlyList<ModInfo> Mods) : ServerMessage
+{
+    /// <summary>Сравнение с модами по значению, а не по ссылке на список.</summary>
+    public bool Equals(WelcomeMessage? other)
+    {
+        return other is not null && (EntityId, Width, Height, TimeScale) == (other.EntityId, other.Width, other.Height, other.TimeScale)
+            && Mods.SequenceEqual(other.Mods);
+    }
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => HashCode.Combine(EntityId, Width, Height, TimeScale, Mods.Count);
+}
 
 /// <summary>Снимок чанка: все созданные слои этажей целиком.</summary>
 public sealed record ChunkSnapshotMessage(int ChunkX, int ChunkY, IReadOnlyList<ChunkLevelData> Levels) : ServerMessage;

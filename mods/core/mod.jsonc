@@ -1,5 +1,6 @@
 // Базовый мод: тело персонажа, навыки, предметы и действия.
 {
+  "$schema": "../../schemas/mod.schema.json",
   "id": "core",
   "name": "Core",
   "version": "0.1.0",

@@ -217,7 +217,7 @@ public class PredictionTest
     private GameClient Lagged(NetRun run, double oneWay)
     {
         LaggedConnection connection = new(run.ConnectRaw(), oneWay, () => _time);
-        return new GameClient(connection, run.Sim.StatTable, run.Sim.ItemTable);
+        return new GameClient(connection, run.Sim.StatTable, run.Sim.ItemTable, run.Sim.Mods);
     }
 
     /// <summary>Тики как в игре: время идёт, клиент шлёт ввод, сервер тикает, клиент принимает.</summary>

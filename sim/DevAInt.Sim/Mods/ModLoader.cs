@@ -114,7 +114,7 @@ public static class ModLoader
             }
         }
 
-        return errors.Count == before ? new ModManifest(data.Id, data.Name, version, depends, data.LoadAfter, directory, shown) : null;
+        return errors.Count == before ? new ModManifest(data.Id, data.Name, version, depends, data.LoadAfter, directory, shown, ModHash.Compute(directory)) : null;
     }
 
     /// <summary>Определения и патчи из data/*.jsonc мода; файлы по имени, патчи после всех определений мода.</summary>
@@ -276,27 +276,5 @@ public static class ModLoader
 
         /// <summary>Файл, где определение объявлено.</summary>
         public string File { get; } = file;
-    }
-
-    /// <summary>Содержимое mod.jsonc до проверки.</summary>
-    private sealed record ManifestFile
-    {
-        /// <summary>Id мода, совпадает с именем папки.</summary>
-        public required string Id { get; init; }
-
-        /// <summary>Название для людей.</summary>
-        public required string Name { get; init; }
-
-        /// <summary>Версия мода.</summary>
-        public required string Version { get; init; }
-
-        /// <summary>Версия API ядра, для которой написан мод.</summary>
-        public required int Api { get; init; }
-
-        /// <summary>Зависимости вида id или id >= 0.1.</summary>
-        public List<string> Depends { get; init; } = [];
-
-        /// <summary>Моды, после которых грузиться, если они есть.</summary>
-        public List<string> LoadAfter { get; init; } = [];
     }
 }

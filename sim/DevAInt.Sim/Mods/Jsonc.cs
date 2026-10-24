@@ -1,6 +1,7 @@
 using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace DevAInt.Sim.Mods;
 
@@ -15,6 +16,9 @@ internal static class Jsonc
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) },
+
+        // Явный резолвер нужен генератору схемы: без него настройки нельзя спросить о типах до первого разбора
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
     };
 
     /// <summary>Настройки разбора дерева JSON с теми же послаблениями.</summary>

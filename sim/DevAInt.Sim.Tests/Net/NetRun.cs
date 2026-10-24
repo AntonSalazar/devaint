@@ -44,7 +44,7 @@ public sealed class NetRun
     public GameServer Server { get; }
 
     /// <summary>Новый клиент; сервер увидит его на следующем тике.</summary>
-    public GameClient Connect() => new(_transport.Connect(), Sim.StatTable, Sim.ItemTable);
+    public GameClient Connect() => new(_transport.Connect(), Sim.StatTable, Sim.ItemTable, Sim.Mods);
 
     /// <summary>Голое подключение без клиента, чтобы слать серверу что угодно.</summary>
     public IConnection ConnectRaw() => _transport.Connect();

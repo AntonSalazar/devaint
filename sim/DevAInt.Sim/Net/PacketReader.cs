@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Text;
 
 namespace DevAInt.Sim.Net;
 
@@ -90,6 +91,20 @@ public sealed class PacketReader(byte[] data)
 
         double value = BinaryPrimitives.ReadDoubleLittleEndian(data.AsSpan(_position));
         _position += 8;
+        return value;
+    }
+
+    /// <summary>Строка UTF-8 не длиннее maxBytes байт.</summary>
+    public string ReadString(int maxBytes)
+    {
+        int length = ReadCount(maxBytes);
+        if (_position + length > data.Length)
+        {
+            throw new ProtocolException("packet is truncated");
+        }
+
+        string value = Encoding.UTF8.GetString(data, _position, length);
+        _position += length;
         return value;
     }
 

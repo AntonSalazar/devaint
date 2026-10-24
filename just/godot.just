@@ -38,6 +38,10 @@ bench:
 map id="core:starter_room" z="0":
     dotnet run --project sim/DevAInt.Sim.Tool/ -- map mods {{id}} {{z}}
 
+# Schema: JSON Schema файлов мода в schemas/ для редактора моддера, после правки типов определений
+schema:
+    dotnet run --project sim/DevAInt.Sim.Tool/ -- schema schemas
+
 # Format: поправить стиль C# по .editorconfig
 format:
     dotnet format {{PROJECT_ROOT}}/DevAInt.sln

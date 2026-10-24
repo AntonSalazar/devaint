@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Text;
 
 namespace DevAInt.Sim.Net;
 
@@ -54,6 +55,16 @@ public sealed class PacketWriter
         Reserve(8);
         BinaryPrimitives.WriteDoubleLittleEndian(_buffer.AsSpan(Length), value);
         Length += 8;
+    }
+
+    /// <summary>Строка UTF-8 с длиной в байтах перед ней.</summary>
+    public void WriteString(string value)
+    {
+        byte[] bytes = Encoding.UTF8.GetBytes(value);
+        WriteVarUInt((ulong)bytes.Length);
+        Reserve(bytes.Length);
+        bytes.CopyTo(_buffer.AsSpan(Length));
+        Length += bytes.Length;
     }
 
     /// <summary>Массив сериями: число серий, затем пары значение и длина серии.</summary>

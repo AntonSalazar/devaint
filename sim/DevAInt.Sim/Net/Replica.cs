@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Items;
+using DevAInt.Sim.Mods;
 using DevAInt.Sim.Stats;
 
 namespace DevAInt.Sim.Net;
@@ -36,8 +37,8 @@ public sealed record ReplicaAction(int Action, long StartTick, int DurationTicks
     public float Progress(long tick) => Math.Clamp((float)(tick - StartTick) / DurationTicks, 0f, 1f);
 }
 
-/// <summary>Копия мира на клиенте: применяет пакеты сервера и сообщает об изменениях событиями.</summary>
-public sealed class Replica(StatTable stats, ItemTable items)
+/// <summary>Копия мира на клиенте: применяет пакеты сервера и сообщает об изменениях событиями; mods - свои моды для сверки.</summary>
+public sealed class Replica(StatTable stats, ItemTable items, IReadOnlyList<ModInfo> mods)
 {
     /// <summary>Свои предметы.</summary>
     private readonly List<ItemData> _inventory = [];
@@ -166,6 +167,12 @@ public sealed class Replica(StatTable stats, ItemTable items)
         switch (message)
         {
             case WelcomeMessage welcome:
+                // Номера статов, полов и предметов в сообщениях имеют смысл только при тех же модах
+                if (ModInfo.Difference(mods, welcome.Mods) is string difference)
+                {
+                    throw new ProtocolException(difference);
+                }
+
                 World = new World(welcome.Width, welcome.Height);
                 OwnEntityId = welcome.EntityId;
                 SecondsPerTick = new GameClock(welcome.TimeScale).SecondsPerTick;

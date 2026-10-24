@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using DevAInt.Sim.Defs;
 using DevAInt.Sim.Grid;
@@ -10,7 +11,7 @@ namespace DevAInt.Sim.Tool;
 internal static class Program
 {
     /// <summary>Справка по командам.</summary>
-    private const string Usage = "usage: map <mods dir> <map id> [z] [mod ids...]";
+    private const string Usage = "usage: map <mods dir> <map id> [z] [mod ids...] | schema <out dir>";
 
     /// <summary>Запуск команды, код выхода 0 при успехе.</summary>
     private static int Main(string[] args)
@@ -20,8 +21,23 @@ internal static class Program
             return Map(args[1], args[2], [.. args.Skip(3)]);
         }
 
+        if (args.Length == 2 && args[0] == "schema")
+        {
+            return Schema(args[1]);
+        }
+
         Console.Error.WriteLine(Usage);
         return 2;
+    }
+
+    /// <summary>Запись JSON Schema файлов мода в папку outDir.</summary>
+    private static int Schema(string outDir)
+    {
+        Directory.CreateDirectory(outDir);
+        File.WriteAllText(Path.Combine(outDir, ModSchema.DataFile), ModSchema.Data());
+        File.WriteAllText(Path.Combine(outDir, ModSchema.ManifestFileName), ModSchema.Manifest());
+        Console.WriteLine($"schemas written to {outDir}");
+        return 0;
     }
 
     /// <summary>ASCII-дамп этажа карты; моды по умолчанию - только core.</summary>

@@ -1,12 +1,14 @@
+using System.Collections.Generic;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Items;
+using DevAInt.Sim.Mods;
 using DevAInt.Sim.Motion;
 using DevAInt.Sim.Stats;
 
 namespace DevAInt.Sim.Net;
 
-/// <summary>Клиент: принимает пакеты сервера в реплику, отправляет ввод и предсказывает своё движение.</summary>
-public sealed class GameClient(IConnection connection, StatTable stats, ItemTable items)
+/// <summary>Клиент: принимает пакеты сервера в реплику, отправляет ввод и предсказывает своё движение; mods - свои моды.</summary>
+public sealed class GameClient(IConnection connection, StatTable stats, ItemTable items, IReadOnlyList<ModInfo> mods)
 {
     /// <summary>Предсказание своего движения.</summary>
     private readonly MovePrediction _prediction = new();
@@ -15,7 +17,7 @@ public sealed class GameClient(IConnection connection, StatTable stats, ItemTabl
     private uint _inputSequence;
 
     /// <summary>Копия мира.</summary>
-    public Replica Replica { get; } = new(stats, items);
+    public Replica Replica { get; } = new(stats, items, mods);
 
     /// <summary>Подключение к серверу живо.</summary>
     public bool IsConnected => connection.IsConnected;

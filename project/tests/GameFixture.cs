@@ -13,7 +13,7 @@ public sealed class GameFixture
         Sim = new Simulation(loaded, new GodotLog(), GameRoot.MapId);
         LoopbackTransport transport = new();
         Server = new GameServer(Sim, transport, new GodotLog());
-        Client = new GameClient(transport.Connect(), Sim.StatTable, Sim.ItemTable);
+        Client = new GameClient(transport.Connect(), Sim.StatTable, Sim.ItemTable, Sim.Mods);
     }
 
     /// <summary>Итог загрузки модов.</summary>

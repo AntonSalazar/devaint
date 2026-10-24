@@ -42,6 +42,7 @@ public sealed class Simulation
         StatTable = new StatTable(mods.Defs);
         WorldTable = new WorldTable(mods.Defs);
         ItemTable = new ItemTable(mods.Defs);
+        Mods = [.. mods.Mods.Select(mod => mod.Info)];
         _hasMap = mapId is not null;
         MapDef? map = mapId is null ? null : mods.Defs.Get<MapDef>(mapId);
         World = map is null ? new World(1, 1) : MapBuilder.Build(map, WorldTable);
@@ -54,6 +55,9 @@ public sealed class Simulation
         _lua = new LuaHost(StatTable, FindStats, log);
         ScriptErrors = _lua.Load(mods.Mods);
     }
+
+    /// <summary>Моды sim в порядке загрузки, для сверки с клиентами.</summary>
+    public IReadOnlyList<ModInfo> Mods { get; }
 
     /// <summary>Игровое время.</summary>
     public GameClock Clock { get; }

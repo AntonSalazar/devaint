@@ -86,7 +86,7 @@ public class NetworkGameTest : TestCase
     }
 
     /// <summary>Клиент на подключении.</summary>
-    private GameClient Client(IConnection connection) => new(connection, _sim.StatTable, _sim.ItemTable);
+    private GameClient Client(IConnection connection) => new(connection, _sim.StatTable, _sim.ItemTable, _sim.Mods);
 
     /// <summary>Тики сервера и приём клиентов, пока условие не выполнится; true - выполнилось.</summary>
     private bool Run(System.Func<bool> condition, params GameClient[] clients)

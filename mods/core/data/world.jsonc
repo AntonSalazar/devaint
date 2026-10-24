@@ -1,5 +1,6 @@
 // Полы, стены и двери. Цвет - пока моделей и текстур нет.
 {
+  "$schema": "../../../schemas/data.schema.json",
   "floors": [
     { "id": "core:wood_floor", "color": "#8b6b4a" },
   ],

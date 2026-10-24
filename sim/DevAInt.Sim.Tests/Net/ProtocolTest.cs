@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using DevAInt.Sim.Grid;
+using DevAInt.Sim.Mods;
 using DevAInt.Sim.Net;
 using Xunit;
 
@@ -14,7 +15,7 @@ public class ProtocolTest
     {
         List<ServerMessage> messages =
         [
-            new WelcomeMessage(7, 4096, 32, 2.5),
+            new WelcomeMessage(7, 4096, 32, 2.5, [new ModInfo("core", "0.1.0", new string('a', 64)), new ModInfo("zombies", "1.2.3", "ff")]),
             new ChunkUnloadMessage(3, 127),
             new EntityMoveMessage(300, 12.5f, -0.25f, -2),
             new MoodleLevelMessage(5, 2, 3),
@@ -112,7 +113,7 @@ public class ProtocolTest
     [InlineData(double.PositiveInfinity)]
     public void BadTimeScaleThrowsProtocolException(double timeScale)
     {
-        byte[] packet = Protocol.Write(new ServerFrame(1, [new WelcomeMessage(1, 32, 32, timeScale)]));
+        byte[] packet = Protocol.Write(new ServerFrame(1, [new WelcomeMessage(1, 32, 32, timeScale, [])]));
 
         Assert.Throws<ProtocolException>(() => Protocol.ReadServerFrame(packet));
     }

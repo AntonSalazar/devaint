@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using DevAInt.Sim.Grid;
+using DevAInt.Sim.Mods;
 using DevAInt.Sim.Motion;
 using DevAInt.Sim.Net;
 using Xunit;
@@ -59,6 +60,21 @@ public class SyncTest
 
         Assert.Equal(2, client.Replica.Entities.Count);
         Assert.Equal(2, client.Replica.Entity(client.Replica.OwnEntityId)!.MoodleLevels[run.Sim.StatTable.MoodleIndex("core:hungry")]);
+    }
+
+    /// <summary>Клиент с другими модами получает понятную ошибку на приветствии, до остальных сообщений.</summary>
+    [Fact]
+    public void DifferentModsAreRejected()
+    {
+        NetRun run = new();
+        ModInfo stale = run.Sim.Mods[0] with { Hash = "stale" };
+        GameClient client = new(run.ConnectRaw(), run.Sim.StatTable, run.Sim.ItemTable, [stale]);
+        run.Server.Tick();
+
+        ProtocolException error = Assert.Throws<ProtocolException>(client.Update);
+
+        Assert.Equal("mods differ from the server: mod core 0.1.0 has different data", error.Message);
+        Assert.Null(client.Replica.World);
     }
 
     /// <summary>Дверь, открытая на сервере, приходит клиенту изменением ребра.</summary>

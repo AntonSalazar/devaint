@@ -169,7 +169,7 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
         Entity own = _sim.Entity(client.EntityId);
         if (!client.Welcomed)
         {
-            messages.Add(new WelcomeMessage(client.EntityId, world.Width, world.Height, _sim.Clock.TimeScale));
+            messages.Add(new WelcomeMessage(client.EntityId, world.Width, world.Height, _sim.Clock.TimeScale, _sim.Mods));
             client.Welcomed = true;
         }
 
