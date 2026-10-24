@@ -96,6 +96,12 @@ public sealed class Replica(StatTable stats, ItemTable items)
     /// <summary>Номер последнего применённого тика сервера.</summary>
     public long Tick { get; private set; }
 
+    /// <summary>Номер последнего ввода, который сервер применил к своей сущности.</summary>
+    public uint LastInput { get; private set; }
+
+    /// <summary>Секунд симуляции за тик на сервере, с его ускорением времени; 0 до приветствия.</summary>
+    public double SecondsPerTick { get; private set; }
+
     /// <summary>Значения статов своей сущности по номерам из StatTable.</summary>
     public float[] OwnStats { get; } = new float[stats.StatCount];
 
@@ -115,6 +121,7 @@ public sealed class Replica(StatTable stats, ItemTable items)
     public void Apply(ServerFrame frame)
     {
         Tick = frame.Tick;
+        LastInput = frame.LastInput;
         foreach (ServerMessage message in frame.Messages)
         {
             try
@@ -161,6 +168,7 @@ public sealed class Replica(StatTable stats, ItemTable items)
             case WelcomeMessage welcome:
                 World = new World(welcome.Width, welcome.Height);
                 OwnEntityId = welcome.EntityId;
+                SecondsPerTick = new GameClock(welcome.TimeScale).SecondsPerTick;
                 WorldCreated?.Invoke();
                 break;
             case ChunkSnapshotMessage snapshot:

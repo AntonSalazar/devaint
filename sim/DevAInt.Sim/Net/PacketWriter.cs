@@ -48,6 +48,14 @@ public sealed class PacketWriter
         Length += 4;
     }
 
+    /// <summary>Double в 8 байтах little-endian.</summary>
+    public void WriteDouble(double value)
+    {
+        Reserve(8);
+        BinaryPrimitives.WriteDoubleLittleEndian(_buffer.AsSpan(Length), value);
+        Length += 8;
+    }
+
     /// <summary>Массив сериями: число серий, затем пары значение и длина серии.</summary>
     public void WriteRuns(ReadOnlySpan<ushort> values)
     {

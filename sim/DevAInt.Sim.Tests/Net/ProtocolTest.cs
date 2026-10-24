@@ -14,7 +14,7 @@ public class ProtocolTest
     {
         List<ServerMessage> messages =
         [
-            new WelcomeMessage(7, 4096, 32),
+            new WelcomeMessage(7, 4096, 32, 2.5),
             new ChunkUnloadMessage(3, 127),
             new EntityMoveMessage(300, 12.5f, -0.25f, -2),
             new MoodleLevelMessage(5, 2, 3),
@@ -23,9 +23,10 @@ public class ProtocolTest
             new EdgeChangeMessage(new CellPos(32, 31, 0), true, new Edge(9, true)),
         ];
 
-        ServerFrame read = Protocol.ReadServerFrame(Protocol.Write(new ServerFrame(123_456, messages)));
+        ServerFrame read = Protocol.ReadServerFrame(Protocol.Write(new ServerFrame(123_456, messages, uint.MaxValue)));
 
         Assert.Equal(123_456, read.Tick);
+        Assert.Equal(uint.MaxValue, read.LastInput);
         Assert.Equal(messages, read.Messages);
     }
 
@@ -101,5 +102,18 @@ public class ProtocolTest
         Assert.Throws<ProtocolException>(() => Protocol.ReadClientMessage([1, 2]));
         Assert.Throws<ProtocolException>(() => Protocol.ReadClientMessage([99]));
         Assert.Throws<ProtocolException>(() => Protocol.ReadClientMessage([3, 0]));
+    }
+
+    /// <summary>Приветствие с нулевым, отрицательным или нечисловым ускорением времени - ProtocolException.</summary>
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(-1.0)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void BadTimeScaleThrowsProtocolException(double timeScale)
+    {
+        byte[] packet = Protocol.Write(new ServerFrame(1, [new WelcomeMessage(1, 32, 32, timeScale)]));
+
+        Assert.Throws<ProtocolException>(() => Protocol.ReadServerFrame(packet));
     }
 }

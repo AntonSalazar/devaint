@@ -3,6 +3,7 @@ using System.Linq;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Net;
+using DevAInt.Sim.Stats;
 using DevAInt.Sim.Tests.Lua;
 using DevAInt.Sim.Tests.Mods;
 using Xunit;
@@ -16,7 +17,7 @@ public sealed class NetRun
     private readonly LoopbackTransport _transport = new();
 
     /// <summary>Сервер над sim с картой mapId; extraMod - мод с картой, если нужна не core.</summary>
-    public NetRun(string mapId = "core:starter_room", string? extraMod = null, int radius = GameServer.DefaultSubscribeRadius)
+    public NetRun(string mapId = "core:starter_room", string? extraMod = null, int radius = GameServer.DefaultSubscribeRadius, double timeScale = 1)
     {
         using TempMods mods = new();
         mods.CopyRepoMod("core");
@@ -29,7 +30,7 @@ public sealed class NetRun
 
         ModLoadResult result = mods.Load(ids);
         Assert.True(result.Ok, string.Join("\n", result.Errors));
-        Sim = new Simulation(result, Log, mapId);
+        Sim = new Simulation(result, Log, mapId, new GameClock(timeScale));
         Server = new GameServer(Sim, _transport, Log, radius);
     }
 

@@ -9,8 +9,8 @@ public readonly record struct ItemData(long Id, int Item);
 /// <summary>Сообщение сервера клиенту.</summary>
 public abstract record ServerMessage;
 
-/// <summary>Подключение принято: своя сущность и размер мира.</summary>
-public sealed record WelcomeMessage(long EntityId, int Width, int Height) : ServerMessage;
+/// <summary>Подключение принято: своя сущность, размер мира и ускорение времени сервера.</summary>
+public sealed record WelcomeMessage(long EntityId, int Width, int Height, double TimeScale) : ServerMessage;
 
 /// <summary>Снимок чанка: все созданные слои этажей целиком.</summary>
 public sealed record ChunkSnapshotMessage(int ChunkX, int ChunkY, IReadOnlyList<ChunkLevelData> Levels) : ServerMessage;
@@ -48,8 +48,8 @@ public sealed record ActionStartedMessage(long Entity, int Action, long StartTic
 /// <summary>Действие сущности закончилось: выполнено или прервано.</summary>
 public sealed record ActionEndedMessage(long Entity, bool Completed) : ServerMessage;
 
-/// <summary>Пакет сервера за тик: номер тика и сообщения по порядку.</summary>
-public sealed record ServerFrame(long Tick, IReadOnlyList<ServerMessage> Messages);
+/// <summary>Пакет сервера за тик: номер тика, сообщения по порядку и номер последнего применённого ввода клиента.</summary>
+public sealed record ServerFrame(long Tick, IReadOnlyList<ServerMessage> Messages, uint LastInput = 0);
 
 /// <summary>Сообщение клиента серверу.</summary>
 public abstract record ClientMessage;

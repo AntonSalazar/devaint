@@ -8,7 +8,7 @@ GODOT := env("GODOT", "godot-mono")
 build:
     dotnet build {{PROJECT_ROOT}}/DevAInt.sln
 
-# Run: запустить игру; аргументы игры после имени: `just run --time-scale 200`
+# Run: запустить игру; аргументы игры после имени: `just run --time-scale 200`, `just run --connect 127.0.0.1 --lag 100`
 run *args: build
     {{GODOT}} --path {{PROJECT_ROOT}} -- {{args}}
 
@@ -16,9 +16,9 @@ run *args: build
 editor:
     {{GODOT}} --path {{PROJECT_ROOT}} --editor
 
-# Server: headless-запуск, пока только пустая сцена, настоящий сервер на этапе 10
-server: build
-    {{GODOT}} --headless --path {{PROJECT_ROOT}} -- --server
+# Server: выделенный сервер без окна; аргументы после имени: `just server --port 7777 --time-scale 200`
+server *args: build
+    {{GODOT}} --headless --path {{PROJECT_ROOT}} res://server/Server.tscn -- {{args}}
 
 # Autotests: стиль, xUnit-тесты sim, тесты Godot-части
 test: build test-sim

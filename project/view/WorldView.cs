@@ -45,6 +45,9 @@ public partial class WorldView : Node3D
     /// <summary>Узел сущности или null.</summary>
     public EntityView? Entity(long id) => _entities.GetValueOrDefault(id);
 
+    /// <summary>Своя капсула идёт к предсказанной позиции.</summary>
+    public void MoveOwn(WorldPos position) => Entity(_replica!.OwnEntityId)?.SetTarget(ViewMath.ToGodot((float)position.X, (float)position.Y, position.Z));
+
     /// <summary>Интерполяция всех сущностей на delta секунд и полосы действий; tickFraction - доля пути до следующего тика.</summary>
     public void Advance(double delta, double tickFraction = 0)
     {
@@ -117,8 +120,14 @@ public partial class WorldView : Node3D
         _entities[entity.Id] = view;
     }
 
-    /// <summary>Сущность сдвинулась.</summary>
-    private void OnEntityMoved(ReplicaEntity entity) => Entity(entity.Id)?.SetTarget(ViewMath.ToGodot(entity.X, entity.Y, entity.Z));
+    /// <summary>Чужая сущность сдвинулась; своя двигается только по предсказанию через MoveOwn.</summary>
+    private void OnEntityMoved(ReplicaEntity entity)
+    {
+        if (entity.Id != _replica!.OwnEntityId)
+        {
+            Entity(entity.Id)?.SetTarget(ViewMath.ToGodot(entity.X, entity.Y, entity.Z));
+        }
+    }
 
     /// <summary>Сущность исчезла.</summary>
     private void OnEntityRemoved(ReplicaEntity entity)

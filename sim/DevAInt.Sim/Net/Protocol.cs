@@ -47,6 +47,7 @@ public static class Protocol
     {
         PacketWriter writer = new();
         writer.WriteVarInt(frame.Tick);
+        writer.WriteVarUInt(frame.LastInput);
         writer.WriteVarUInt((ulong)frame.Messages.Count);
         foreach (ServerMessage message in frame.Messages)
         {
@@ -61,6 +62,7 @@ public static class Protocol
     {
         PacketReader reader = new(data);
         long tick = reader.ReadVarInt();
+        uint lastInput = ReadSequence(reader);
         int count = reader.ReadCount(MaxMessages);
         List<ServerMessage> messages = new(count);
         for (int i = 0; i < count; i++)
@@ -69,7 +71,7 @@ public static class Protocol
         }
 
         RequireEnd(reader);
-        return new ServerFrame(tick, messages);
+        return new ServerFrame(tick, messages, lastInput);
     }
 
     /// <summary>Сообщение клиента в байты: тип одним байтом, дальше его поля.</summary>
@@ -125,6 +127,7 @@ public static class Protocol
                 writer.WriteVarInt(welcome.EntityId);
                 writer.WriteVarUInt((ulong)welcome.Width);
                 writer.WriteVarUInt((ulong)welcome.Height);
+                writer.WriteDouble(welcome.TimeScale);
                 break;
             case ChunkSnapshotMessage snapshot:
                 writer.WriteByte((byte)ServerType.ChunkSnapshot);
@@ -224,7 +227,7 @@ public static class Protocol
         byte type = reader.ReadByte();
         return (ServerType)type switch
         {
-            ServerType.Welcome => new WelcomeMessage(reader.ReadVarInt(), reader.ReadCount(World.MaxSize), reader.ReadCount(World.MaxSize)),
+            ServerType.Welcome => ReadWelcome(reader),
             ServerType.ChunkSnapshot => ReadSnapshot(reader),
             ServerType.ChunkUnload => new ChunkUnloadMessage(reader.ReadCount(MaxList), reader.ReadCount(MaxList)),
             ServerType.EntitySpawn => ReadSpawn(reader),
@@ -239,6 +242,21 @@ public static class Protocol
             ServerType.ActionEnded => new ActionEndedMessage(reader.ReadVarInt(), reader.ReadBool()),
             _ => throw new ProtocolException($"unknown server message type {type}"),
         };
+    }
+
+    /// <summary>Приветствие; ускорение времени должно быть конечным и больше нуля.</summary>
+    private static WelcomeMessage ReadWelcome(PacketReader reader)
+    {
+        long entityId = reader.ReadVarInt();
+        int width = reader.ReadCount(World.MaxSize);
+        int height = reader.ReadCount(World.MaxSize);
+        double timeScale = reader.ReadDouble();
+        if (!double.IsFinite(timeScale) || timeScale <= 0)
+        {
+            throw new ProtocolException($"time scale {timeScale} is not positive");
+        }
+
+        return new WelcomeMessage(entityId, width, height, timeScale);
     }
 
     /// <summary>Снимок чанка со всеми слоями.</summary>
@@ -280,15 +298,13 @@ public static class Protocol
     }
 
     /// <summary>Ввод движения после байта типа.</summary>
-    private static InputMessage ReadInput(PacketReader reader)
+    private static InputMessage ReadInput(PacketReader reader) => new(ReadSequence(reader), reader.ReadFloat(), reader.ReadFloat());
+
+    /// <summary>Номер ввода, который должен поместиться в uint.</summary>
+    private static uint ReadSequence(PacketReader reader)
     {
         ulong sequence = reader.ReadVarUInt();
-        if (sequence > uint.MaxValue)
-        {
-            throw new ProtocolException("input sequence is too large");
-        }
-
-        return new InputMessage((uint)sequence, reader.ReadFloat(), reader.ReadFloat());
+        return sequence <= uint.MaxValue ? (uint)sequence : throw new ProtocolException("input sequence is too large");
     }
 
     /// <summary>Свой инвентарь.</summary>

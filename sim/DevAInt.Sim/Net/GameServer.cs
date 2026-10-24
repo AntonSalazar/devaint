@@ -15,6 +15,9 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
     /// <summary>Радиус подписки в чанках вокруг чанка своей сущности.</summary>
     public const int DefaultSubscribeRadius = 4;
 
+    /// <summary>Наибольшее число вводов в очереди клиента: сверх этого старые выбрасываются, чтобы задержка не копилась.</summary>
+    public const int MaxQueuedInputs = 3;
+
     /// <summary>Sim, который сервер ведёт.</summary>
     private readonly Simulation _sim = sim;
 
@@ -47,6 +50,7 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
         foreach (ClientSession client in _clients)
         {
             ReceiveInputs(client);
+            ApplyNextInput(client);
         }
 
         _sim.Tick();
@@ -100,6 +104,18 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
         return new ChunkSnapshotMessage(chunk.X, chunk.Y, levels);
     }
 
+    /// <summary>Один ввод из очереди на тик; без ввода сущность идёт по прежнему.</summary>
+    private void ApplyNextInput(ClientSession client)
+    {
+        // Клиент предсказывает движение по вводу на каждый тик, поэтому сервер тоже тратит ровно один ввод за тик,
+        // даже если по сети пришло несколько сразу
+        if (client.Inputs.TryDequeue(out InputMessage? input))
+        {
+            _sim.Entity(client.EntityId).Input = new MoveInput(input.X, input.Y);
+            client.LastInput = input.Sequence;
+        }
+    }
+
     /// <summary>Применение всех пришедших сообщений клиента; неверный пакет разрывает подключение.</summary>
     private void ReceiveInputs(ClientSession client)
     {
@@ -124,8 +140,12 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
         switch (message)
         {
             case InputMessage input:
-                _sim.Entity(client.EntityId).Input = new MoveInput(input.X, input.Y);
-                client.LastInput = input.Sequence;
+                client.Inputs.Enqueue(input);
+                if (client.Inputs.Count > MaxQueuedInputs)
+                {
+                    client.Inputs.Dequeue();
+                }
+
                 break;
             case StartActionMessage start:
                 if (start.Action >= _sim.ItemTable.ActionCount)
@@ -149,7 +169,7 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
         Entity own = _sim.Entity(client.EntityId);
         if (!client.Welcomed)
         {
-            messages.Add(new WelcomeMessage(client.EntityId, world.Width, world.Height));
+            messages.Add(new WelcomeMessage(client.EntityId, world.Width, world.Height, _sim.Clock.TimeScale));
             client.Welcomed = true;
         }
 
@@ -196,7 +216,7 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
             client.Stats = stats;
         }
 
-        return new ServerFrame(_sim.Clock.Tick, messages);
+        return new ServerFrame(_sim.Clock.Tick, messages, client.LastInput);
     }
 
     /// <summary>Появления, движения, мудлы и исчезновения сущностей относительно того, что клиент уже знает.</summary>
@@ -325,6 +345,9 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
 
         /// <summary>Номер последнего применённого ввода.</summary>
         public uint LastInput { get; set; }
+
+        /// <summary>Пришедшие, но ещё не применённые вводы.</summary>
+        public Queue<InputMessage> Inputs { get; } = new();
 
         /// <summary>Чанки, которые клиент знает.</summary>
         public HashSet<(int X, int Y)> Chunks { get; } = [];

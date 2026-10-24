@@ -41,16 +41,18 @@ public class PacketTest
         Assert.Equal(value, new PacketReader(writer.ToArray()).ReadVarInt());
     }
 
-    /// <summary>Float и bool читаются как записаны.</summary>
+    /// <summary>Float, double и bool читаются как записаны.</summary>
     [Fact]
-    public void FloatAndBoolRoundTrip()
+    public void FloatDoubleAndBoolRoundTrip()
     {
         PacketWriter writer = new();
         writer.WriteFloat(-12.375f);
+        writer.WriteDouble(0.1);
         writer.WriteBool(true);
         PacketReader reader = new(writer.ToArray());
 
         Assert.Equal(-12.375f, reader.ReadFloat());
+        Assert.Equal(0.1, reader.ReadDouble());
         Assert.True(reader.ReadBool());
         Assert.True(reader.AtEnd);
     }
@@ -88,12 +90,13 @@ public class PacketTest
     [InlineData(new byte[] { 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01 })]
     public void BadVarIntThrowsProtocolException(byte[] data) => Assert.Throws<ProtocolException>(() => new PacketReader(data).ReadVarUInt());
 
-    /// <summary>Bool только 0 или 1, float целиком, серии ровно на длину массива.</summary>
+    /// <summary>Bool только 0 или 1, float и double целиком, серии ровно на длину массива.</summary>
     [Fact]
     public void BadValuesThrowProtocolException()
     {
         Assert.Throws<ProtocolException>(() => new PacketReader([2]).ReadBool());
         Assert.Throws<ProtocolException>(() => new PacketReader([1, 2, 3]).ReadFloat());
+        Assert.Throws<ProtocolException>(() => new PacketReader([1, 2, 3, 4, 5, 6, 7]).ReadDouble());
 
         // Одна серия значения 5 длиной 3 при массиве из 4
         Assert.Throws<ProtocolException>(() => new PacketReader([1, 5, 3]).ReadRuns(new ushort[4]));

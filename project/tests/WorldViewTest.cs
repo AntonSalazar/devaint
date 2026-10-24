@@ -48,17 +48,34 @@ public class WorldViewTest : TestCase
         Check(_view.Chunk(0, 0)!.HasFloors, "chunk 0,0 has floors");
     }
 
-    /// <summary>Ввод клиента двигает капсулу через сервер и интерполяцию.</summary>
+    /// <summary>Своя капсула идёт по предсказанию клиента через интерполяцию.</summary>
     public void TestInputMovesCapsule()
     {
         _game.Tick();
         long own = _game.Client.Replica.OwnEntityId;
 
         _game.Client.SendInput(new MoveInput(1, 0));
+        _view.MoveOwn(_game.Client.OwnPosition!.Value);
+        _view.Advance(1);
+
+        CheckNear(6.5 + 0.15, _view.Entity(own)!.Position.X, Tolerance, "moved one tick east before the server answered");
+    }
+
+    /// <summary>Позиции своей сущности от сервера капсулу не двигают, чужие сущности двигают.</summary>
+    public void TestServerMovesOnlyOthers()
+    {
+        long npc = _game.Sim.CreateEntity(new WorldPos(3.5, 3.5, 0));
+        _game.Tick();
+        long own = _game.Client.Replica.OwnEntityId;
+
+        // Сервер сам ведёт обе сущности на восток, клиент ввода не шлёт
+        _game.Sim.Entity(own).Input = new MoveInput(1, 0);
+        _game.Sim.Entity(npc).Input = new MoveInput(1, 0);
         _game.Tick();
         _view.Advance(1);
 
-        CheckNear(6.5 + 0.15, _view.Entity(own)!.Position.X, Tolerance, "moved one tick east");
+        CheckNear(6.5, _view.Entity(own)!.Position.X, Tolerance, "own capsule waits for prediction");
+        CheckNear(3.5 + 0.15, _view.Entity(npc)!.Position.X, Tolerance, "npc follows the server");
     }
 
     /// <summary>Открытая на сервере дверь перестраивает чанк клиента.</summary>

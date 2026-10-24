@@ -80,6 +80,19 @@ public sealed class PacketReader(byte[] data)
         return value;
     }
 
+    /// <summary>Double из 8 байт little-endian.</summary>
+    public double ReadDouble()
+    {
+        if (_position + 8 > data.Length)
+        {
+            throw new ProtocolException("packet is truncated");
+        }
+
+        double value = BinaryPrimitives.ReadDoubleLittleEndian(data.AsSpan(_position));
+        _position += 8;
+        return value;
+    }
+
     /// <summary>Массив из серий; сумма длин серий должна совпасть с длиной массива.</summary>
     public void ReadRuns(Span<ushort> target)
     {
