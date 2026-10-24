@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using DevAInt.Sim.Creatures;
 using DevAInt.Sim.Defs;
 using DevAInt.Sim.Grid;
@@ -21,6 +22,12 @@ public sealed class Entity(long id, StatSet stats, WorldPos position, CreatureDe
 
     /// <summary>Куда смотрит: последнее направление движения, единичный вектор.</summary>
     public (double X, double Y) Facing { get; internal set; } = (0, 1);
+
+    /// <summary>Целится ли: взгляд идёт за точкой прицела, а не за движением.</summary>
+    public bool Aiming { get; internal set; }
+
+    /// <summary>Точка под курсором игрока на земле, null пока клиент её не прислал.</summary>
+    public WorldPos? AimPoint { get; internal set; }
 
     /// <summary>Тик, с которого атака снова готова.</summary>
     public long AttackReadyTick { get; internal set; }
@@ -48,6 +55,9 @@ public sealed class Entity(long id, StatSet stats, WorldPos position, CreatureDe
 
     /// <summary>Игрок просит атаковать на этом тике.</summary>
     internal bool AttackRequested { get; set; }
+
+    /// <summary>Зажатые действия управления по номерам из ControlTable.</summary>
+    internal HashSet<int> HeldControls { get; } = [];
 
     /// <summary>Память поведения, null у существ без поведения.</summary>
     internal BrainState? Brain { get; set; }

@@ -47,7 +47,7 @@ public static class Protocol
         StartAction,
         CancelAction,
         Hello,
-        Attack,
+        Control,
     }
 
     /// <summary>Пакет сервера в байты.</summary>
@@ -93,6 +93,8 @@ public static class Protocol
                 writer.WriteVarUInt(input.Sequence);
                 writer.WriteFloat(input.X);
                 writer.WriteFloat(input.Y);
+                writer.WriteFloat(input.AimX);
+                writer.WriteFloat(input.AimY);
                 break;
             case StartActionMessage start:
                 writer.WriteByte((byte)ClientType.StartAction);
@@ -102,8 +104,10 @@ public static class Protocol
             case CancelActionMessage:
                 writer.WriteByte((byte)ClientType.CancelAction);
                 break;
-            case AttackRequestMessage:
-                writer.WriteByte((byte)ClientType.Attack);
+            case ControlMessage control:
+                writer.WriteByte((byte)ClientType.Control);
+                writer.WriteVarUInt((ulong)control.Control);
+                writer.WriteBool(control.Pressed);
                 break;
             case HelloMessage hello:
                 writer.WriteByte((byte)ClientType.Hello);
@@ -127,7 +131,7 @@ public static class Protocol
             ClientType.StartAction => new StartActionMessage(reader.ReadVarInt(), reader.ReadCount(MaxList)),
             ClientType.CancelAction => new CancelActionMessage(),
             ClientType.Hello => new HelloMessage(reader.ReadString(MaxText)),
-            ClientType.Attack => new AttackRequestMessage(),
+            ClientType.Control => new ControlMessage(reader.ReadCount(MaxList), reader.ReadBool()),
             _ => throw new ProtocolException($"unknown client message type {type}"),
         };
         RequireEnd(reader);
@@ -332,7 +336,7 @@ public static class Protocol
     }
 
     /// <summary>Ввод движения после байта типа.</summary>
-    private static InputMessage ReadInput(PacketReader reader) => new(ReadSequence(reader), reader.ReadFloat(), reader.ReadFloat());
+    private static InputMessage ReadInput(PacketReader reader) => new(ReadSequence(reader), reader.ReadFloat(), reader.ReadFloat(), reader.ReadFloat(), reader.ReadFloat());
 
     /// <summary>Номер ввода, который должен поместиться в uint.</summary>
     private static uint ReadSequence(PacketReader reader)

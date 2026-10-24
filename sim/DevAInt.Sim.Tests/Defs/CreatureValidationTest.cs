@@ -51,4 +51,20 @@ public class CreatureValidationTest
             ],
             messages);
     }
+
+    /// <summary>Неверное действие управления: пустые клавиши, неизвестная клавиша, needs не на зажатое действие.</summary>
+    [Theory]
+    [InlineData("""{ "id": "alpha:c", "keys": [], "does": "attack" }""", "keys must not be empty")]
+    [InlineData("""{ "id": "alpha:c", "keys": ["F1"], "does": "attack" }""", "key F1 must be mouse_left, mouse_right, mouse_middle or key_ and a key name")]
+    [InlineData("""{ "id": "alpha:c", "keys": ["key_f"], "needs": "alpha:c", "does": "attack" }""", "needs alpha:c must be a hold control")]
+    public void BadControlIsError(string control, string message)
+    {
+        using TempMods mods = new();
+        mods.Manifest("alpha").Write("alpha/data/controls.jsonc", $$"""{ "controls": [ {{control}} ] }""");
+
+        ModError error = Assert.Single(mods.Load("alpha").Errors);
+
+        Assert.Equal("alpha:c", error.JsonPath);
+        Assert.Equal(message, error.Message);
+    }
 }

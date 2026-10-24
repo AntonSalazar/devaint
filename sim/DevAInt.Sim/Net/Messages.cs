@@ -77,17 +77,17 @@ public abstract record ClientMessage;
 /// <summary>Первое сообщение клиента: кто играет; по id сервер возвращает сохранённого персонажа.</summary>
 public sealed record HelloMessage(string PlayerId) : ClientMessage;
 
-/// <summary>Ввод движения: номер по порядку и направление.</summary>
-public sealed record InputMessage(uint Sequence, float X, float Y) : ClientMessage;
+/// <summary>Ввод движения: номер по порядку, направление и точка под курсором на земле.</summary>
+public sealed record InputMessage(uint Sequence, float X, float Y, float AimX = 0, float AimY = 0) : ClientMessage;
+
+/// <summary>Действие управления нажато или отпущено: номер из ControlTable.</summary>
+public sealed record ControlMessage(int Control, bool Pressed) : ClientMessage;
 
 /// <summary>Просьба начать действие предметом: id предмета и номер действия из ItemTable.</summary>
 public sealed record StartActionMessage(long ItemId, int Action) : ClientMessage;
 
 /// <summary>Просьба прервать своё действие.</summary>
 public sealed record CancelActionMessage : ClientMessage;
-
-/// <summary>Просьба ударить ближайшего впереди.</summary>
-public sealed record AttackRequestMessage : ClientMessage;
 
 /// <summary>Один слой этажа чанка в снимке.</summary>
 public sealed record ChunkLevelData(int Z, ushort[] Floors, ushort[] NorthWalls, ushort[] WestWalls, ushort[] Flags);

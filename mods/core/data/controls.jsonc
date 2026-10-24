@@ -1,0 +1,9 @@
+// Управление человека, как в Project Zomboid: правая кнопка мыши или Ctrl - прицел, левая при прицеле - удар, E - применить предмет.
+{
+  "$schema": "../../../schemas/data.schema.json",
+  "controls": [
+    { "id": "core:aim", "keys": ["mouse_right", "key_ctrl"], "hold": true, "does": "aim" },
+    { "id": "core:attack", "keys": ["mouse_left"], "needs": "core:aim", "does": "attack" },
+    { "id": "core:use_item", "keys": ["key_e"], "does": "useItem" },
+  ],
+}

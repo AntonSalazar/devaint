@@ -144,7 +144,9 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
         // даже если по сети пришло несколько сразу
         if (client.Joined && client.Inputs.TryDequeue(out InputMessage? input))
         {
-            _sim.Entity(client.EntityId).Input = new MoveInput(input.X, input.Y);
+            Entity entity = _sim.Entity(client.EntityId);
+            entity.Input = new MoveInput(input.X, input.Y);
+            entity.AimPoint = new WorldPos(input.AimX, input.AimY, entity.Position.Z);
             client.LastInput = input.Sequence;
         }
     }
@@ -202,8 +204,13 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
             case CancelActionMessage:
                 _sim.CancelAction(client.EntityId);
                 break;
-            case AttackRequestMessage:
-                _sim.Attack(client.EntityId);
+            case ControlMessage control:
+                if (control.Control >= _sim.ControlTable.Count)
+                {
+                    throw new ProtocolException($"control {control.Control} is out of range");
+                }
+
+                _sim.Control(client.EntityId, control.Control, control.Pressed);
                 break;
         }
     }

@@ -63,11 +63,12 @@ public sealed class GameClient
         }
     }
 
-    /// <summary>Отправка ввода движения с новым номером; своя сущность сразу двигается по предсказанию.</summary>
-    public void SendInput(MoveInput input)
+    /// <summary>Отправка ввода движения с новым номером и точкой под курсором; своя сущность сразу двигается по предсказанию.</summary>
+    public void SendInput(MoveInput input, WorldPos? aim = null)
     {
         _inputSequence++;
-        _connection.Send(Protocol.Write(new InputMessage(_inputSequence, (float)input.X, (float)input.Y)));
+        WorldPos point = aim ?? default;
+        _connection.Send(Protocol.Write(new InputMessage(_inputSequence, (float)input.X, (float)input.Y, (float)point.X, (float)point.Y)));
 
         // Предсказание идёт по тому же числу во float, которое получит сервер
         MoveInput sent = new((float)input.X, (float)input.Y);
@@ -80,8 +81,8 @@ public sealed class GameClient
     /// <summary>Просьба начать действие предметом; номер действия из ItemTable.</summary>
     public void SendStartAction(long itemId, int action) => _connection.Send(Protocol.Write(new StartActionMessage(itemId, action)));
 
-    /// <summary>Просьба ударить ближайшего впереди.</summary>
-    public void SendAttack() => _connection.Send(Protocol.Write(new AttackRequestMessage()));
+    /// <summary>Действие управления нажато или отпущено: номер из ControlTable.</summary>
+    public void SendControl(int control, bool pressed) => _connection.Send(Protocol.Write(new ControlMessage(control, pressed)));
 
     /// <summary>Просьба прервать своё действие.</summary>
     public void SendCancelAction() => _connection.Send(Protocol.Write(new CancelActionMessage()));

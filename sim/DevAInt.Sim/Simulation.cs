@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using DevAInt.Sim.Controls;
 using DevAInt.Sim.Creatures;
 using DevAInt.Sim.Defs;
 using DevAInt.Sim.Grid;
@@ -56,6 +57,7 @@ public sealed class Simulation
         WorldTable = new WorldTable(mods.Defs);
         ItemTable = new ItemTable(mods.Defs);
         CreatureTable = new CreatureTable(mods.Defs);
+        ControlTable = new ControlTable(mods.Defs);
         Mods = [.. mods.Mods.Select(mod => mod.Info)];
         _hasMap = mapId is not null;
         MapId = mapId;
@@ -95,6 +97,9 @@ public sealed class Simulation
 
     /// <summary>Виды существ по номерам.</summary>
     public CreatureTable CreatureTable { get; }
+
+    /// <summary>Действия управления по номерам.</summary>
+    public ControlTable ControlTable { get; }
 
     /// <summary>Вид существа игроков с карты, null - сущность без вида.</summary>
     public string? SpawnCreature { get; }
@@ -198,6 +203,46 @@ public sealed class Simulation
         return ActionStart.Started;
     }
 
+    /// <summary>Действие управления нажато или отпущено игроком сущности; действие, которому нужно другое зажатое, без него не срабатывает.</summary>
+    public void Control(long entityId, int control, bool pressed)
+    {
+        Entity entity = _entities[entityId];
+        ControlDef def = ControlTable.Control(control);
+        if (!pressed)
+        {
+            entity.HeldControls.Remove(control);
+            entity.Aiming = IsAimHeld(entity);
+            return;
+        }
+
+        if (def.Needs is string needed && !entity.HeldControls.Contains(ControlTable.Index(needed)))
+        {
+            return;
+        }
+
+        if (def.Hold)
+        {
+            entity.HeldControls.Add(control);
+        }
+
+        switch (def.Does)
+        {
+            case ControlAction.Aim:
+                entity.Aiming = true;
+                break;
+            case ControlAction.Attack:
+                entity.AttackRequested = true;
+                break;
+            case ControlAction.UseItem:
+                UseFirstItem(entity);
+                break;
+            case ControlAction.Lua:
+                WorldPos aim = entity.AimPoint ?? entity.Position;
+                _lua.RaiseControl(entity.Id, def.Id, aim.X, aim.Y);
+                break;
+        }
+    }
+
     /// <summary>Просьба атаковать на следующем тике ближайшую сущность впереди.</summary>
     public void Attack(long entityId) => _entities[entityId].AttackRequested = true;
 
@@ -278,9 +323,22 @@ public sealed class Simulation
         }
     }
 
-    /// <summary>Взгляд по направлению движения, если сущность движется.</summary>
+    /// <summary>Взгляд за точкой прицела, если сущность целится, иначе по направлению движения.</summary>
     private static void UpdateFacing(Entity entity)
     {
+        if (entity.Aiming && entity.AimPoint is WorldPos aim)
+        {
+            double dx = aim.X - entity.Position.X;
+            double dy = aim.Y - entity.Position.Y;
+            double distance = Math.Sqrt((dx * dx) + (dy * dy));
+            if (distance > MoveThreshold)
+            {
+                entity.Facing = (dx / distance, dy / distance);
+            }
+
+            return;
+        }
+
         MoveInput input = entity.Input.Clamped();
         double length = Math.Sqrt((input.X * input.X) + (input.Y * input.Y));
         if (length > MoveThreshold)
@@ -307,6 +365,18 @@ public sealed class Simulation
             }
         }
     }
+
+    /// <summary>Первое применение первого предмета, у которого оно есть.</summary>
+    private void UseFirstItem(Entity entity)
+    {
+        if (entity.Inventory.Items.FirstOrDefault(item => item.Def.Uses.Count > 0) is Item item)
+        {
+            StartAction(entity.Id, item.Id, item.Def.Uses[0].Action);
+        }
+    }
+
+    /// <summary>Зажато ли ещё какое-нибудь действие прицеливания.</summary>
+    private bool IsAimHeld(Entity entity) => entity.HeldControls.Any(held => ControlTable.Control(held).Does == ControlAction.Aim);
 
     /// <summary>Решения поведения всех существ с поведением.</summary>
     private void ThinkAll()

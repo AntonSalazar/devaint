@@ -72,17 +72,20 @@ public class GameInputTest : TestCase
         camera.Free();
     }
 
-    /// <summary>Первое применение: первое яблоко и действие core:eat; без предметов - ничего.</summary>
-    public void TestFirstUseIsEatingApple()
+    /// <summary>Луч из центра изометрической камеры попадает на землю в точку, на которую она смотрит; луч вдоль земли - null.</summary>
+    public void TestGroundPoint()
     {
-        GameFixture game = new();
-        CheckEqual<(long, int)?>(null, GameInput.FirstUse(game.Client.Replica, game.Sim.ItemTable), "nothing before inventory arrives");
-        game.Tick();
+        IsoCamera camera = new();
+        camera.Init(new Vector3(5, 0, 7));
 
-        (long ItemId, int Action)? use = GameInput.FirstUse(game.Client.Replica, game.Sim.ItemTable);
+        Vector3? point = GameInput.GroundPoint(camera.Position, -camera.Basis.Z, 0);
+        Vector3? upper = GameInput.GroundPoint(camera.Position, -camera.Basis.Z, 3);
 
-        CheckEqual(game.Client.Replica.Inventory[0].Id, use?.ItemId ?? -1, "first apple");
-        CheckEqual(game.Sim.ItemTable.ActionIndex("core:eat"), use?.Action ?? -1, "eat action");
+        CheckNear(5, point?.X ?? 0, 1e-3, "x");
+        CheckNear(7, point?.Z ?? 0, 1e-3, "z");
+        CheckNear(3, upper?.Y ?? 0, 1e-3, "upper floor height");
+        CheckEqual(null, GameInput.GroundPoint(Vector3.Up, Vector3.Forward, 0), "ray along the ground");
+        camera.Free();
     }
 
     /// <summary>Действия регистрируются один раз с клавишами WASD и стрелками.</summary>
@@ -97,16 +100,5 @@ public class GameInputTest : TestCase
             CheckEqual(2, InputMap.ActionGetEvents(action).Count, $"keys of {action}");
         }
 
-        CheckEqual(1, InputMap.ActionGetEvents(GameInput.Use).Count, "use key");
-    }
-
-    /// <summary>Удар - на пробеле.</summary>
-    public void TestAttackOnSpace()
-    {
-        GameInput.EnsureActions();
-        InputEventKey space = new() { PhysicalKeycode = Key.Space, Pressed = true };
-
-        Check(InputMap.HasAction(GameInput.Attack), "attack action exists");
-        Check(space.IsAction(GameInput.Attack), "space is attack");
     }
 }

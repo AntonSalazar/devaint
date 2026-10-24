@@ -483,6 +483,49 @@
         "additionalProperties": false
       }
     },
+    "controls": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "hold": {
+            "type": "boolean"
+          },
+          "needs": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "does": {
+            "enum": [
+              "aim",
+              "attack",
+              "useItem",
+              "lua"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "keys",
+          "does"
+        ],
+        "additionalProperties": false
+      }
+    },
     "patches": {
       "type": [
         "array",

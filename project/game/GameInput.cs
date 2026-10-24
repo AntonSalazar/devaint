@@ -1,7 +1,4 @@
-using DevAInt.Sim.Defs;
-using DevAInt.Sim.Items;
 using DevAInt.Sim.Motion;
-using DevAInt.Sim.Net;
 using Godot;
 
 /// <summary>Ввод игрока: действия движения и пересчёт клавиш в направление относительно камеры.</summary>
@@ -19,12 +16,6 @@ public static class GameInput
     /// <summary>Действие вправо.</summary>
     public const string Right = "move_right";
 
-    /// <summary>Применить первый подходящий предмет.</summary>
-    public const string Use = "use_item";
-
-    /// <summary>Ударить ближайшего впереди.</summary>
-    public const string Attack = "attack";
-
     /// <summary>Приблизить камеру.</summary>
     public const string ZoomIn = "zoom_in";
 
@@ -34,15 +25,13 @@ public static class GameInput
     /// <summary>Выйти из игры.</summary>
     public const string Quit = "quit";
 
-    /// <summary>Регистрация действий WASD, стрелок, E, пробела, колёсика мыши и Esc, если их ещё нет.</summary>
+    /// <summary>Регистрация движения WASD и стрелками, зума колёсиком и выхода по Esc, если их ещё нет; остальное управление задают моды.</summary>
     public static void EnsureActions()
     {
         Add(Up, Key.W, Key.Up);
         Add(Down, Key.S, Key.Down);
         Add(Left, Key.A, Key.Left);
         Add(Right, Key.D, Key.Right);
-        Add(Use, Key.E);
-        Add(Attack, Key.Space);
         Add(Quit, Key.Escape);
         AddMouse(ZoomIn, MouseButton.WheelUp);
         AddMouse(ZoomOut, MouseButton.WheelDown);
@@ -57,21 +46,6 @@ public static class GameInput
         }
 
         return input.IsActionPressed(ZoomOut) ? -1 : 0;
-    }
-
-    /// <summary>Первый предмет инвентаря, у которого есть применение: id предмета и номер действия, null если таких нет.</summary>
-    public static (long ItemId, int Action)? FirstUse(Replica replica, ItemTable table)
-    {
-        foreach (ItemData item in replica.Inventory)
-        {
-            ItemDef def = table.Item(item.Item);
-            if (def.Uses.Count > 0)
-            {
-                return (item.Id, table.ActionIndex(def.Uses[0].Action));
-            }
-        }
-
-        return null;
     }
 
     /// <summary>Нажатые клавиши: x вправо, y вверх по экрану.</summary>
@@ -90,6 +64,18 @@ public static class GameInput
         Vector3 right = Flat(camera.X);
         Vector3 direction = (right * keys.X) + (forward * keys.Y);
         return new MoveInput(direction.X, direction.Z);
+    }
+
+    /// <summary>Точка, где луч камеры пересекает горизонтальную плоскость высоты height; null, если луч идёт вдоль неё.</summary>
+    public static Vector3? GroundPoint(Vector3 origin, Vector3 direction, float height)
+    {
+        if (Mathf.Abs(direction.Y) < 1e-6f)
+        {
+            return null;
+        }
+
+        float distance = (height - origin.Y) / direction.Y;
+        return origin + (direction * distance);
     }
 
     /// <summary>Вектор по земле единичной длины, ноль если он смотрит строго вверх или вниз.</summary>

@@ -145,7 +145,9 @@ public class WorldViewTest : TestCase
         _game.Tick();
         _view.FaceOwn(new MoveInput(0, 1));
 
-        _game.Client.SendAttack();
+        _game.Client.SendControl(_game.Sim.ControlTable.Index("core:aim"), true);
+        _game.Client.SendInput(MoveInput.None, new WorldPos(6.5, 7.3, 0));
+        _game.Client.SendControl(_game.Sim.ControlTable.Index("core:attack"), true);
         _game.Tick();
         _view.Advance(EntityView.LungeSeconds / 2);
 

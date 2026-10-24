@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using DevAInt.Sim;
 using DevAInt.Sim.Grid;
-using DevAInt.Sim.Items;
 using DevAInt.Sim.Logging;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Motion;
@@ -44,8 +43,8 @@ public partial class GameRoot : Node3D
     /// <summary>HUD своего персонажа.</summary>
     private Hud? _hud;
 
-    /// <summary>Предметы и действия по номерам.</summary>
-    private ItemTable? _items;
+    /// <summary>Действия управления из данных модов.</summary>
+    private GameControls? _controls;
 
     /// <summary>Камера уже встала на свою капсулу.</summary>
     private bool _cameraPlaced;
@@ -102,7 +101,6 @@ public partial class GameRoot : Node3D
         string[] args = OS.GetCmdlineUserArgs();
         ClientTables tables = ClientTables.From(loaded);
         WorldTable world = new(loaded.Defs);
-        _items = tables.Items;
         IConnection? connection = GameArgs.Connect(args) is (string host, int port) ? ConnectTo(host, port) : StartLocalServer(loaded, args);
         if (GameArgs.Player(args) is string player && !SaveGame.IsValidName(player))
         {
@@ -127,6 +125,8 @@ public partial class GameRoot : Node3D
         string playerId = GameArgs.Player(args) ?? PlayerIdentity.LoadOrCreate(ProjectSettings.GlobalizePath(PlayerIdentity.DefaultPath));
         _client = new GameClient(connection, tables, playerId);
         GameInput.EnsureActions();
+        _controls = new GameControls(tables.Controls, _log);
+        _controls.Register();
         _autoWalk = args.Contains("--autowalk");
         BuildScene(tables, world);
     }
@@ -165,8 +165,9 @@ public partial class GameRoot : Node3D
         for (int ticks = _timer.Advance(delta); ticks > 0; ticks--)
         {
             MoveInput input = ReadInput(_camera);
-            _client.SendInput(input);
-            _view.FaceOwn(input);
+            WorldPos? aim = CursorPoint();
+            _client.SendInput(input, aim);
+            FaceOwn(input, aim);
             _server?.Tick();
             if (!UpdateClient(_client))
             {
@@ -185,12 +186,7 @@ public partial class GameRoot : Node3D
             return;
         }
 
-        UseItemOnKey();
-        if (Input.IsActionJustPressed(GameInput.Attack))
-        {
-            _client.SendAttack();
-        }
-
+        _controls?.Poll(_client);
         _view.Advance(delta, _timer.Fraction);
         FollowOwn(delta);
         _hud.Refresh(delta);
@@ -305,20 +301,29 @@ public partial class GameRoot : Node3D
         Cutaway.SetFocus(own.Position);
     }
 
-    /// <summary>По клавише E - первое применение первого подходящего предмета, если сейчас нет действия.</summary>
-    private void UseItemOnKey()
+    /// <summary>Точка под курсором на земле своего этажа в координатах sim; null без своей сущности.</summary>
+    private WorldPos? CursorPoint()
     {
-        if (!Input.IsActionJustPressed(GameInput.Use) || _client is null || _items is null)
+        if (_client?.OwnPosition is not WorldPos own || _camera is null)
         {
+            return null;
+        }
+
+        Vector2 mouse = GetViewport().GetMousePosition();
+        Vector3? point = GameInput.GroundPoint(_camera.ProjectRayOrigin(mouse), _camera.ProjectRayNormal(mouse), own.Z * ViewMath.FloorHeight);
+        return point is Vector3 ground ? new WorldPos(ground.X, ground.Z, own.Z) : null;
+    }
+
+    /// <summary>Взгляд своей капсулы: на курсор при прицеле, иначе по вводу движения.</summary>
+    private void FaceOwn(MoveInput input, WorldPos? aim)
+    {
+        if (_controls?.IsAiming() == true && aim is WorldPos point && _client?.OwnPosition is WorldPos own)
+        {
+            _view!.FaceOwn(new MoveInput(point.X - own.X, point.Y - own.Y));
             return;
         }
 
-        Replica replica = _client.Replica;
-        bool busy = replica.Entity(replica.OwnEntityId)?.Action is not null;
-        if (!busy && GameInput.FirstUse(replica, _items) is (long item, int action))
-        {
-            _client.SendStartAction(item, action);
-        }
+        _view!.FaceOwn(input);
     }
 
     /// <summary>Ввод с клавиатуры или автоходьба по кругу.</summary>

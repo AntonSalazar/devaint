@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Mods;
+using DevAInt.Sim.Motion;
 using DevAInt.Sim.Net;
 using DevAInt.Sim.Saves;
 using DevAInt.Sim.Stats;
@@ -52,6 +53,14 @@ public sealed class NetRun
 
     /// <summary>Клиент игрока playerId на готовом подключении.</summary>
     public GameClient Connect(IConnection connection, string playerId) => new(connection, ClientTables.From(Sim), playerId);
+
+    /// <summary>Прицел клиента на точку и удар, как ПКМ и ЛКМ у игрока.</summary>
+    public void Strike(GameClient client, WorldPos target)
+    {
+        client.SendControl(Sim.ControlTable.Index("core:aim"), true);
+        client.SendInput(MoveInput.None, target);
+        client.SendControl(Sim.ControlTable.Index("core:attack"), true);
+    }
 
     /// <summary>Голое подключение без клиента, чтобы слать серверу что угодно.</summary>
     public IConnection ConnectRaw() => _transport.Connect();

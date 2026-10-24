@@ -17,8 +17,11 @@ internal sealed class LuaHost
     /// <summary>Хук смены уровня мудла: entity, moodle, old_level, new_level.</summary>
     public const string StatThresholdHook = "stat_threshold";
 
+    /// <summary>Имя хука действия управления с поведением lua: сущность, id действия, точка курсора.</summary>
+    public const string ControlHook = "control";
+
     /// <summary>Известные хуки.</summary>
-    private static readonly HashSet<string> _hooks = [TickHook, StatThresholdHook];
+    private static readonly HashSet<string> _hooks = [TickHook, StatThresholdHook, ControlHook];
 
     /// <summary>Таблица статов для перевода id в номера.</summary>
     private readonly StatTable _table;
@@ -91,6 +94,19 @@ internal sealed class LuaHost
         foreach (LuaMod mod in _mods)
         {
             mod.Raise(StatThresholdHook, id, _moodleIds[change.Moodle], oldLevel, newLevel);
+        }
+    }
+
+    /// <summary>Хук control у всех модов: каждый мод сам смотрит, его ли это действие.</summary>
+    public void RaiseControl(long entity, string control, double x, double y)
+    {
+        DynValue id = DynValue.NewNumber(entity);
+        DynValue name = DynValue.NewString(control);
+        DynValue aimX = DynValue.NewNumber(x);
+        DynValue aimY = DynValue.NewNumber(y);
+        foreach (LuaMod mod in _mods)
+        {
+            mod.Raise(ControlHook, id, name, aimX, aimY);
         }
     }
 

@@ -25,7 +25,7 @@ public class AttackSyncTest
         attacker.Replica.Attacked += (from, to) => seen.Add((from, to));
         watcher.Replica.Attacked += (from, to) => watched.Add((from, to));
 
-        attacker.SendAttack();
+        run.Strike(attacker, new WorldPos(6.5, 7.3, 0));
         run.Tick(1, attacker, watcher);
 
         long own = attacker.Replica.OwnEntityId;
@@ -47,7 +47,7 @@ public class AttackSyncTest
         bool knownAtAttack = false;
         attacker.Replica.Attacked += (from, to) => knownAtAttack = attacker.Replica.Entity(to) is not null;
 
-        attacker.SendAttack();
+        run.Strike(attacker, new WorldPos(6.5, 7.3, 0));
         run.Tick(1, attacker);
 
         Assert.True(knownAtAttack, "target is still known when the attack arrives");
