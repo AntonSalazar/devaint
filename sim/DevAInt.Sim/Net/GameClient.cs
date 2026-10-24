@@ -80,6 +80,9 @@ public sealed class GameClient
     /// <summary>Просьба начать действие предметом; номер действия из ItemTable.</summary>
     public void SendStartAction(long itemId, int action) => _connection.Send(Protocol.Write(new StartActionMessage(itemId, action)));
 
+    /// <summary>Просьба ударить ближайшего впереди.</summary>
+    public void SendAttack() => _connection.Send(Protocol.Write(new AttackRequestMessage()));
+
     /// <summary>Просьба прервать своё действие.</summary>
     public void SendCancelAction() => _connection.Send(Protocol.Write(new CancelActionMessage()));
 

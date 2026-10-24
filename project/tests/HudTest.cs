@@ -83,4 +83,22 @@ public class HudTest : TestCase
 
     /// <summary>Короткое имя из id: пространство имён убирается, подчёркивания - пробелы.</summary>
     public void TestShortName() => CheckEqual("low power", HudModel.ShortName("robots:low_power"), "short name");
+
+    /// <summary>После смерти своего персонажа надпись видна 3 секунды.</summary>
+    public void TestDeathMessage()
+    {
+        Hud hud = new();
+        hud.Init(_model);
+        Entity own = _game.Sim.Entity(_game.Client.Replica.OwnEntityId);
+
+        own.Stats.SetValue(_game.Sim.StatTable.StatIndex("core:health"), 0);
+        _game.Tick();
+        hud.Refresh();
+        bool shown = hud.DeathVisible;
+        hud.Refresh(HudModel.DeathMessageSeconds + 0.1);
+
+        Check(shown, "death message is shown");
+        Check(!hud.DeathVisible, "death message is hidden after 3 seconds");
+        hud.Free();
+    }
 }

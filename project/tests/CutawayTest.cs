@@ -15,7 +15,7 @@ public class CutawayTest : TestCase
     {
         GameFixture game = new();
         WorldView view = new();
-        view.Init(game.Client.Replica, game.Sim.WorldTable);
+        view.Init(game.Client.Replica, game.Sim.WorldTable, game.Sim.CreatureTable);
         game.Tick();
         ChunkView chunk = view.Chunk(0, 0)!;
 

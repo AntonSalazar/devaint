@@ -14,6 +14,19 @@ public partial class Hud : CanvasLayer
     /// <summary>Колонка предметов.</summary>
     private readonly VBoxContainer _items = new() { Name = "Items" };
 
+    /// <summary>Надпись о смерти по центру экрана.</summary>
+    private readonly Label _death = new()
+    {
+        Name = "Death",
+        Text = "You died",
+        Visible = false,
+        HorizontalAlignment = HorizontalAlignment.Center,
+        VerticalAlignment = VerticalAlignment.Center,
+        AnchorRight = 1,
+        AnchorBottom = 1,
+        Modulate = new Color(1f, 0.3f, 0.25f),
+    };
+
     /// <summary>Данные HUD.</summary>
     private HudModel? _model;
 
@@ -25,6 +38,9 @@ public partial class Hud : CanvasLayer
 
     /// <summary>Доли полос статов, для тестов.</summary>
     public IReadOnlyList<double> BarValues => _rows.ConvertAll(row => row.Bar.Value);
+
+    /// <summary>Видна ли надпись о смерти.</summary>
+    public bool DeathVisible => _death.Visible;
 
     /// <summary>Постройка панели по числу статов; вызывается сразу после создания.</summary>
     public void Init(HudModel model)
@@ -48,16 +64,21 @@ public partial class Hud : CanvasLayer
         column.AddChild(_moodles);
         column.AddChild(new HSeparator());
         column.AddChild(_items);
+        _death.AddThemeFontSizeOverride("font_size", 48);
+        AddChild(_death);
         Refresh();
     }
 
-    /// <summary>Обновление по текущей реплике; дёшево, вызывается каждый кадр.</summary>
-    public void Refresh()
+    /// <summary>Обновление по текущей реплике через delta секунд после прошлого; дёшево, вызывается каждый кадр.</summary>
+    public void Refresh(double delta = 0)
     {
         if (_model is null)
         {
             return;
         }
+
+        _model.Advance(delta);
+        _death.Visible = _model.DeathVisible;
 
         IReadOnlyList<StatBar> bars = _model.Bars();
         for (int i = 0; i < _rows.Count; i++)

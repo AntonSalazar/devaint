@@ -138,6 +138,7 @@ internal static class Combat
         }
 
         target.Stats.SetValue(stat, target.Stats.Value(stat) + attack.Add);
+        sim.RecordAttack(attacker, target);
         attacker.AttackReadyTick = sim.Clock.Tick + Math.Max(1, (int)Math.Ceiling(attack.Seconds / sim.Clock.SecondsPerTick));
         return true;
     }

@@ -128,7 +128,7 @@ public partial class GameRoot : Node3D
         _client = new GameClient(connection, tables, playerId);
         GameInput.EnsureActions();
         _autoWalk = args.Contains("--autowalk");
-        BuildScene(tables.Stats, world);
+        BuildScene(tables, world);
     }
 
     /// <summary>Ввод, который не съел интерфейс: зум колёсиком и выход по Esc.</summary>
@@ -164,7 +164,9 @@ public partial class GameRoot : Node3D
 
         for (int ticks = _timer.Advance(delta); ticks > 0; ticks--)
         {
-            _client.SendInput(ReadInput(_camera));
+            MoveInput input = ReadInput(_camera);
+            _client.SendInput(input);
+            _view.FaceOwn(input);
             _server?.Tick();
             if (!UpdateClient(_client))
             {
@@ -184,9 +186,14 @@ public partial class GameRoot : Node3D
         }
 
         UseItemOnKey();
+        if (Input.IsActionJustPressed(GameInput.Attack))
+        {
+            _client.SendAttack();
+        }
+
         _view.Advance(delta, _timer.Fraction);
         FollowOwn(delta);
-        _hud.Refresh();
+        _hud.Refresh(delta);
     }
 
     /// <summary>Запись мира своего сервера и отключение от сетевого при выходе.</summary>
@@ -226,18 +233,21 @@ public partial class GameRoot : Node3D
     }
 
     /// <summary>Свет, вид мира, камера и HUD.</summary>
-    private void BuildScene(StatTable stats, WorldTable world)
+    private void BuildScene(ClientTables tables, WorldTable world)
     {
         AddChild(Lighting.CreateEnvironment());
         AddChild(Lighting.CreateSun());
         _view = new WorldView();
-        _view.Init(_client!.Replica, world);
+        _view.Init(_client!.Replica, world, tables.Creatures);
+
+        // После смерти своя сущность новая и стоит в точке появления: камера встаёт на неё сразу, без полёта
+        _client.Replica.OwnEntityChanged += () => _cameraPlaced = false;
         AddChild(_view);
         _camera = new IsoCamera();
         _camera.Init(Vector3.Zero);
         AddChild(_camera);
         _hud = new Hud();
-        _hud.Init(new HudModel(stats, _items!, _client.Replica));
+        _hud.Init(new HudModel(tables.Stats, tables.Items, _client.Replica));
         AddChild(_hud);
     }
 

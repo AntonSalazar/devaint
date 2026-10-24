@@ -35,6 +35,9 @@ public sealed record ChunkUnloadMessage(int ChunkX, int ChunkY) : ServerMessage;
 /// <summary>Сущность появилась у клиента: позиция, номер вида из CreatureTable или -1 и уровни всех мудлов.</summary>
 public sealed record EntitySpawnMessage(long Id, float X, float Y, int Z, int Creature, IReadOnlyList<int> MoodleLevels) : ServerMessage;
 
+/// <summary>Удар прошёл: кто ударил и кого, для выпада и вспышки на клиенте.</summary>
+public sealed record AttackMessage(long Attacker, long Target) : ServerMessage;
+
 /// <summary>Своя сущность сменилась: прежняя умерла, у игрока новый персонаж.</summary>
 public sealed record OwnEntityMessage(long EntityId) : ServerMessage;
 
@@ -82,6 +85,9 @@ public sealed record StartActionMessage(long ItemId, int Action) : ClientMessage
 
 /// <summary>Просьба прервать своё действие.</summary>
 public sealed record CancelActionMessage : ClientMessage;
+
+/// <summary>Просьба ударить ближайшего впереди.</summary>
+public sealed record AttackRequestMessage : ClientMessage;
 
 /// <summary>Один слой этажа чанка в снимке.</summary>
 public sealed record ChunkLevelData(int Z, ushort[] Floors, ushort[] NorthWalls, ushort[] WestWalls, ushort[] Flags);

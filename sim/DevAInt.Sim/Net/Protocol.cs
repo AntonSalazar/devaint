@@ -37,6 +37,7 @@ public static class Protocol
         ActionStarted,
         ActionEnded,
         OwnEntity,
+        Attack,
     }
 
     /// <summary>Типы сообщений клиента.</summary>
@@ -46,6 +47,7 @@ public static class Protocol
         StartAction,
         CancelAction,
         Hello,
+        Attack,
     }
 
     /// <summary>Пакет сервера в байты.</summary>
@@ -100,6 +102,9 @@ public static class Protocol
             case CancelActionMessage:
                 writer.WriteByte((byte)ClientType.CancelAction);
                 break;
+            case AttackRequestMessage:
+                writer.WriteByte((byte)ClientType.Attack);
+                break;
             case HelloMessage hello:
                 writer.WriteByte((byte)ClientType.Hello);
                 writer.WriteString(hello.PlayerId);
@@ -122,6 +127,7 @@ public static class Protocol
             ClientType.StartAction => new StartActionMessage(reader.ReadVarInt(), reader.ReadCount(MaxList)),
             ClientType.CancelAction => new CancelActionMessage(),
             ClientType.Hello => new HelloMessage(reader.ReadString(MaxText)),
+            ClientType.Attack => new AttackRequestMessage(),
             _ => throw new ProtocolException($"unknown client message type {type}"),
         };
         RequireEnd(reader);
@@ -226,6 +232,11 @@ public static class Protocol
                 writer.WriteVarInt(started.StartTick);
                 writer.WriteVarUInt((ulong)started.DurationTicks);
                 break;
+            case AttackMessage attack:
+                writer.WriteByte((byte)ServerType.Attack);
+                writer.WriteVarInt(attack.Attacker);
+                writer.WriteVarInt(attack.Target);
+                break;
             case OwnEntityMessage own:
                 writer.WriteByte((byte)ServerType.OwnEntity);
                 writer.WriteVarInt(own.EntityId);
@@ -260,6 +271,7 @@ public static class Protocol
             ServerType.ActionStarted => new ActionStartedMessage(reader.ReadVarInt(), reader.ReadCount(MaxList), reader.ReadVarInt(), reader.ReadCount(int.MaxValue)),
             ServerType.ActionEnded => new ActionEndedMessage(reader.ReadVarInt(), reader.ReadBool()),
             ServerType.OwnEntity => new OwnEntityMessage(reader.ReadVarInt()),
+            ServerType.Attack => new AttackMessage(reader.ReadVarInt(), reader.ReadVarInt()),
             _ => throw new ProtocolException($"unknown server message type {type}"),
         };
     }

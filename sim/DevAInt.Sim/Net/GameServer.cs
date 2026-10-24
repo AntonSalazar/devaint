@@ -202,6 +202,9 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
             case CancelActionMessage:
                 _sim.CancelAction(client.EntityId);
                 break;
+            case AttackRequestMessage:
+                _sim.Attack(client.EntityId);
+                break;
         }
     }
 
@@ -392,6 +395,15 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
                     messages.Add(new MoodleLevelMessage(entity.Id, i, level));
                     known.Moodles[i] = level;
                 }
+            }
+        }
+
+        // Удары до исчезновений: цель, убитая этим ударом, ещё известна клиенту
+        foreach ((long attacker, long target) in _sim.Attacks)
+        {
+            if (client.Known.ContainsKey(attacker))
+            {
+                messages.Add(new AttackMessage(attacker, target));
             }
         }
 

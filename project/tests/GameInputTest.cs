@@ -99,4 +99,14 @@ public class GameInputTest : TestCase
 
         CheckEqual(1, InputMap.ActionGetEvents(GameInput.Use).Count, "use key");
     }
+
+    /// <summary>Удар - на пробеле.</summary>
+    public void TestAttackOnSpace()
+    {
+        GameInput.EnsureActions();
+        InputEventKey space = new() { PhysicalKeycode = Key.Space, Pressed = true };
+
+        Check(InputMap.HasAction(GameInput.Attack), "attack action exists");
+        Check(space.IsAction(GameInput.Attack), "space is attack");
+    }
 }

@@ -1,6 +1,7 @@
 using System.Linq;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Motion;
+using Godot;
 using Side = DevAInt.Sim.Grid.Side;
 
 /// <summary>Тесты <see cref="WorldView"/> на настоящих сервере и клиенте в одном процессе.</summary>
@@ -20,7 +21,7 @@ public class WorldViewTest : TestCase
     {
         _game = new GameFixture();
         _view = new WorldView();
-        _view.Init(_game.Client.Replica, _game.Sim.WorldTable);
+        _view.Init(_game.Client.Replica, _game.Sim.WorldTable, _game.Sim.CreatureTable);
     }
 
     /// <summary>Освобождение вида после теста.</summary>
@@ -123,5 +124,34 @@ public class WorldViewTest : TestCase
 
         CheckEqual(1, _view.EntityCount, "entities after removal");
         Check(_view.Entity(npc) is null, "npc view is gone");
+    }
+
+    /// <summary>Цвет капсулы из вида существа, своя - с кольцом.</summary>
+    public void TestCapsuleColorFromCreature()
+    {
+        _game.Tick();
+        EntityView own = _view.Entity(_game.Client.Replica.OwnEntityId)!;
+        string human = _game.Sim.CreatureTable.Creature(_game.Sim.CreatureTable.Index("core:human")).Color;
+
+        CheckEqual(Color.FromHtml(human), own.BodyColor, "human color");
+        Check(own.HasRing, "own ring");
+    }
+
+    /// <summary>Удар по сети: свой выпад и вспышка цели; взгляд своей капсулы по вводу.</summary>
+    public void TestAttackShowsLungeAndFlash()
+    {
+        _game.Tick();
+        long dummy = _game.Sim.CreateEntity(new WorldPos(6.5, 7.3, 0), "core:human");
+        _game.Tick();
+        _view.FaceOwn(new MoveInput(0, 1));
+
+        _game.Client.SendAttack();
+        _game.Tick();
+        _view.Advance(EntityView.LungeSeconds / 2);
+
+        EntityView own = _view.Entity(_game.Client.Replica.OwnEntityId)!;
+        Check(own.LungeOffset > 0.1f, $"own lunges: {own.LungeOffset}");
+        Check(_view.Entity(dummy)!.IsFlashing, "target flashes");
+        CheckNear(1, own.Facing.Z, Tolerance, "own faces south");
     }
 }

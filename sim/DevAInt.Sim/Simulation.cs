@@ -34,6 +34,9 @@ public sealed class Simulation
     /// <summary>Умершие на последнем тике.</summary>
     private readonly List<Entity> _died = [];
 
+    /// <summary>Удары на последнем тике.</summary>
+    private readonly List<(long Attacker, long Target)> _attacks = [];
+
     /// <summary>Lua-моды.</summary>
     private readonly LuaHost _lua;
 
@@ -98,6 +101,9 @@ public sealed class Simulation
 
     /// <summary>Сущности, умершие на последнем тике, уже убраны из мира.</summary>
     public IReadOnlyList<Entity> Died => _died;
+
+    /// <summary>Удары, которые прошли на последнем тике: кто и кого.</summary>
+    public IReadOnlyList<(long Attacker, long Target)> Attacks => _attacks;
 
     /// <summary>Полы и стены по номерам.</summary>
     public WorldTable WorldTable { get; }
@@ -229,6 +235,7 @@ public sealed class Simulation
     {
         Clock.Advance();
         _died.Clear();
+        _attacks.Clear();
         ThinkAll();
         foreach (Entity entity in _order)
         {
@@ -255,6 +262,9 @@ public sealed class Simulation
 
         _lua.RaiseTick();
     }
+
+    /// <summary>Запись прошедшего удара для рассылки клиентам.</summary>
+    internal void RecordAttack(Entity attacker, Entity target) => _attacks.Add((attacker.Id, target.Id));
 
     /// <summary>Сущность из сохранения со своим id; счётчики id сдвигаются за неё и её предметы.</summary>
     internal void RestoreEntity(Entity entity)

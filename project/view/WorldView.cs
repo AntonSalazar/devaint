@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using DevAInt.Sim.Creatures;
 using DevAInt.Sim.Grid;
+using DevAInt.Sim.Motion;
 using DevAInt.Sim.Net;
 using Godot;
 
@@ -18,6 +20,9 @@ public partial class WorldView : Node3D
     /// <summary>Полы и стены по номерам, для цветов.</summary>
     private WorldTable? _table;
 
+    /// <summary>Виды существ по номерам, для цветов капсул.</summary>
+    private CreatureTable? _creatures;
+
     /// <summary>Число узлов чанков.</summary>
     public int ChunkCount => _chunks.Count;
 
@@ -25,11 +30,13 @@ public partial class WorldView : Node3D
     public int EntityCount => _entities.Count;
 
     /// <summary>Подписка на реплику; вызывается сразу после создания, до первого пакета.</summary>
-    public void Init(Replica replica, WorldTable table)
+    public void Init(Replica replica, WorldTable table, CreatureTable creatures)
     {
         Name = "WorldView";
         _replica = replica;
         _table = table;
+        _creatures = creatures;
+        replica.Attacked += OnAttacked;
         replica.ChunkLoaded += OnChunkLoaded;
         replica.ChunkUnloaded += OnChunkUnloaded;
         replica.FloorChanged += OnCellChanged;
@@ -44,6 +51,9 @@ public partial class WorldView : Node3D
 
     /// <summary>Узел сущности или null.</summary>
     public EntityView? Entity(long id) => _entities.GetValueOrDefault(id);
+
+    /// <summary>Своя капсула смотрит по вводу движения; без ввода взгляд прежний.</summary>
+    public void FaceOwn(MoveInput input) => Entity(_replica!.OwnEntityId)?.SetFacing(new Vector3((float)input.X, 0, (float)input.Y));
 
     /// <summary>Своя капсула идёт к предсказанной позиции.</summary>
     public void MoveOwn(WorldPos position) => Entity(_replica!.OwnEntityId)?.SetTarget(ViewMath.ToGodot((float)position.X, (float)position.Y, position.Z));
@@ -77,6 +87,7 @@ public partial class WorldView : Node3D
         _replica.EntitySpawned -= OnEntitySpawned;
         _replica.EntityMoved -= OnEntityMoved;
         _replica.EntityRemoved -= OnEntityRemoved;
+        _replica.Attacked -= OnAttacked;
     }
 
     /// <summary>Узел удаляется из вида и освобождается.</summary>
@@ -115,7 +126,7 @@ public partial class WorldView : Node3D
     private void OnEntitySpawned(ReplicaEntity entity)
     {
         EntityView view = new();
-        view.Init(entity.Id, entity.Id == _replica!.OwnEntityId, ViewMath.ToGodot(entity.X, entity.Y, entity.Z));
+        view.Init(entity.Id, entity.Id == _replica!.OwnEntityId, ViewMath.ToGodot(entity.X, entity.Y, entity.Z), ColorOf(entity));
         AddChild(view);
         _entities[entity.Id] = view;
     }
@@ -128,6 +139,16 @@ public partial class WorldView : Node3D
             Entity(entity.Id)?.SetTarget(ViewMath.ToGodot(entity.X, entity.Y, entity.Z));
         }
     }
+
+    /// <summary>Удар прошёл: выпад атакующего и вспышка цели, если они видны.</summary>
+    private void OnAttacked(long attacker, long target)
+    {
+        Entity(attacker)?.PlayAttack();
+        Entity(target)?.PlayHit();
+    }
+
+    /// <summary>Цвет капсулы из вида существа; у сущности без вида - серый.</summary>
+    private Color ColorOf(ReplicaEntity entity) => entity.Creature >= 0 ? Color.FromHtml(_creatures!.Creature(entity.Creature).Color) : new Color(0.6f, 0.6f, 0.6f);
 
     /// <summary>Сущность исчезла.</summary>
     private void OnEntityRemoved(ReplicaEntity entity)

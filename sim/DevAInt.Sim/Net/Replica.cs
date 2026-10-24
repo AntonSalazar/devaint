@@ -60,6 +60,12 @@ public sealed class Replica(ClientTables tables)
     /// <summary>Чанк выгружен.</summary>
     public event Action<int, int>? ChunkUnloaded;
 
+    /// <summary>Своя сущность сменилась: прежняя умерла.</summary>
+    public event Action? OwnEntityChanged;
+
+    /// <summary>Удар прошёл: id атакующего и цели.</summary>
+    public event Action<long, long>? Attacked;
+
     /// <summary>Сущность появилась.</summary>
     public event Action<ReplicaEntity>? EntitySpawned;
 
@@ -237,6 +243,11 @@ public sealed class Replica(ClientTables tables)
                 break;
             case OwnEntityMessage own:
                 OwnEntityId = own.EntityId;
+                OwnEntityChanged?.Invoke();
+                break;
+            case AttackMessage attack:
+                // Цель могла уже исчезнуть в этом же пакете, удар показывается тем, кто остался
+                Attacked?.Invoke(attack.Attacker, attack.Target);
                 break;
             case ActionEndedMessage ended:
                 ReplicaEntity finished = Existing(ended.Entity);

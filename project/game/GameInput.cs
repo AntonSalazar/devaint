@@ -22,6 +22,9 @@ public static class GameInput
     /// <summary>Применить первый подходящий предмет.</summary>
     public const string Use = "use_item";
 
+    /// <summary>Ударить ближайшего впереди.</summary>
+    public const string Attack = "attack";
+
     /// <summary>Приблизить камеру.</summary>
     public const string ZoomIn = "zoom_in";
 
@@ -31,7 +34,7 @@ public static class GameInput
     /// <summary>Выйти из игры.</summary>
     public const string Quit = "quit";
 
-    /// <summary>Регистрация действий WASD, стрелок, E, колёсика мыши и Esc, если их ещё нет.</summary>
+    /// <summary>Регистрация действий WASD, стрелок, E, пробела, колёсика мыши и Esc, если их ещё нет.</summary>
     public static void EnsureActions()
     {
         Add(Up, Key.W, Key.Up);
@@ -39,6 +42,7 @@ public static class GameInput
         Add(Left, Key.A, Key.Left);
         Add(Right, Key.D, Key.Right);
         Add(Use, Key.E);
+        Add(Attack, Key.Space);
         Add(Quit, Key.Escape);
         AddMouse(ZoomIn, MouseButton.WheelUp);
         AddMouse(ZoomOut, MouseButton.WheelDown);

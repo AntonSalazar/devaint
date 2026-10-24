@@ -22,6 +22,8 @@ public class ProtocolTest
             new EntityRemoveMessage(long.MaxValue),
             new FloorChangeMessage(new CellPos(4095, 0, 8), 65_535),
             new EdgeChangeMessage(new CellPos(32, 31, 0), true, new Edge(9, true)),
+            new AttackMessage(3, long.MaxValue),
+            new OwnEntityMessage(12),
         ];
 
         ServerFrame read = Protocol.ReadServerFrame(Protocol.Write(new ServerFrame(123_456, messages, uint.MaxValue)));
@@ -67,7 +69,7 @@ public class ProtocolTest
     [Fact]
     public void ClientMessagesRoundTrip()
     {
-        ClientMessage[] messages = [new InputMessage(uint.MaxValue, -0.5f, 1f), new StartActionMessage(123_456_789, 3), new CancelActionMessage()];
+        ClientMessage[] messages = [new InputMessage(uint.MaxValue, -0.5f, 1f), new StartActionMessage(123_456_789, 3), new CancelActionMessage(), new AttackRequestMessage(), new HelloMessage("anna")];
 
         foreach (ClientMessage message in messages)
         {

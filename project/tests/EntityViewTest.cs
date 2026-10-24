@@ -18,7 +18,7 @@ public class EntityViewTest : TestCase
     public void TestActionBarShowsProgress()
     {
         EntityView view = new();
-        view.Init(1, own: true, Vector3.Zero);
+        view.Init(1, own: true, Vector3.Zero, Colors.White);
         Check(!view.ActionBarVisible, "hidden at start");
 
         view.SetActionProgress(0.4f);
@@ -34,7 +34,7 @@ public class EntityViewTest : TestCase
     public void TestInterpolatesOverOneTick()
     {
         EntityView view = new();
-        view.Init(1, own: true, Vector3.Zero);
+        view.Init(1, own: true, Vector3.Zero, Colors.White);
 
         view.SetTarget(new Vector3(1, 0, 0));
         view.Advance(0.05);
@@ -49,7 +49,7 @@ public class EntityViewTest : TestCase
     public void TestRetargetStartsFromCurrent()
     {
         EntityView view = new();
-        view.Init(1, own: false, Vector3.Zero);
+        view.Init(1, own: false, Vector3.Zero, Colors.White);
         view.SetTarget(new Vector3(1, 0, 0));
         view.Advance(0.05);
 
@@ -59,6 +59,61 @@ public class EntityViewTest : TestCase
 
         CheckNear(0.75, view.Position.X, Tolerance, "x after retarget");
         CheckNear(0.5, view.Position.Z, Tolerance, "z after retarget");
+        view.Free();
+    }
+
+    /// <summary>Кольцо только под своей капсулой, цвет тела из вида.</summary>
+    public void TestRingAndColor()
+    {
+        EntityView own = new();
+        own.Init(1, own: true, Vector3.Zero, Colors.Blue);
+        EntityView other = new();
+        other.Init(2, own: false, Vector3.Zero, Colors.Green);
+
+        Check(own.HasRing, "own has a ring");
+        Check(!other.HasRing, "other has no ring");
+        CheckEqual(Colors.Green, other.BodyColor, "body color");
+        own.Free();
+        other.Free();
+    }
+
+    /// <summary>Чужая капсула смотрит по движению, своя - только по SetFacing, короткое направление взгляд не меняет.</summary>
+    public void TestFacing()
+    {
+        EntityView own = new();
+        own.Init(1, own: true, Vector3.Zero, Colors.Blue);
+        EntityView other = new();
+        other.Init(2, own: false, Vector3.Zero, Colors.Green);
+
+        other.SetTarget(new Vector3(1, 0, 0));
+        own.SetTarget(new Vector3(1, 0, 0));
+        CheckNear(1, other.Facing.X, Tolerance, "other faces east");
+        CheckNear(1, own.Facing.Z, Tolerance, "own keeps facing south");
+
+        own.SetFacing(new Vector3(0, 0, -1));
+        own.SetFacing(new Vector3(0.0001f, 0, 0));
+        CheckNear(-1, own.Facing.Z, Tolerance, "own faces north after input");
+        own.Free();
+        other.Free();
+    }
+
+    /// <summary>Выпад сдвигает тело вперёд и возвращает, вспышка красит тело и гаснет.</summary>
+    public void TestLungeAndFlash()
+    {
+        EntityView view = new();
+        view.Init(1, own: false, Vector3.Zero, Colors.Green);
+
+        view.PlayAttack();
+        view.PlayHit();
+        view.Advance(EntityView.LungeSeconds / 2);
+        float middle = view.LungeOffset;
+        bool flashing = view.IsFlashing && view.BodyColor != Colors.Green;
+        view.Advance(1);
+
+        Check(middle > 0.2f, $"body moved forward by {middle}");
+        Check(flashing, "flashes red");
+        CheckNear(0, view.LungeOffset, Tolerance, "body is back");
+        Check(!view.IsFlashing && view.BodyColor == Colors.Green, "flash is over");
         view.Free();
     }
 }
