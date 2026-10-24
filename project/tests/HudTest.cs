@@ -30,7 +30,7 @@ public class HudTest : TestCase
 
         StatBar hunger = _model.Bars().Single(bar => bar.Name == "hunger");
 
-        CheckEqual(3, _model.Bars().Count, "bar count");
+        CheckEqual(4, _model.Bars().Count, "bar count");
         CheckNear(0.25, hunger.Fraction, Tolerance, "hunger fraction");
     }
 
@@ -62,7 +62,7 @@ public class HudTest : TestCase
         hud.Refresh();
 
         CheckEqual("thirsty III", hud.MoodleLines.Single(), "moodle line");
-        CheckNear(0.95, hud.BarValues.Max(), Tolerance, "thirst bar");
+        CheckNear(0.95, hud.BarValues[_game.Sim.StatTable.StatIndex("core:thirst")], Tolerance, "thirst bar");
         hud.Free();
     }
 

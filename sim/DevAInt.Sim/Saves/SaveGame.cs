@@ -16,7 +16,7 @@ namespace DevAInt.Sim.Saves;
 public sealed partial class SaveGame(string directory)
 {
     /// <summary>Версия формата файлов сохранения.</summary>
-    public const byte FormatVersion = 1;
+    public const byte FormatVersion = 2;
 
     /// <summary>Имя файла меты.</summary>
     private const string MetaName = "meta.json";
@@ -94,7 +94,7 @@ public sealed partial class SaveGame(string directory)
 
         _ids = new SaveIds(meta.Ids);
         Simulation sim = new(mods, log, meta.MapId, new Stats.GameClock(timeScale, meta.Tick), CreateWorld(meta));
-        SaveTables tables = new(sim.StatTable, sim.ItemTable, sim.WorldTable);
+        SaveTables tables = new(sim.StatTable, sim.ItemTable, sim.WorldTable, sim.CreatureTable);
         RegionReader regions = new(sim.World, _ids, tables, log);
         foreach (string file in RegionFiles())
         {
@@ -140,7 +140,7 @@ public sealed partial class SaveGame(string directory)
         }
 
         HashSet<string> missing = [];
-        Entity entity = ReadPlayer(path, new SaveTables(sim.StatTable, sim.ItemTable, sim.WorldTable), missing, log);
+        Entity entity = ReadPlayer(path, new SaveTables(sim.StatTable, sim.ItemTable, sim.WorldTable, sim.CreatureTable), missing, log);
         if (missing.Count > 0)
         {
             throw new SaveException($"player {playerId} needs ids missing from loaded mods: {string.Join(", ", missing.Order())}");
@@ -242,6 +242,11 @@ public sealed partial class SaveGame(string directory)
         for (int i = 0; i < sim.ItemTable.ActionCount; i++)
         {
             _ids.Actions.NumberOf(sim.ItemTable.Action(i).Id);
+        }
+
+        for (int i = 0; i < sim.CreatureTable.Count; i++)
+        {
+            _ids.Creatures.NumberOf(sim.CreatureTable.Creature(i).Id);
         }
     }
 

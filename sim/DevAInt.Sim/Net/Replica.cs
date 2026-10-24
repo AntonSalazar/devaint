@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using DevAInt.Sim.Grid;
-using DevAInt.Sim.Items;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Stats;
 
@@ -23,6 +22,9 @@ public sealed class ReplicaEntity(long id, float x, float y, int z, int[] moodle
     /// <summary>Этаж.</summary>
     public int Z { get; internal set; } = z;
 
+    /// <summary>Номер вида из CreatureTable, -1 - сущность без вида.</summary>
+    public int Creature { get; init; } = -1;
+
     /// <summary>Уровни мудлов по номерам из StatTable.</summary>
     public int[] MoodleLevels { get; } = moodleLevels;
 
@@ -37,8 +39,8 @@ public sealed record ReplicaAction(int Action, long StartTick, int DurationTicks
     public float Progress(long tick) => Math.Clamp((float)(tick - StartTick) / DurationTicks, 0f, 1f);
 }
 
-/// <summary>Копия мира на клиенте: применяет пакеты сервера и сообщает об изменениях событиями; mods - свои моды для сверки.</summary>
-public sealed class Replica(StatTable stats, ItemTable items, IReadOnlyList<ModInfo> mods)
+/// <summary>Копия мира на клиенте: применяет пакеты сервера и сообщает об изменениях событиями; в tables и свои моды для сверки.</summary>
+public sealed class Replica(ClientTables tables)
 {
     /// <summary>Свои предметы.</summary>
     private readonly List<ItemData> _inventory = [];
@@ -104,7 +106,7 @@ public sealed class Replica(StatTable stats, ItemTable items, IReadOnlyList<ModI
     public double SecondsPerTick { get; private set; }
 
     /// <summary>Значения статов своей сущности по номерам из StatTable.</summary>
-    public float[] OwnStats { get; } = new float[stats.StatCount];
+    public float[] OwnStats { get; } = new float[tables.Stats.StatCount];
 
     /// <summary>Свои предметы: id и номер определения из ItemTable.</summary>
     public IReadOnlyList<ItemData> Inventory => _inventory;
@@ -168,7 +170,7 @@ public sealed class Replica(StatTable stats, ItemTable items, IReadOnlyList<ModI
         {
             case WelcomeMessage welcome:
                 // Номера статов, полов и предметов в сообщениях имеют смысл только при тех же модах
-                if (ModInfo.Difference(mods, welcome.Mods) is string difference)
+                if (ModInfo.Difference(tables.Mods, welcome.Mods) is string difference)
                 {
                     throw new ProtocolException(difference);
                 }
@@ -220,7 +222,7 @@ public sealed class Replica(StatTable stats, ItemTable items, IReadOnlyList<ModI
             case OwnInventoryMessage inventory:
                 foreach (ItemData item in inventory.Items)
                 {
-                    RequireIndex(item.Item, items.ItemCount, "item");
+                    RequireIndex(item.Item, tables.Items.ItemCount, "item");
                 }
 
                 _inventory.Clear();
@@ -228,10 +230,13 @@ public sealed class Replica(StatTable stats, ItemTable items, IReadOnlyList<ModI
                 InventoryChanged?.Invoke();
                 break;
             case ActionStartedMessage started:
-                RequireIndex(started.Action, items.ActionCount, "action");
+                RequireIndex(started.Action, tables.Items.ActionCount, "action");
                 ReplicaEntity actor = Existing(started.Entity);
                 actor.Action = new ReplicaAction(started.Action, started.StartTick, Math.Max(1, started.DurationTicks));
                 ActionStarted?.Invoke(actor);
+                break;
+            case OwnEntityMessage own:
+                OwnEntityId = own.EntityId;
                 break;
             case ActionEndedMessage ended:
                 ReplicaEntity finished = Existing(ended.Entity);
@@ -297,12 +302,17 @@ public sealed class Replica(StatTable stats, ItemTable items, IReadOnlyList<ModI
     /// <summary>Новая сущность.</summary>
     private void SpawnEntity(EntitySpawnMessage spawn)
     {
-        if (spawn.MoodleLevels.Count != stats.MoodleCount)
+        if (spawn.MoodleLevels.Count != tables.Stats.MoodleCount)
         {
-            throw new ProtocolException($"got {spawn.MoodleLevels.Count} moodles, expected {stats.MoodleCount}");
+            throw new ProtocolException($"got {spawn.MoodleLevels.Count} moodles, expected {tables.Stats.MoodleCount}");
         }
 
-        ReplicaEntity entity = new(spawn.Id, spawn.X, spawn.Y, spawn.Z, [.. spawn.MoodleLevels]);
+        if (spawn.Creature >= tables.Creatures.Count)
+        {
+            throw new ProtocolException($"creature {spawn.Creature} is out of range");
+        }
+
+        ReplicaEntity entity = new(spawn.Id, spawn.X, spawn.Y, spawn.Z, [.. spawn.MoodleLevels]) { Creature = spawn.Creature };
         if (!_entities.TryAdd(spawn.Id, entity))
         {
             throw new ProtocolException($"entity {spawn.Id} already exists");

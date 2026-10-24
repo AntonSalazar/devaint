@@ -1,9 +1,5 @@
-using System.Collections.Generic;
 using DevAInt.Sim.Grid;
-using DevAInt.Sim.Items;
-using DevAInt.Sim.Mods;
 using DevAInt.Sim.Motion;
-using DevAInt.Sim.Stats;
 
 namespace DevAInt.Sim.Net;
 
@@ -16,14 +12,21 @@ public sealed class GameClient
     /// <summary>Предсказание своего движения.</summary>
     private readonly MovePrediction _prediction = new();
 
+    /// <summary>Таблицы номеров, для тела своего существа.</summary>
+    private readonly ClientTables _tables;
+
+    /// <summary>Сущность, движение которой предсказывается.</summary>
+    private long _predictedEntity;
+
     /// <summary>Номер последнего отправленного ввода.</summary>
     private uint _inputSequence;
 
-    /// <summary>Клиент игрока playerId на подключении; mods - свои моды для сверки, приветствие уходит сразу.</summary>
-    public GameClient(IConnection connection, StatTable stats, ItemTable items, IReadOnlyList<ModInfo> mods, string playerId)
+    /// <summary>Клиент игрока playerId на подключении; приветствие уходит сразу.</summary>
+    public GameClient(IConnection connection, ClientTables tables, string playerId)
     {
         _connection = connection;
-        Replica = new Replica(stats, items, mods);
+        _tables = tables;
+        Replica = new Replica(tables);
         connection.Send(Protocol.Write(new HelloMessage(playerId)));
     }
 
@@ -46,10 +49,17 @@ public sealed class GameClient
             received = true;
         }
 
+        // После смерти своя сущность новая: вводы прежней к ней не относятся
+        if (Replica.OwnEntityId != _predictedEntity)
+        {
+            _prediction.Reset();
+            _predictedEntity = Replica.OwnEntityId;
+        }
+
         if (received && Replica.Entity(Replica.OwnEntityId) is ReplicaEntity own)
         {
             WorldPos server = new(own.X, own.Y, own.Z);
-            _prediction.Reconcile(Replica.LastInput, server, Replica.World!, Replica.SecondsPerTick);
+            _prediction.Reconcile(Replica.LastInput, server, Replica.World!, Replica.SecondsPerTick, OwnBody());
         }
     }
 
@@ -63,7 +73,7 @@ public sealed class GameClient
         MoveInput sent = new((float)input.X, (float)input.Y);
         if (Replica.World is World world)
         {
-            _prediction.Add(_inputSequence, sent, world, Replica.SecondsPerTick);
+            _prediction.Add(_inputSequence, sent, world, Replica.SecondsPerTick, OwnBody());
         }
     }
 
@@ -72,4 +82,11 @@ public sealed class GameClient
 
     /// <summary>Просьба прервать своё действие.</summary>
     public void SendCancelAction() => _connection.Send(Protocol.Write(new CancelActionMessage()));
+
+    /// <summary>Тело своего существа: радиус и скорость из вида, как на сервере.</summary>
+    private MoveParams OwnBody()
+    {
+        int creature = Replica.Entity(Replica.OwnEntityId)?.Creature ?? -1;
+        return creature >= 0 ? _tables.Creatures.Creature(creature).Body : MoveParams.Default;
+    }
 }

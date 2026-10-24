@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -34,6 +35,7 @@ internal static class Program
         try
         {
             CopyDirectory(Path.Combine(repoMods, "core"), Path.Combine(temp, "core"));
+            CopyDirectory(Path.Combine(repoMods, "zombies"), Path.Combine(temp, "zombies"));
             Directory.CreateDirectory(Path.Combine(temp, "bench", "scripts"));
             File.WriteAllText(Path.Combine(temp, "bench", "mod.jsonc"), """{ "id": "bench", "name": "Bench", "version": "0.1", "api": 1, "depends": ["core"] }""");
 
@@ -51,6 +53,7 @@ internal static class Program
             MeasureSave(temp, "core:starter_room", entities: 0);
             WriteHugeMap(temp);
             MeasureSave(temp, "bench:huge", Entities);
+            MeasureZombies(temp);
             return 0;
         }
         finally
@@ -216,6 +219,40 @@ internal static class Program
         double raw = regions.Sum(file => SaveFile.ReadBinary(file, "DVRG").Length) / 1024.0;
         Console.WriteLine($"  save {mapId}, {entities} entities: {regions.Length} regions, {size:F0} KB on disk, {raw:F0} KB before zlib");
         Console.WriteLine($"    full save {full:F0} ms, save after one change {one:F0} ms, load {load:F0} ms");
+    }
+
+    /// <summary>1000 зомби гонятся за 32 игроками, которые бегают по кругу среди комнат большой карты.</summary>
+    private static void MeasureZombies(string mods)
+    {
+        ModLoadResult loaded = ModLoader.Load(mods, ["core", "zombies", "bench"]);
+        Simulation sim = new(loaded.Ok ? loaded : throw new InvalidOperationException(string.Join("\n", loaded.Errors)), new ConsoleLog(), "bench:huge");
+        Random random = new(1);
+        List<Entity> players = [];
+        for (int i = 0; i < 32; i++)
+        {
+            players.Add(sim.Entity(sim.CreateEntity(new WorldPos(2040.5 + random.Next(16), 2040.5 + random.Next(16), 0), "core:human")));
+        }
+
+        // Зомби вокруг игроков в квадрате 60 на 60 метров: почти все видят кого-то или идут на последнее место
+        for (int i = 0; i < Entities; i++)
+        {
+            sim.CreateEntity(new WorldPos(2018.5 + random.Next(60), 2018.5 + random.Next(60), 0), "zombies:zombie");
+        }
+
+        int health = sim.StatTable.StatIndex("core:health");
+        double time = 0;
+        Measure($"{Entities} zombies chase 32 players", () =>
+        {
+            // Игроки бессмертны и бегают по кругу, чтобы зомби всё время искали путь заново
+            time += 0.05;
+            for (int i = 0; i < players.Count; i++)
+            {
+                players[i].Stats.SetValue(health, 100);
+                players[i].Input = new MoveInput(Math.Cos(time + i), Math.Sin(time + i));
+            }
+
+            sim.Tick();
+        });
     }
 
     /// <summary>Время действия в миллисекундах.</summary>

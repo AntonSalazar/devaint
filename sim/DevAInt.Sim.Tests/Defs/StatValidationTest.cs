@@ -16,6 +16,9 @@ public class StatValidationTest
     [InlineData("""{ "id": "alpha:s", "min": 0, "max": 100, "moodles": [ { "id": "Bad", "levels": [{ "at": 1 }] } ] }""", "moodle Bad: moodle id must look like mod:name")]
     [InlineData("""{ "id": "alpha:s", "min": 0, "max": 100, "moodles": [ { "id": "alpha:m", "levels": [{ "at": 1, "effects": [ { "stat": "alpha:nope", "kind": "add", "value": 1 } ] }] } ] }""", "moodle alpha:m: level 1 effect targets unknown stat alpha:nope")]
     [InlineData("""{ "id": "alpha:s", "min": 0, "max": 100, "moodles": [ { "id": "alpha:m", "levels": [{ "at": 1, "effects": [ { "stat": "alpha:s", "kind": "multiply", "value": -1 } ] }] } ] }""", "moodle alpha:m: level 1 effect multiplier -1 must not be negative")]
+    [InlineData("""{ "id": "alpha:s", "min": 0, "max": 100, "start": 120 }""", "start 120 is outside 0..100")]
+    [InlineData("""{ "id": "alpha:s", "min": 0, "max": 100, "start": 100, "deathAt": 100 }""", "deathAt 100 must be within 0..100 and differ from start 100")]
+    [InlineData("""{ "id": "alpha:s", "min": 0, "max": 100, "deathAt": -1 }""", "deathAt -1 must be within 0..100 and differ from start 0")]
     public void BadStatIsError(string stat, string message)
     {
         using TempMods mods = new();

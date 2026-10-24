@@ -69,6 +69,8 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
             Leave(client);
         }
 
+        Respawn();
+
         if (_save is not null && _sim.Clock.Tick % AutosaveTicks == 0)
         {
             Save();
@@ -235,6 +237,38 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
         _log.Info($"player {playerId} joined");
     }
 
+    /// <summary>Игроки, чьи персонажи умерли на этом тике, получают новых в точке появления.</summary>
+    private void Respawn()
+    {
+        foreach (Entity dead in _sim.Died)
+        {
+            if (_clients.Find(client => client.EntityId == dead.Id) is not ClientSession client)
+            {
+                continue;
+            }
+
+            // Новый персонаж сразу пишется в файл игрока, иначе после сбоя вернулся бы умерший
+            client.EntityId = _sim.SpawnPlayer(client.PlayerId!);
+            client.OwnChanged = true;
+            client.Inputs.Clear();
+            SavePlayer(client);
+            _log.Info($"player {client.PlayerId} died");
+        }
+    }
+
+    /// <summary>Запись персонажа игрока; ошибка диска - в лог.</summary>
+    private void SavePlayer(ClientSession client)
+    {
+        try
+        {
+            _save?.SavePlayer(_sim, _sim.Entity(client.EntityId));
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            _log.Error($"saving player {client.PlayerId} failed: {error.Message}");
+        }
+    }
+
     /// <summary>Клиент ушёл: его персонаж записывается и уходит из мира.</summary>
     private void Leave(ClientSession client)
     {
@@ -244,15 +278,7 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
             return;
         }
 
-        try
-        {
-            _save?.SavePlayer(_sim, _sim.Entity(client.EntityId));
-        }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
-        {
-            _log.Error($"saving player {client.PlayerId} failed: {error.Message}");
-        }
-
+        SavePlayer(client);
         _sim.RemoveEntity(client.EntityId);
         _log.Info($"player {client.PlayerId} left");
     }
@@ -267,6 +293,13 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
         {
             messages.Add(new WelcomeMessage(client.EntityId, world.Width, world.Height, _sim.Clock.TimeScale, _sim.Mods));
             client.Welcomed = true;
+        }
+
+        // Смена своей сущности идёт до сущностей: новая придёт уже своей
+        if (client.OwnChanged)
+        {
+            messages.Add(new OwnEntityMessage(client.EntityId));
+            client.OwnChanged = false;
         }
 
         HashSet<(int X, int Y)> wanted = WantedChunks(world, ChunkOf(own.Position.Cell));
@@ -334,7 +367,8 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
             if (!client.Known.TryGetValue(entity.Id, out KnownEntity? known))
             {
                 int[] moodles = [.. Enumerable.Range(0, _sim.StatTable.MoodleCount).Select(entity.Stats.MoodleLevel)];
-                messages.Add(new EntitySpawnMessage(entity.Id, x, y, z, moodles));
+                int creature = entity.Creature is null ? -1 : _sim.CreatureTable.Index(entity.Creature.Id);
+                messages.Add(new EntitySpawnMessage(entity.Id, x, y, z, creature, moodles));
                 known = new KnownEntity { X = x, Y = y, Z = z, Moodles = moodles, Chunk = chunk };
                 client.Known[entity.Id] = known;
                 AddActionMessages(entity, known, messages);
@@ -438,6 +472,9 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
 
         /// <summary>Id игрока, null до опознания.</summary>
         public string? PlayerId { get; set; }
+
+        /// <summary>Своя сущность сменилась после смерти, клиенту нужно сообщить.</summary>
+        public bool OwnChanged { get; set; }
 
         /// <summary>Клиент опознан и его персонаж в мире.</summary>
         public bool Joined => PlayerId is not null;

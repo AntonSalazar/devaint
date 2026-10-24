@@ -51,4 +51,7 @@ internal sealed record SaveIdLists
 
     /// <summary>Действия.</summary>
     public List<string> Actions { get; init; } = [];
+
+    /// <summary>Виды существ, номер в файле на единицу больше места: 0 - без вида.</summary>
+    public List<string> Creatures { get; init; } = [];
 }

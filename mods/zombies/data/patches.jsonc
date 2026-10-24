@@ -1,0 +1,10 @@
+// Стартовая комната core: три зомби во дворе и распахнутая дверь.
+{
+  "$schema": "../../../schemas/data.schema.json",
+  "patches": [
+    { "op": "add", "target": "core:starter_room", "path": "creatures", "value": { "creature": "zombies:zombie", "x": 6, "y": 11 } },
+    { "op": "add", "target": "core:starter_room", "path": "creatures", "value": { "creature": "zombies:zombie", "x": 2, "y": 11 } },
+    { "op": "add", "target": "core:starter_room", "path": "creatures", "value": { "creature": "zombies:zombie", "x": 11, "y": 11 } },
+    { "op": "set", "target": "core:starter_room", "path": "build.2.open", "value": true },
+  ],
+}

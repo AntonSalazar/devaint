@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using DevAInt.Sim.Defs;
 
 namespace DevAInt.Sim.Stats;
@@ -31,20 +32,25 @@ public sealed class StatSet
     /// <summary>Текущие уровни мудлов по номерам.</summary>
     private readonly int[] _moodleLevels;
 
+    /// <summary>Есть ли стат у существа.</summary>
+    private readonly bool[] _active;
+
     /// <summary>Смены уровней мудлов за последний тик.</summary>
     private readonly List<MoodleChange> _changes = [];
 
-    /// <summary>Статы на минимуме, мудлы по начальным значениям.</summary>
-    public StatSet(StatTable table)
+    /// <summary>Статы на начальных значениях, мудлы по ним; creature - вид со своим набором статов, null - все статы.</summary>
+    public StatSet(StatTable table, CreatureDef? creature = null)
     {
         _table = table;
         _values = new double[table.StatCount];
         _rates = new double[table.StatCount];
         _modifiers = new List<Modifier>[table.StatCount];
         _moodleLevels = new int[table.MoodleCount];
+        _active = new bool[table.StatCount];
         for (int i = 0; i < table.StatCount; i++)
         {
-            _values[i] = table.Stat(i).Min;
+            _active[i] = creature is null || creature.Stats.Contains(table.Stat(i).Id);
+            _values[i] = table.Stat(i).StartValue;
             _modifiers[i] = [];
             RecalculateRate(i);
         }
@@ -56,6 +62,9 @@ public sealed class StatSet
 
     /// <summary>Смены уровней мудлов за последний тик.</summary>
     public IReadOnlyList<MoodleChange> Changes => _changes;
+
+    /// <summary>Есть ли стат у существа: остальные не меняются, не дают мудлов и не принимают урон.</summary>
+    public bool IsActive(int stat) => _active[stat];
 
     /// <summary>Значение стата.</summary>
     public double Value(int stat) => _values[stat];
@@ -106,6 +115,22 @@ public sealed class StatSet
         UpdateMoodles();
     }
 
+    /// <summary>Дошёл ли какой-то смертельный стат существа до порога смерти.</summary>
+    internal bool ReachedDeath()
+    {
+        for (int i = 0; i < _values.Length; i++)
+        {
+            // Порог считается достигнутым при движении от начального значения к нему
+            StatDef def = _table.Stat(i);
+            if (_active[i] && def.DeathAt is double death && (def.StartValue > death ? _values[i] <= death + ThresholdEpsilon : _values[i] >= death - ThresholdEpsilon))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>Значения статов из сохранения; мудлы и их модификаторы пересчитываются без смен для хуков.</summary>
     internal void Restore(IEnumerable<(int Stat, double Value)> values)
     {
@@ -137,7 +162,7 @@ public sealed class StatSet
         for (int i = 0; i < _moodleLevels.Length; i++)
         {
             MoodleInfo moodle = _table.Moodle(i);
-            int level = LevelFor(moodle.Def, _values[moodle.Stat]);
+            int level = _active[moodle.Stat] ? LevelFor(moodle.Def, _values[moodle.Stat]) : 0;
             int old = _moodleLevels[i];
             if (level == old)
             {
@@ -161,6 +186,13 @@ public sealed class StatSet
     /// <summary>Итоговая скорость: базовая плюс прибавки, умноженные на все множители.</summary>
     private void RecalculateRate(int stat)
     {
+        // У существа без этого стата он стоит на месте
+        if (!_active[stat])
+        {
+            _rates[stat] = 0;
+            return;
+        }
+
         double add = 0;
         double multiply = 1;
         foreach (Modifier modifier in _modifiers[stat])

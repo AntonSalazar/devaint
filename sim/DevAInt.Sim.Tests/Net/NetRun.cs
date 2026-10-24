@@ -51,7 +51,7 @@ public sealed class NetRun
     public GameClient Connect() => Connect(_transport.Connect(), $"player{++_players}");
 
     /// <summary>Клиент игрока playerId на готовом подключении.</summary>
-    public GameClient Connect(IConnection connection, string playerId) => new(connection, Sim.StatTable, Sim.ItemTable, Sim.Mods, playerId);
+    public GameClient Connect(IConnection connection, string playerId) => new(connection, ClientTables.From(Sim), playerId);
 
     /// <summary>Голое подключение без клиента, чтобы слать серверу что угодно.</summary>
     public IConnection ConnectRaw() => _transport.Connect();

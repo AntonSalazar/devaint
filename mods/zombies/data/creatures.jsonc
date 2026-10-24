@@ -1,0 +1,15 @@
+// Зомби медленнее человека, видит на 12 метров, кусает раз в полторы секунды.
+{
+  "$schema": "../../../schemas/data.schema.json",
+  "creatures": [
+    {
+      "id": "zombies:zombie",
+      "color": "#6f9a4c",
+      "radius": 0.3,
+      "speed": 0.9,
+      "stats": ["core:health"],
+      "attack": { "range": 0.9, "seconds": 1.5, "stat": "core:health", "add": -10 },
+      "brain": { "sight": 12, "targets": ["core:human"] },
+    },
+  ],
+}

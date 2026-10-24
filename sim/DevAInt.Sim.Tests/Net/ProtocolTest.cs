@@ -42,7 +42,8 @@ public class ProtocolTest
         ServerFrame frame = new(1,
         [
             new ChunkSnapshotMessage(1, 2, [level]),
-            new EntitySpawnMessage(9, 1.5f, 2.5f, 0, [0, 3, 1]),
+            new EntitySpawnMessage(9, 1.5f, 2.5f, 0, 2, [0, 3, 1]),
+            new EntitySpawnMessage(10, 0.5f, 0.5f, 1, -1, []),
             new OwnStatsMessage([0f, 41.5f, 100f]),
         ]);
 
@@ -55,10 +56,11 @@ public class ProtocolTest
         Assert.Equal(3, readLevel.Flags[1023]);
 
         EntitySpawnMessage spawn = Assert.IsType<EntitySpawnMessage>(read.Messages[1]);
-        Assert.Equal((9L, 1.5f, 2.5f, 0), (spawn.Id, spawn.X, spawn.Y, spawn.Z));
+        Assert.Equal((9L, 1.5f, 2.5f, 0, 2), (spawn.Id, spawn.X, spawn.Y, spawn.Z, spawn.Creature));
         Assert.Equal([0, 3, 1], spawn.MoodleLevels);
+        Assert.Equal(-1, Assert.IsType<EntitySpawnMessage>(read.Messages[2]).Creature);
 
-        Assert.Equal([0f, 41.5f, 100f], Assert.IsType<OwnStatsMessage>(read.Messages[2]).Values);
+        Assert.Equal([0f, 41.5f, 100f], Assert.IsType<OwnStatsMessage>(read.Messages[3]).Values);
     }
 
     /// <summary>Каждое сообщение клиента туда и обратно.</summary>

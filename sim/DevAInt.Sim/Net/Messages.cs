@@ -32,8 +32,11 @@ public sealed record ChunkSnapshotMessage(int ChunkX, int ChunkY, IReadOnlyList<
 /// <summary>Чанк вышел из зоны клиента, клиент забывает его вместе с сущностями в нём.</summary>
 public sealed record ChunkUnloadMessage(int ChunkX, int ChunkY) : ServerMessage;
 
-/// <summary>Сущность появилась у клиента: позиция и уровни всех мудлов.</summary>
-public sealed record EntitySpawnMessage(long Id, float X, float Y, int Z, IReadOnlyList<int> MoodleLevels) : ServerMessage;
+/// <summary>Сущность появилась у клиента: позиция, номер вида из CreatureTable или -1 и уровни всех мудлов.</summary>
+public sealed record EntitySpawnMessage(long Id, float X, float Y, int Z, int Creature, IReadOnlyList<int> MoodleLevels) : ServerMessage;
+
+/// <summary>Своя сущность сменилась: прежняя умерла, у игрока новый персонаж.</summary>
+public sealed record OwnEntityMessage(long EntityId) : ServerMessage;
 
 /// <summary>Сущность сдвинулась.</summary>
 public sealed record EntityMoveMessage(long Id, float X, float Y, int Z) : ServerMessage;

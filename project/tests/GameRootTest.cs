@@ -38,7 +38,7 @@ public class GameRootTest : TestCase
         LoopbackTransport transport = new();
         GameServer server = new(game.Sim, transport, new GodotLog());
         ModInfo stale = game.Sim.Mods[0] with { Hash = "stale" };
-        GameClient client = new(transport.Connect(), game.Sim.StatTable, game.Sim.ItemTable, [stale], "anna");
+        GameClient client = new(transport.Connect(), ClientTables.From(game.Sim) with { Mods = [stale] }, "anna");
         ListLog log = new();
         server.Tick();
 

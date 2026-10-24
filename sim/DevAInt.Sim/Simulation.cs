@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using DevAInt.Sim.Creatures;
 using DevAInt.Sim.Defs;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Items;
@@ -24,6 +25,15 @@ public sealed class Simulation
     /// <summary>Сущности в порядке создания, чтобы тик шёл всегда в одном порядке.</summary>
     private readonly List<Entity> _order = [];
 
+    /// <summary>Сущности по видам существ на текущем тике, для поиска целей.</summary>
+    private readonly Dictionary<string, List<Entity>> _byCreature = [];
+
+    /// <summary>Общий список целей нескольких видов, чтобы не выделять память каждый тик.</summary>
+    private readonly List<Entity> _candidates = [];
+
+    /// <summary>Умершие на последнем тике.</summary>
+    private readonly List<Entity> _died = [];
+
     /// <summary>Lua-моды.</summary>
     private readonly LuaHost _lua;
 
@@ -42,6 +52,7 @@ public sealed class Simulation
         StatTable = new StatTable(mods.Defs);
         WorldTable = new WorldTable(mods.Defs);
         ItemTable = new ItemTable(mods.Defs);
+        CreatureTable = new CreatureTable(mods.Defs);
         Mods = [.. mods.Mods.Select(mod => mod.Info)];
         _hasMap = mapId is not null;
         MapId = mapId;
@@ -49,12 +60,19 @@ public sealed class Simulation
         World = world ?? (map is null ? new World(1, 1) : MapBuilder.Build(map, WorldTable));
         Spawn = map is null ? WorldPos.CenterOf(new CellPos(0, 0, 0)) : WorldPos.CenterOf(new CellPos(map.Spawn.X, map.Spawn.Y, map.Spawn.Z));
         SpawnItems = map is null ? [] : [.. map.Spawn.Items.Select(mods.Defs.Get<ItemDef>)];
+        SpawnCreature = map?.Spawn.Creature;
 
         // Постройка карты - не изменения для клиентов: они получат мир снимками чанков
         World.ClearChanges();
         Clock = clock ?? new GameClock();
         _lua = new LuaHost(StatTable, FindStats, log);
         ScriptErrors = _lua.Load(mods.Mods);
+
+        // Существа карты появляются только в новом мире: в сохранённом они уже есть
+        if (world is null && map is not null)
+        {
+            SpawnMapCreatures(map, log);
+        }
     }
 
     /// <summary>Карта, из которой sim начат, null без карты.</summary>
@@ -71,6 +89,15 @@ public sealed class Simulation
 
     /// <summary>Статы и мудлы по номерам.</summary>
     public StatTable StatTable { get; }
+
+    /// <summary>Виды существ по номерам.</summary>
+    public CreatureTable CreatureTable { get; }
+
+    /// <summary>Вид существа игроков с карты, null - сущность без вида.</summary>
+    public string? SpawnCreature { get; }
+
+    /// <summary>Сущности, умершие на последнем тике, уже убраны из мира.</summary>
+    public IReadOnlyList<Entity> Died => _died;
 
     /// <summary>Полы и стены по номерам.</summary>
     public WorldTable WorldTable { get; }
@@ -93,11 +120,14 @@ public sealed class Simulation
     /// <summary>Id следующей сущности.</summary>
     internal long NextEntityId { get; set; } = 1;
 
+    /// <summary>Поиск пути с переиспользуемыми коллекциями, общий для всех существ.</summary>
+    internal Pathfinder Paths { get; } = new();
+
     /// <summary>Id следующего предмета.</summary>
     internal long NextItemId { get; set; } = 1;
 
-    /// <summary>Новая сущность со статами на минимуме; на карте позиция должна быть на полу.</summary>
-    public long CreateEntity(WorldPos? at = null)
+    /// <summary>Новая сущность вида creatureId или без вида со статами на начальных значениях; на карте позиция должна быть на полу.</summary>
+    public long CreateEntity(WorldPos? at = null, string? creatureId = null)
     {
         WorldPos position = at ?? WorldPos.CenterOf(new CellPos(0, 0, 0));
         if (_hasMap && !World.IsWalkable(position.Cell))
@@ -105,7 +135,11 @@ public sealed class Simulation
             throw new ArgumentException($"position {position} is not on a floor", nameof(at));
         }
 
-        Entity entity = new(NextEntityId++, new StatSet(StatTable), position);
+        CreatureDef? creature = creatureId is null ? null : CreatureTable.Creature(CreatureTable.Index(creatureId));
+        Entity entity = new(NextEntityId++, new StatSet(StatTable, creature), position, creature)
+        {
+            Brain = creature?.Brain is null ? null : new BrainState(),
+        };
         _entities[entity.Id] = entity;
         _order.Add(entity);
         return entity.Id;
@@ -114,7 +148,7 @@ public sealed class Simulation
     /// <summary>Новый персонаж игрока playerId в точке появления со стартовыми предметами карты, id сущности.</summary>
     public long SpawnPlayer(string playerId)
     {
-        long id = CreateEntity(Spawn);
+        long id = CreateEntity(Spawn, SpawnCreature);
         _entities[id].PlayerId = playerId;
         foreach (ItemDef item in SpawnItems)
         {
@@ -158,6 +192,9 @@ public sealed class Simulation
         return ActionStart.Started;
     }
 
+    /// <summary>Просьба атаковать на следующем тике ближайшую сущность впереди.</summary>
+    public void Attack(long entityId) => _entities[entityId].AttackRequested = true;
+
     /// <summary>Отмена идущего действия, false если действия нет.</summary>
     public bool CancelAction(long entityId)
     {
@@ -187,19 +224,25 @@ public sealed class Simulation
         return true;
     }
 
-    /// <summary>Тик: время, движение, действия, статы всех сущностей, хуки stat_threshold по сменам мудлов, хуки tick.</summary>
+    /// <summary>Тик: время, поведение, движение, действия, статы, атаки, смерти, хуки stat_threshold по сменам мудлов, хуки tick.</summary>
     public void Tick()
     {
         Clock.Advance();
+        _died.Clear();
+        ThinkAll();
         foreach (Entity entity in _order)
         {
             // Движение идёт в секундах симуляции, статы - в игровых минутах; ускорение действует на оба
-            entity.Position = Movement.Step(World, entity.Position, entity.Input, Clock.SecondsPerTick, MoveParams.Default);
+            entity.Position = Movement.Step(World, entity.Position, entity.Input, Clock.SecondsPerTick, entity.Body);
+            UpdateFacing(entity);
 
             // Действие до статов: мудлы от съеденного видны в этом же тике
             TickAction(entity);
             entity.Stats.Tick(Clock.MinutesPerTick);
         }
+
+        AttackAll();
+        RemoveDead();
 
         // Хуки идут после всех сущностей: мод видит согласованное состояние тика
         foreach (Entity entity in _order)
@@ -222,6 +265,104 @@ public sealed class Simulation
         foreach (Item item in entity.Inventory.Items)
         {
             NextItemId = Math.Max(NextItemId, item.Id + 1);
+        }
+    }
+
+    /// <summary>Взгляд по направлению движения, если сущность движется.</summary>
+    private static void UpdateFacing(Entity entity)
+    {
+        MoveInput input = entity.Input.Clamped();
+        double length = Math.Sqrt((input.X * input.X) + (input.Y * input.Y));
+        if (length > MoveThreshold)
+        {
+            entity.Facing = (input.X / length, input.Y / length);
+        }
+    }
+
+    /// <summary>Существа карты в центрах своих клеток; клетка без пола - ошибка в лог, существа пропускаются.</summary>
+    private void SpawnMapCreatures(MapDef map, ISimLog log)
+    {
+        foreach (CreatureSpawnDef spawn in map.Creatures)
+        {
+            WorldPos position = WorldPos.CenterOf(new CellPos(spawn.X, spawn.Y, spawn.Z));
+            if (!World.IsWalkable(position.Cell))
+            {
+                log.Error($"map {map.Id}: creature {spawn.Creature} at {spawn.X},{spawn.Y},{spawn.Z} is not on a floor");
+                continue;
+            }
+
+            for (int i = 0; i < spawn.Count; i++)
+            {
+                CreateEntity(position, spawn.Creature);
+            }
+        }
+    }
+
+    /// <summary>Решения поведения всех существ с поведением.</summary>
+    private void ThinkAll()
+    {
+        // Цели собираются по видам один раз за тик, а не перебором всех сущностей каждым существом
+        foreach (List<Entity> list in _byCreature.Values)
+        {
+            list.Clear();
+        }
+
+        foreach (Entity entity in _order.Where(entity => entity.Creature is not null))
+        {
+            if (!_byCreature.TryGetValue(entity.Creature!.Id, out List<Entity>? list))
+            {
+                _byCreature[entity.Creature.Id] = list = [];
+            }
+
+            list.Add(entity);
+        }
+
+        foreach (Entity entity in _order)
+        {
+            if (entity.Creature?.Brain is BrainDef brain)
+            {
+                Brain.Think(this, entity, brain, Candidates(brain));
+            }
+        }
+    }
+
+    /// <summary>Сущности видов-целей поведения.</summary>
+    private IReadOnlyList<Entity> Candidates(BrainDef brain)
+    {
+        if (brain.Targets.Count == 1)
+        {
+            return _byCreature.GetValueOrDefault(brain.Targets[0]) ?? [];
+        }
+
+        _candidates.Clear();
+        foreach (string target in brain.Targets)
+        {
+            _candidates.AddRange(_byCreature.GetValueOrDefault(target) ?? []);
+        }
+
+        return _candidates;
+    }
+
+    /// <summary>Атаки, которые попросили игроки: ближайшая сущность впереди.</summary>
+    private void AttackAll()
+    {
+        foreach (Entity entity in _order.Where(entity => entity.AttackRequested))
+        {
+            entity.AttackRequested = false;
+            if (Combat.FrontTarget(this, entity) is Entity target)
+            {
+                Combat.TryAttack(this, entity, target);
+            }
+        }
+    }
+
+    /// <summary>Смерть существ, у которых смертельный стат дошёл до порога: они уходят из мира в Died.</summary>
+    private void RemoveDead()
+    {
+        foreach (Entity entity in _order.Where(entity => entity.Stats.ReachedDeath()).ToList())
+        {
+            RemoveEntity(entity.Id);
+            _died.Add(entity);
         }
     }
 

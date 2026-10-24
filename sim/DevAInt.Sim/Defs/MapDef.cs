@@ -21,6 +21,9 @@ public sealed record MapDef : IDef
     /// <summary>Клетка появления игроков.</summary>
     public SpawnDef Spawn { get; init; } = new();
 
+    /// <summary>Существа, которые появляются в новом мире.</summary>
+    public IReadOnlyList<CreatureSpawnDef> Creatures { get; init; } = [];
+
     /// <inheritdoc/>
     public IEnumerable<string> Validate(DefDatabase defs)
     {
@@ -33,6 +36,30 @@ public sealed record MapDef : IDef
         if (Spawn.X < 0 || Spawn.Y < 0 || Spawn.X >= Width || Spawn.Y >= Height || Spawn.Z < World.MinLevel || Spawn.Z > World.MaxLevel)
         {
             yield return $"spawn {Spawn.X},{Spawn.Y},{Spawn.Z} is outside the map";
+        }
+
+        if (Spawn.Creature is not null && !defs.TryGet<CreatureDef>(Spawn.Creature, out _))
+        {
+            yield return $"spawn: unknown creature {Spawn.Creature}";
+        }
+
+        for (int i = 0; i < Creatures.Count; i++)
+        {
+            CreatureSpawnDef spawn = Creatures[i];
+            if (!defs.TryGet<CreatureDef>(spawn.Creature, out _))
+            {
+                yield return $"creatures[{i}]: unknown creature {spawn.Creature}";
+            }
+
+            if (spawn.X < 0 || spawn.Y < 0 || spawn.X >= Width || spawn.Y >= Height || spawn.Z < World.MinLevel || spawn.Z > World.MaxLevel)
+            {
+                yield return $"creatures[{i}]: cell {spawn.X},{spawn.Y},{spawn.Z} is outside the map";
+            }
+
+            if (spawn.Count < 1)
+            {
+                yield return $"creatures[{i}]: count {spawn.Count} must be positive";
+            }
         }
 
         foreach (string item in Spawn.Items)
@@ -67,6 +94,28 @@ public sealed record SpawnDef
 
     /// <summary>Предметы, с которыми появляется игрок.</summary>
     public IReadOnlyList<string> Items { get; init; } = [];
+
+    /// <summary>Вид существа игрока, null - сущность без вида со всеми статами.</summary>
+    public string? Creature { get; init; }
+}
+
+/// <summary>Существа одного вида в клетке карты.</summary>
+public sealed record CreatureSpawnDef
+{
+    /// <summary>Вид существа.</summary>
+    public required string Creature { get; init; }
+
+    /// <summary>Клетка по x.</summary>
+    public required int X { get; init; }
+
+    /// <summary>Клетка по y.</summary>
+    public required int Y { get; init; }
+
+    /// <summary>Этаж.</summary>
+    public int Z { get; init; }
+
+    /// <summary>Сколько существ.</summary>
+    public int Count { get; init; } = 1;
 }
 
 /// <summary>Операция построения: ровно одно из floor, walls, door и прямоугольник или клетка.</summary>

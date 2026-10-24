@@ -36,6 +36,7 @@ public static class Protocol
         OwnInventory,
         ActionStarted,
         ActionEnded,
+        OwnEntity,
     }
 
     /// <summary>Типы сообщений клиента.</summary>
@@ -165,6 +166,7 @@ public static class Protocol
             case EntitySpawnMessage spawn:
                 writer.WriteByte((byte)ServerType.EntitySpawn);
                 WritePosition(writer, spawn.Id, spawn.X, spawn.Y, spawn.Z);
+                writer.WriteVarUInt((ulong)(spawn.Creature + 1));
                 writer.WriteVarUInt((ulong)spawn.MoodleLevels.Count);
                 foreach (int level in spawn.MoodleLevels)
                 {
@@ -224,6 +226,10 @@ public static class Protocol
                 writer.WriteVarInt(started.StartTick);
                 writer.WriteVarUInt((ulong)started.DurationTicks);
                 break;
+            case OwnEntityMessage own:
+                writer.WriteByte((byte)ServerType.OwnEntity);
+                writer.WriteVarInt(own.EntityId);
+                break;
             case ActionEndedMessage ended:
                 writer.WriteByte((byte)ServerType.ActionEnded);
                 writer.WriteVarInt(ended.Entity);
@@ -253,6 +259,7 @@ public static class Protocol
             ServerType.OwnInventory => ReadInventory(reader),
             ServerType.ActionStarted => new ActionStartedMessage(reader.ReadVarInt(), reader.ReadCount(MaxList), reader.ReadVarInt(), reader.ReadCount(int.MaxValue)),
             ServerType.ActionEnded => new ActionEndedMessage(reader.ReadVarInt(), reader.ReadBool()),
+            ServerType.OwnEntity => new OwnEntityMessage(reader.ReadVarInt()),
             _ => throw new ProtocolException($"unknown server message type {type}"),
         };
     }
@@ -301,6 +308,7 @@ public static class Protocol
         float x = reader.ReadFloat();
         float y = reader.ReadFloat();
         int z = (int)reader.ReadVarInt();
+        int creature = reader.ReadCount(MaxList) - 1;
         int count = reader.ReadCount(MaxList);
         int[] levels = new int[count];
         for (int i = 0; i < count; i++)
@@ -308,7 +316,7 @@ public static class Protocol
             levels[i] = reader.ReadCount(MaxList);
         }
 
-        return new EntitySpawnMessage(id, x, y, z, levels);
+        return new EntitySpawnMessage(id, x, y, z, creature, levels);
     }
 
     /// <summary>Ввод движения после байта типа.</summary>

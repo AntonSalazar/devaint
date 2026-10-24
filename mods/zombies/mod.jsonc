@@ -1,0 +1,9 @@
+// Зомби: медленные существа, которые замечают людей, догоняют и кусают.
+{
+  "$schema": "../../schemas/mod.schema.json",
+  "id": "zombies",
+  "name": "Zombies",
+  "version": "0.1.0",
+  "api": 1,
+  "depends": ["core >= 0.1"],
+}

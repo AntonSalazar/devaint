@@ -100,9 +100,9 @@ public partial class GameRoot : Node3D
         }
 
         string[] args = OS.GetCmdlineUserArgs();
-        StatTable stats = new(loaded.Defs);
+        ClientTables tables = ClientTables.From(loaded);
         WorldTable world = new(loaded.Defs);
-        _items = new ItemTable(loaded.Defs);
+        _items = tables.Items;
         IConnection? connection = GameArgs.Connect(args) is (string host, int port) ? ConnectTo(host, port) : StartLocalServer(loaded, args);
         if (GameArgs.Player(args) is string player && !SaveGame.IsValidName(player))
         {
@@ -125,10 +125,10 @@ public partial class GameRoot : Node3D
         }
 
         string playerId = GameArgs.Player(args) ?? PlayerIdentity.LoadOrCreate(ProjectSettings.GlobalizePath(PlayerIdentity.DefaultPath));
-        _client = new GameClient(connection, stats, _items, [.. loaded.Mods.Select(mod => mod.Info)], playerId);
+        _client = new GameClient(connection, tables, playerId);
         GameInput.EnsureActions();
         _autoWalk = args.Contains("--autowalk");
-        BuildScene(stats, world);
+        BuildScene(tables.Stats, world);
     }
 
     /// <summary>Ввод, который не съел интерфейс: зум колёсиком и выход по Esc.</summary>

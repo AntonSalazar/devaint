@@ -16,6 +16,15 @@ public sealed record StatDef : IDef
     /// <summary>Верхняя граница значения.</summary>
     public required double Max { get; init; }
 
+    /// <summary>Начальное значение, null - Min.</summary>
+    public double? Start { get; init; }
+
+    /// <summary>Значение, на котором существо умирает, null - стат не смертелен.</summary>
+    public double? DeathAt { get; init; }
+
+    /// <summary>Начальное значение с учётом умолчания.</summary>
+    public double StartValue => Start ?? Min;
+
     /// <summary>Изменение значения за игровую минуту.</summary>
     public double Rate { get; init; }
 
@@ -28,6 +37,17 @@ public sealed record StatDef : IDef
         if (Min >= Max)
         {
             yield return $"min {Min} must be less than max {Max}";
+        }
+
+        if (StartValue < Min || StartValue > Max)
+        {
+            yield return $"start {StartValue} is outside {Min}..{Max}";
+        }
+
+        // Смерть наступает при движении от начала к порогу, поэтому порог не может совпасть с началом
+        if (DeathAt is double death && (death < Min || death > Max || death == StartValue))
+        {
+            yield return $"deathAt {death} must be within {Min}..{Max} and differ from start {StartValue}";
         }
 
         foreach (MoodleDef moodle in Moodles)

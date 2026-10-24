@@ -34,7 +34,8 @@ public class NetworkGameTest : TestCase
     /// <summary>Сервер на ENet и два подключения к нему.</summary>
     public override void BeforeEach()
     {
-        ModLoadResult loaded = ModLoader.Load(ModsPath.Find(), GameMods.Ids);
+        // Только core: зомби мешали бы проверять, что клиенты видят именно друг друга
+        ModLoadResult loaded = ModLoader.Load(ModsPath.Find(), ["core"]);
         _sim = new Simulation(loaded, new GodotLog(), GameRoot.MapId);
         _transport = new EnetServerTransport(Port, 4);
         _server = new GameServer(_sim, _transport, new GodotLog());
@@ -89,7 +90,7 @@ public class NetworkGameTest : TestCase
     }
 
     /// <summary>Клиент на подключении.</summary>
-    private GameClient Client(IConnection connection) => new(connection, _sim.StatTable, _sim.ItemTable, _sim.Mods, $"player{++_players}");
+    private GameClient Client(IConnection connection) => new(connection, ClientTables.From(_sim), $"player{++_players}");
 
     /// <summary>Тики сервера и приём клиентов, пока условие не выполнится; true - выполнилось.</summary>
     private bool Run(System.Func<bool> condition, params GameClient[] clients)

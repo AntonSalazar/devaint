@@ -198,6 +198,41 @@ public sealed class SaveGameTest : IDisposable
         Assert.True(loaded.NextItemId > sim.Entity(player).Inventory.Items[0].Id, "item counter skips player items");
     }
 
+    /// <summary>Зомби сохраняется своим видом, с телом и поведением, и после загрузки снова гонится.</summary>
+    [Fact]
+    public void CreatureRoundTrip()
+    {
+        _mods.CopyRepoMod("zombies");
+        ModLoadResult mods = Load("core", "zombies");
+        Simulation original = new(mods, _log, "core:starter_room");
+        original.SpawnPlayer("anna");
+        Tick(original, 5);
+
+        new SaveGame(SaveDir).Save(original);
+        SaveGame save = new(SaveDir);
+        Simulation loaded = save.Load(mods, _log);
+        save.LoadPlayer(loaded, "anna", _log);
+
+        Assert.Equal(3, loaded.Entities.Count(entity => entity.Creature?.Id == "zombies:zombie"));
+        AssertSame(original, loaded);
+        Tick(original, 40);
+        Tick(loaded, 40);
+        AssertSame(original, loaded);
+    }
+
+    /// <summary>Сохранение старого формата не грузится, с понятной ошибкой.</summary>
+    [Fact]
+    public void OldFormatIsRejected()
+    {
+        new SaveGame(SaveDir).Save(NewSim());
+        string meta = Path.Combine(SaveDir, "meta.json");
+        File.WriteAllText(meta, File.ReadAllText(meta).Replace("\"format\": 2", "\"format\": 1"));
+
+        SaveException error = Assert.Throws<SaveException>(() => new SaveGame(SaveDir).Load(Load("core", "test"), _log));
+
+        Assert.Equal("meta.json: save format 1 is not supported, expected 2", error.Message);
+    }
+
     /// <summary>Повреждённые и чужие файлы дают SaveException с именем файла, а не падение.</summary>
     [Theory]
     [InlineData("regions/r.0.0.bin", "garbage")]
@@ -314,6 +349,8 @@ public sealed class SaveGameTest : IDisposable
             Assert.Equal(expected.Stats.MoodleLevel(i), actual.Stats.MoodleLevel(actualSim.StatTable.MoodleIndex(moodle)));
         }
 
+        Assert.Equal(expected.Creature?.Id, actual.Creature?.Id);
+        Assert.Equal(expected.Brain is null, actual.Brain is null);
         Assert.Equal(expected.Inventory.Items.Select(item => (item.Id, item.Def.Id)), actual.Inventory.Items.Select(item => (item.Id, item.Def.Id)));
         Assert.Equal(Describe(expected.Action), Describe(actual.Action));
     }

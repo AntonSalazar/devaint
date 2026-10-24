@@ -180,7 +180,7 @@ public class PredictionTest
     {
         MovePrediction prediction = new();
 
-        prediction.Add(1, new MoveInput(1, 0), new World(1, 1), 0.1);
+        prediction.Add(1, new MoveInput(1, 0), new World(1, 1), 0.1, MoveParams.Default);
 
         Assert.Null(prediction.Position);
         Assert.Equal(0, prediction.PendingCount);
@@ -193,12 +193,12 @@ public class PredictionTest
         // Пол стартовой комнаты: в мире без пола ходить нельзя
         World world = new NetRun().Sim.World;
         MovePrediction prediction = new();
-        prediction.Reconcile(0, new WorldPos(1, 1, 0), world, 0.1);
-        prediction.Add(1, new MoveInput(1, 0), world, 0.1);
-        prediction.Add(2, new MoveInput(1, 0), world, 0.1);
-        prediction.Add(3, new MoveInput(0, 1), world, 0.1);
+        prediction.Reconcile(0, new WorldPos(1, 1, 0), world, 0.1, MoveParams.Default);
+        prediction.Add(1, new MoveInput(1, 0), world, 0.1, MoveParams.Default);
+        prediction.Add(2, new MoveInput(1, 0), world, 0.1, MoveParams.Default);
+        prediction.Add(3, new MoveInput(0, 1), world, 0.1, MoveParams.Default);
 
-        prediction.Reconcile(1, new WorldPos(5, 5, 0), world, 0.1);
+        prediction.Reconcile(1, new WorldPos(5, 5, 0), world, 0.1, MoveParams.Default);
 
         Assert.Equal(2, prediction.PendingCount);
         Assert.Equal(5 + Step, prediction.Position!.Value.X, 9);

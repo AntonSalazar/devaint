@@ -26,6 +26,21 @@
           "max": {
             "type": "number"
           },
+          "start": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "deathAt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "startValue": {
+            "type": "number"
+          },
           "rate": {
             "type": "number"
           },
@@ -236,9 +251,44 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "creature": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "additionalProperties": false
+          },
+          "creatures": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "creature": {
+                  "type": "string"
+                },
+                "x": {
+                  "type": "integer"
+                },
+                "y": {
+                  "type": "integer"
+                },
+                "z": {
+                  "type": "integer"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "creature",
+                "x",
+                "y"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -324,6 +374,107 @@
               ],
               "additionalProperties": false
             }
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "creatures": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "radius": {
+            "type": "number"
+          },
+          "speed": {
+            "type": "number"
+          },
+          "stats": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "attack": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "range": {
+                "type": "number"
+              },
+              "seconds": {
+                "type": "number"
+              },
+              "stat": {
+                "type": "string"
+              },
+              "add": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "range",
+              "seconds",
+              "stat",
+              "add"
+            ],
+            "additionalProperties": false
+          },
+          "brain": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "sight": {
+                "type": "number"
+              },
+              "targets": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "sight",
+              "targets"
+            ],
+            "additionalProperties": false
+          },
+          "body": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "radius": {
+                "type": "number"
+              },
+              "speed": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "radius",
+              "speed"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [

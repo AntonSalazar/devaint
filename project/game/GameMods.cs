@@ -5,7 +5,7 @@ using DevAInt.Sim.Mods;
 public static class GameMods
 {
     /// <summary>Моды, которые грузятся сейчас; выбор модов появится позже.</summary>
-    public static readonly string[] Ids = ["core"];
+    public static readonly string[] Ids = ["core", "zombies"];
 
     /// <summary>Загруженные моды или null, если были ошибки, они уже в логе.</summary>
     public static ModLoadResult? Load(ISimLog log)

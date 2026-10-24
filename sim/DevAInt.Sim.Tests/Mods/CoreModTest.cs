@@ -43,6 +43,6 @@ public class CoreModTest
         StatDef hunger = result.Defs.Get<StatDef>("core:hunger");
         Assert.Equal(0.01, hunger.Rate);
         Assert.Equal(["core:hungry", "robots:low_power"], hunger.Moodles.Select(moodle => moodle.Id));
-        Assert.Equal(["core:fatigue", "core:hunger", "core:thirst", "robots:heat"], result.Defs.All<StatDef>().Select(stat => stat.Id));
+        Assert.Equal(["core:fatigue", "core:health", "core:hunger", "core:thirst", "robots:heat"], result.Defs.All<StatDef>().Select(stat => stat.Id));
     }
 }

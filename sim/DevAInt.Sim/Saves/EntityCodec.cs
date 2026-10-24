@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using DevAInt.Sim.Creatures;
 using DevAInt.Sim.Defs;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Items;
@@ -22,6 +23,7 @@ internal static class EntityCodec
     public static void Write(PacketWriter writer, Entity entity, SaveIds ids, StatTable stats)
     {
         writer.WriteVarInt(entity.Id);
+        writer.WriteVarUInt(entity.Creature is null ? 0 : (ulong)ids.Creatures.NumberOf(entity.Creature.Id));
         writer.WriteBool(entity.PlayerId is not null);
         if (entity.PlayerId is string playerId)
         {
@@ -62,6 +64,7 @@ internal static class EntityCodec
     public static Entity Read(PacketReader reader, SaveIds ids, SaveTables tables, ISet<string> missing, ISimLog log)
     {
         long id = reader.ReadVarInt();
+        CreatureDef? creature = ReadCreature(reader, ids, tables, missing);
         string? playerId = reader.ReadBool() ? reader.ReadString(MaxPlayerId) : null;
         double x = reader.ReadDouble();
         double y = reader.ReadDouble();
@@ -87,7 +90,11 @@ internal static class EntityCodec
             }
         }
 
-        Entity entity = new(id, new StatSet(tables.Stats), new WorldPos(x, y, z)) { PlayerId = playerId };
+        Entity entity = new(id, new StatSet(tables.Stats, creature), new WorldPos(x, y, z), creature)
+        {
+            PlayerId = playerId,
+            Brain = creature?.Brain is null ? null : new BrainState(),
+        };
         entity.Stats.Restore(values);
         int itemCount = reader.ReadCount(MaxList);
         for (int i = 0; i < itemCount; i++)
@@ -112,6 +119,25 @@ internal static class EntityCodec
         return entity;
     }
 
+    /// <summary>Вид существа или null без вида; вид без мода попадает в missing.</summary>
+    private static CreatureDef? ReadCreature(PacketReader reader, SaveIds ids, SaveTables tables, ISet<string> missing)
+    {
+        int number = reader.ReadCount(MaxList);
+        if (number == 0)
+        {
+            return null;
+        }
+
+        string creature = ids.Creatures.IdAt(number);
+        if (tables.Creatures.TryIndex(creature, out int index))
+        {
+            return tables.Creatures.Creature(index);
+        }
+
+        missing.Add(creature);
+        return null;
+    }
+
     /// <summary>Идущее действие или null, если его действие или предмет пропали из модов.</summary>
     private static ActionState? ReadAction(PacketReader reader, SaveIds ids, SaveTables tables, Entity entity, ISimLog log)
     {
@@ -133,4 +159,4 @@ internal static class EntityCodec
 }
 
 /// <summary>Таблицы текущих модов, по которым номера сохранения переводятся в определения.</summary>
-internal sealed record SaveTables(StatTable Stats, ItemTable Items, WorldTable World);
+internal sealed record SaveTables(StatTable Stats, ItemTable Items, WorldTable World, CreatureTable Creatures);

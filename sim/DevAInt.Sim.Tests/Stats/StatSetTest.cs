@@ -127,14 +127,15 @@ public class StatSetTest
         Assert.Equal(0, stats.Value(thirst));
     }
 
-    /// <summary>Начальные мудлы не попадают в смены, статы начинаются с минимума.</summary>
+    /// <summary>Статы начинаются со start или min, без смен мудлов.</summary>
     [Fact]
-    public void StartsAtMinWithoutChanges()
+    public void StartsAtStartValueWithoutChanges()
     {
         StatSet stats = new(_core);
 
         Assert.Empty(stats.Changes);
-        Assert.All(Enumerable.Range(0, _core.StatCount), i => Assert.Equal(_core.Stat(i).Min, stats.Value(i)));
+        Assert.All(Enumerable.Range(0, _core.StatCount), i => Assert.Equal(_core.Stat(i).Start ?? _core.Stat(i).Min, stats.Value(i)));
+        Assert.Equal(100, stats.Value(_core.StatIndex("core:health")));
         Assert.All(Enumerable.Range(0, _core.MoodleCount), i => Assert.Equal(0, stats.MoodleLevel(i)));
     }
 

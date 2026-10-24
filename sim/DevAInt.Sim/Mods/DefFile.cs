@@ -17,6 +17,7 @@ internal sealed class DefFile
         ["maps"] = typeof(MapDef),
         ["actions"] = typeof(ActionDef),
         ["items"] = typeof(ItemDef),
+        ["creatures"] = typeof(CreatureDef),
     };
 
     /// <summary>Путь к JSON Schema для редактора, загрузчик его пропускает.</summary>
@@ -40,6 +41,9 @@ internal sealed class DefFile
 
     /// <summary>Предметы.</summary>
     public List<ItemDef?>? Items { get; init; }
+
+    /// <summary>Виды существ.</summary>
+    public List<CreatureDef?>? Creatures { get; init; }
 
     /// <summary>Патчи определений этого и других модов.</summary>
     public List<PatchDef?>? Patches { get; init; }
