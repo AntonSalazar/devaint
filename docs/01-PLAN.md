@@ -178,6 +178,11 @@
 проверки — `LaggedConnection`, оба в `sim/DevAInt.Sim/Net/`. Итоговый тест —
 `project/tests/NetworkGameTest.cs`: сервер и два клиента на настоящем ENet.
 
+Тестовый сервер в локальной сети: `just export-server` собирает выделенный сервер Linux
+x86_64 в `builds/server`, `just deploy-server` копирует его на `DEVAINT_SERVER_HOST`,
+`just remote-server --port 7777` запускает его там. Собранный сервер сам стартует без окна
+со сценой сервера: признак `dedicated_server` подменяет главную сцену.
+
 ## После среза
 
 Не входит в срез, порядок обсудим после:

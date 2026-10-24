@@ -14,6 +14,9 @@ obj/
 *.tpsheet.import
 *.depren
 
+# Local settings, e.g. DEVAINT_SERVER_HOST
+.env
+
 # Other
 *.DS_Store
 

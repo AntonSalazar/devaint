@@ -21,4 +21,11 @@ public class ServerSceneTest : TestCase
         CheckEqual(0, root.GetChildCount(), "no child nodes");
         root.Free();
     }
+
+    /// <summary>Экспорт в режиме выделенного сервера запускает сцену сервера вместо игры.</summary>
+    public void TestDedicatedServerMainScene()
+    {
+        string scene = ProjectSettings.GetSetting("application/run/main_scene.dedicated_server").AsString();
+        CheckEqual(ServerScenePath, scene, "application/run/main_scene.dedicated_server");
+    }
 }
