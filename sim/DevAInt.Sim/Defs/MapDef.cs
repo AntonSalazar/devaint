@@ -18,7 +18,7 @@ public sealed record MapDef : IDef
     /// <summary>Операции построения, применяются по порядку.</summary>
     public IReadOnlyList<MapOpDef> Build { get; init; } = [];
 
-    /// <summary>Клетка появления игроков.</summary>
+    /// <summary>Появление игроков: точки, вид существа и стартовые предметы.</summary>
     public SpawnDef Spawn { get; init; } = new();
 
     /// <summary>Существа, которые появляются в новом мире.</summary>
@@ -33,9 +33,18 @@ public sealed record MapDef : IDef
             yield break;
         }
 
-        if (Spawn.X < 0 || Spawn.Y < 0 || Spawn.X >= Width || Spawn.Y >= Height || Spawn.Z < World.MinLevel || Spawn.Z > World.MaxLevel)
+        if (Spawn.Points.Count == 0)
         {
-            yield return $"spawn {Spawn.X},{Spawn.Y},{Spawn.Z} is outside the map";
+            yield return "spawn needs at least one point";
+        }
+
+        for (int i = 0; i < Spawn.Points.Count; i++)
+        {
+            SpawnPointDef point = Spawn.Points[i];
+            if (point.X < 0 || point.Y < 0 || point.X >= Width || point.Y >= Height || point.Z < World.MinLevel || point.Z > World.MaxLevel)
+            {
+                yield return $"spawn.points[{i}]: cell {point.X},{point.Y},{point.Z} is outside the map";
+            }
         }
 
         if (Spawn.Creature is not null && !defs.TryGet<CreatureDef>(Spawn.Creature, out _))
@@ -80,23 +89,30 @@ public sealed record MapDef : IDef
     }
 }
 
-/// <summary>Клетка появления игроков на карте.</summary>
+/// <summary>Появление игроков на карте: точки, из которых выбирает хук мода choose_spawn или ядро.</summary>
 public sealed record SpawnDef
 {
-    /// <summary>Клетка по x.</summary>
-    public int X { get; init; }
-
-    /// <summary>Клетка по y.</summary>
-    public int Y { get; init; }
-
-    /// <summary>Этаж.</summary>
-    public int Z { get; init; }
+    /// <summary>Клетки появления по порядку.</summary>
+    public IReadOnlyList<SpawnPointDef> Points { get; init; } = [];
 
     /// <summary>Предметы, с которыми появляется игрок.</summary>
     public IReadOnlyList<string> Items { get; init; } = [];
 
     /// <summary>Вид существа игрока, null - сущность без вида со всеми статами.</summary>
     public string? Creature { get; init; }
+}
+
+/// <summary>Клетка появления игрока.</summary>
+public sealed record SpawnPointDef
+{
+    /// <summary>Клетка по x.</summary>
+    public required int X { get; init; }
+
+    /// <summary>Клетка по y.</summary>
+    public required int Y { get; init; }
+
+    /// <summary>Этаж.</summary>
+    public int Z { get; init; }
 }
 
 /// <summary>Существа одного вида в клетке карты.</summary>

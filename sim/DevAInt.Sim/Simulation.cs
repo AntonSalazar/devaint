@@ -35,6 +35,9 @@ public sealed class Simulation
     /// <summary>Умершие на последнем тике.</summary>
     private readonly List<Entity> _died = [];
 
+    /// <summary>Случай для выбора точки появления, когда моды не выбрали; зерно постоянное, чтобы игра была повторяемой.</summary>
+    private readonly Random _random = new(0);
+
     /// <summary>Удары на последнем тике.</summary>
     private readonly List<(long Attacker, long Target)> _attacks = [];
 
@@ -63,14 +66,14 @@ public sealed class Simulation
         MapId = mapId;
         MapDef? map = mapId is null ? null : mods.Defs.Get<MapDef>(mapId);
         World = world ?? (map is null ? new World(1, 1) : MapBuilder.Build(map, WorldTable));
-        Spawn = map is null ? WorldPos.CenterOf(new CellPos(0, 0, 0)) : WorldPos.CenterOf(new CellPos(map.Spawn.X, map.Spawn.Y, map.Spawn.Z));
+        SpawnPoints = map is null ? [new CellPos(0, 0, 0)] : [.. map.Spawn.Points.Select(point => new CellPos(point.X, point.Y, point.Z))];
         SpawnItems = map is null ? [] : [.. map.Spawn.Items.Select(mods.Defs.Get<ItemDef>)];
         SpawnCreature = map?.Spawn.Creature;
 
         // Постройка карты - не изменения для клиентов: они получат мир снимками чанков
         World.ClearChanges();
         Clock = clock ?? new GameClock();
-        _lua = new LuaHost(StatTable, FindStats, log);
+        _lua = new LuaHost(StatTable, FindStats, () => _order, log);
         ScriptErrors = _lua.Load(mods.Mods);
 
         // Существа карты появляются только в новом мире: в сохранённом они уже есть
@@ -119,8 +122,8 @@ public sealed class Simulation
     /// <summary>Ошибки загрузки Lua-скриптов модов.</summary>
     public IReadOnlyList<ModError> ScriptErrors { get; }
 
-    /// <summary>Точка появления игроков: центр клетки spawn карты.</summary>
-    public WorldPos Spawn { get; }
+    /// <summary>Клетки появления игроков с карты.</summary>
+    public IReadOnlyList<CellPos> SpawnPoints { get; }
 
     /// <summary>Предметы, с которыми появляется игрок.</summary>
     public IReadOnlyList<ItemDef> SpawnItems { get; }
@@ -159,7 +162,7 @@ public sealed class Simulation
     /// <summary>Новый персонаж игрока playerId в точке появления со стартовыми предметами карты, id сущности.</summary>
     public long SpawnPlayer(string playerId)
     {
-        long id = CreateEntity(Spawn, SpawnCreature);
+        long id = CreateEntity(WorldPos.CenterOf(ChooseSpawn(playerId)), SpawnCreature);
         _entities[id].PlayerId = playerId;
         foreach (ItemDef item in SpawnItems)
         {
@@ -346,6 +349,9 @@ public sealed class Simulation
             entity.Facing = (input.X / length, input.Y / length);
         }
     }
+
+    /// <summary>Точка появления игрока: ответ хука choose_spawn или случайная точка карты.</summary>
+    private CellPos ChooseSpawn(string playerId) => _lua.ChooseSpawn(playerId, SpawnPoints) is int chosen ? SpawnPoints[chosen] : SpawnPoints[_random.Next(SpawnPoints.Count)];
 
     /// <summary>Существа карты в центрах своих клеток; клетка без пола - ошибка в лог, существа пропускаются.</summary>
     private void SpawnMapCreatures(MapDef map, ISimLog log)

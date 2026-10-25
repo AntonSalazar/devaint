@@ -1,4 +1,5 @@
 using System.Linq;
+using DevAInt.Sim.Grid;
 using DevAInt.Sim.Items;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Motion;
@@ -23,7 +24,7 @@ public class ActionTest
         Assert.Equal(3, player.Inventory.Items.Count);
         Assert.All(player.Inventory.Items, item => Assert.Equal("core:apple", item.Def.Id));
         Assert.Equal(3, player.Inventory.Items.Select(item => item.Id).Distinct().Count());
-        Assert.Equal(sim.Spawn, player.Position);
+        Assert.Equal(WorldPos.CenterOf(sim.SpawnPoints[0]), player.Position);
     }
 
     /// <summary>Итог этапа 9: съел яблоко - голод упал на 25, яблоко исчезло.</summary>

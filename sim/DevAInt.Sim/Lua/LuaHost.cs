@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using DevAInt.Sim.Grid;
 using DevAInt.Sim.Logging;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Stats;
@@ -20,14 +21,20 @@ internal sealed class LuaHost
     /// <summary>Имя хука действия управления с поведением lua: сущность, id действия, точка курсора.</summary>
     public const string ControlHook = "control";
 
+    /// <summary>Имя хука выбора точки появления: id игрока и точки, ответ - номер точки с единицы.</summary>
+    public const string ChooseSpawnHook = "choose_spawn";
+
     /// <summary>Известные хуки.</summary>
-    private static readonly HashSet<string> _hooks = [TickHook, StatThresholdHook, ControlHook];
+    private static readonly HashSet<string> _hooks = [TickHook, StatThresholdHook, ControlHook, ChooseSpawnHook];
 
     /// <summary>Таблица статов для перевода id в номера.</summary>
     private readonly StatTable _table;
 
     /// <summary>Статы сущности по id, null если её нет.</summary>
     private readonly Func<long, StatSet?> _entities;
+
+    /// <summary>Все сущности мира, для запросов к миру.</summary>
+    private readonly Func<IReadOnlyList<Entity>> _all;
 
     /// <summary>Лог для ошибок и print.</summary>
     private readonly ISimLog _log;
@@ -38,9 +45,10 @@ internal sealed class LuaHost
     /// <summary>Id мудлов как Lua-строки, чтобы не создавать их на каждое событие.</summary>
     private readonly DynValue[] _moodleIds;
 
-    /// <summary>Хост с доступом к статам сущностей.</summary>
-    public LuaHost(StatTable table, Func<long, StatSet?> entities, ISimLog log)
+    /// <summary>Хост с доступом к статам сущностей и списку всех сущностей мира.</summary>
+    public LuaHost(StatTable table, Func<long, StatSet?> entities, Func<IReadOnlyList<Entity>> all, ISimLog log)
     {
+        _all = all;
         _table = table;
         _entities = entities;
         _log = log;
@@ -110,6 +118,44 @@ internal sealed class LuaHost
         }
     }
 
+    /// <summary>Номер точки появления от хука choose_spawn, null - ни один мод не ответил; поздний мод спрашивается первым.</summary>
+    public int? ChooseSpawn(string player, IReadOnlyList<CellPos> points)
+    {
+        for (int m = _mods.Count - 1; m >= 0; m--)
+        {
+            LuaMod mod = _mods[m];
+            if (!mod.Handles(ChooseSpawnHook))
+            {
+                continue;
+            }
+
+            Table list = new(mod.Script);
+            foreach (CellPos point in points)
+            {
+                Table cell = new(mod.Script);
+                cell["x"] = point.X;
+                cell["y"] = point.Y;
+                cell["z"] = point.Z;
+                list.Append(DynValue.NewTable(cell));
+            }
+
+            DynValue answer = mod.Ask(ChooseSpawnHook, DynValue.NewString(player), DynValue.NewTable(list), DynValue.Nil, DynValue.Nil);
+            if (answer.IsNil())
+            {
+                continue;
+            }
+
+            if (answer.Type == DataType.Number && answer.Number == Math.Floor(answer.Number) && answer.Number >= 1 && answer.Number <= points.Count)
+            {
+                return (int)answer.Number - 1;
+            }
+
+            _log.Error($"mod {mod.Id}: hook {ChooseSpawnHook}: answer {answer} is not a point number 1..{points.Count}");
+        }
+
+        return null;
+    }
+
     /// <summary>hooks.add: имя хука и функция-обработчик.</summary>
     private static DynValue AddHook(LuaMod mod, CallbackArguments args)
     {
@@ -136,6 +182,38 @@ internal sealed class LuaHost
         stats["set"] = DynValue.NewCallback((context, args) => StatsSet(args), "stats.set");
         stats["moodle"] = DynValue.NewCallback((context, args) => StatsMoodle(args), "stats.moodle");
         mod.Script.Globals["stats"] = stats;
+
+        Table entities = new(mod.Script);
+        entities["near"] = DynValue.NewCallback((context, args) => EntitiesNear(mod, args), "entities.near");
+        mod.Script.Globals["entities"] = entities;
+    }
+
+    /// <summary>entities.near: сущности этажа z в радиусе от точки x, y - таблицы id, creature, x, y.</summary>
+    private DynValue EntitiesNear(LuaMod mod, CallbackArguments args)
+    {
+        double x = args.AsType(0, "entities.near", DataType.Number).Number;
+        double y = args.AsType(1, "entities.near", DataType.Number).Number;
+        int z = (int)args.AsType(2, "entities.near", DataType.Number).Number;
+        double radius = args.AsType(3, "entities.near", DataType.Number).Number;
+        Table result = new(mod.Script);
+        foreach (Entity entity in _all())
+        {
+            double dx = entity.Position.X - x;
+            double dy = entity.Position.Y - y;
+            if (entity.Position.Z != z || (dx * dx) + (dy * dy) > radius * radius)
+            {
+                continue;
+            }
+
+            Table row = new(mod.Script);
+            row["id"] = entity.Id;
+            row["creature"] = entity.Creature is null ? DynValue.Nil : DynValue.NewString(entity.Creature.Id);
+            row["x"] = entity.Position.X;
+            row["y"] = entity.Position.Y;
+            result.Append(DynValue.NewTable(row));
+        }
+
+        return DynValue.NewTable(result);
     }
 
     /// <summary>stats.get: значение стата сущности.</summary>

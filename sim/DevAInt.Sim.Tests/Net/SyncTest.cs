@@ -13,7 +13,7 @@ public class SyncTest
 {
     /// <summary>Длинная полоса пола 300 на 8 клеток для проверки подписки на чанки.</summary>
     private const string StripMap = """
-        { "maps": [ { "id": "test:strip", "width": 300, "height": 8, "spawn": { "x": 5, "y": 4 },
+        { "maps": [ { "id": "test:strip", "width": 300, "height": 8, "spawn": { "points": [ { "x": 5, "y": 4 } ] },
           "build": [ { "floor": "core:wood_floor", "x": 0, "y": 0, "w": 300, "h": 8 } ] } ] }
         """;
 

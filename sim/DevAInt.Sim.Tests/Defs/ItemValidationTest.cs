@@ -33,7 +33,7 @@ public class ItemValidationTest
     {
         using TempMods mods = new();
         mods.Manifest("alpha").Write("alpha/data/map.jsonc", """
-            { "maps": [ { "id": "alpha:map", "width": 4, "height": 4, "spawn": { "x": 1, "y": 1, "items": ["alpha:ghost"] } } ] }
+            { "maps": [ { "id": "alpha:map", "width": 4, "height": 4, "spawn": { "points": [ { "x": 1, "y": 1 } ], "items": ["alpha:ghost"] } } ] }
             """);
 
         Assert.Equal("spawn: unknown item alpha:ghost", Assert.Single(mods.Load("alpha").Errors).Message);

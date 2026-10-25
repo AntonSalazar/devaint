@@ -61,7 +61,7 @@ internal sealed partial class LuaMod
                 continue;
             }
 
-            if (Run(chunk, DynValue.Nil, DynValue.Nil, DynValue.Nil, DynValue.Nil, out bool runaway) is string problem)
+            if (Run(chunk, DynValue.Nil, DynValue.Nil, DynValue.Nil, DynValue.Nil, out bool runaway, out _) is string problem)
             {
                 errors.Add(ToError(shown, runaway ? $"file exceeded {LuaSandbox.InstructionBudget} instructions" : problem));
             }
@@ -80,18 +80,29 @@ internal sealed partial class LuaMod
         list.Add(handler);
     }
 
+    /// <summary>Есть ли у мода обработчики хука.</summary>
+    public bool Handles(string hook) => _handlers.TryGetValue(hook, out List<DynValue>? list) && list.Count > 0;
+
     /// <summary>Вызов всех обработчиков хука; обработчик, превысивший лимит, отключается.</summary>
-    public void Raise(string hook, DynValue a, DynValue b, DynValue c, DynValue d)
+    public void Raise(string hook, DynValue a, DynValue b, DynValue c, DynValue d) => Ask(hook, a, b, c, d, stopAtAnswer: false);
+
+    /// <summary>Вызов обработчиков хука до первого ответа не nil; nil, если ответа нет.</summary>
+    public DynValue Ask(string hook, DynValue a, DynValue b, DynValue c, DynValue d, bool stopAtAnswer = true)
     {
         if (!_handlers.TryGetValue(hook, out List<DynValue>? list))
         {
-            return;
+            return DynValue.Nil;
         }
 
         for (int i = 0; i < list.Count; i++)
         {
-            if (Run(list[i], a, b, c, d, out bool runaway) is not string problem)
+            if (Run(list[i], a, b, c, d, out bool runaway, out DynValue result) is not string problem)
             {
+                if (stopAtAnswer && !result.IsNil())
+                {
+                    return result;
+                }
+
                 continue;
             }
 
@@ -105,6 +116,8 @@ internal sealed partial class LuaMod
             list.RemoveAt(i);
             i--;
         }
+
+        return DynValue.Nil;
     }
 
     /// <summary>Позиция в сообщении MoonSharp, первая группа - строка.</summary>
@@ -120,13 +133,16 @@ internal sealed partial class LuaMod
         return new ModError(file, line, string.Empty, text);
     }
 
-    /// <summary>Вызов функции через диспетчер, текст ошибки или null; runaway - превышен лимит.</summary>
-    private string? Run(DynValue function, DynValue a, DynValue b, DynValue c, DynValue d, out bool runaway)
+    /// <summary>Вызов функции через диспетчер, текст ошибки или null; runaway - превышен лимит, result - первое возвращённое значение.</summary>
+    private string? Run(DynValue function, DynValue a, DynValue b, DynValue c, DynValue d, out bool runaway, out DynValue result)
     {
         runaway = false;
+        result = DynValue.Nil;
         try
         {
-            _coroutine.Coroutine.Resume(function, a, b, c, d);
+            // Диспетчер отдаёт результат функции через yield, из нескольких значений берётся первое
+            DynValue returned = _coroutine.Coroutine.Resume(function, a, b, c, d);
+            result = returned.Type == DataType.Tuple ? (returned.Tuple.Length > 0 ? returned.Tuple[0] : DynValue.Nil) : returned;
         }
         catch (InterpreterException error)
         {
@@ -141,6 +157,7 @@ internal sealed partial class LuaMod
         }
 
         runaway = true;
+        result = DynValue.Nil;
         _coroutine = NewCoroutine();
         return "instruction budget exceeded";
     }

@@ -55,6 +55,18 @@ public class MapValidationTest
         Assert.Equal("size 5000x8 must be within 1..4096", Assert.Single(mods.Load("alpha").Errors).Message);
     }
 
+    /// <summary>Без точек появления и с точкой вне карты - ошибки.</summary>
+    [Theory]
+    [InlineData("""{ "points": [] }""", "spawn needs at least one point")]
+    [InlineData("""{ "points": [ { "x": 1, "y": 1 }, { "x": 8, "y": 2 } ] }""", "spawn.points[1]: cell 8,2,0 is outside the map")]
+    public void BadSpawnIsError(string spawn, string message)
+    {
+        using TempMods mods = new();
+        mods.Manifest("alpha").Write("alpha/data/map.jsonc", $$"""{ "maps": [ { "id": "alpha:map", "width": 8, "height": 8, "spawn": {{spawn}} } ] }""");
+
+        Assert.Equal(message, Assert.Single(mods.Load("alpha").Errors).Message);
+    }
+
     /// <summary>Цвет пола и стены только в виде #rrggbb.</summary>
     [Theory]
     [InlineData("""{ "floors": [ { "id": "alpha:f", "color": "brown" } ] }""", "alpha:f")]
@@ -75,7 +87,7 @@ public class MapValidationTest
     {
         using TempMods mods = new();
         mods.Manifest("alpha").Write("alpha/data/world.jsonc", World);
-        mods.Write("alpha/data/map.jsonc", $$"""{ "maps": [ { "id": "alpha:map", "width": 8, "height": 8, "build": [ {{ops}} ] } ] }""");
+        mods.Write("alpha/data/map.jsonc", $$"""{ "maps": [ { "id": "alpha:map", "width": 8, "height": 8, "spawn": { "points": [ { "x": 1, "y": 1 } ] }, "build": [ {{ops}} ] } ] }""");
         return mods.Load("alpha");
     }
 }

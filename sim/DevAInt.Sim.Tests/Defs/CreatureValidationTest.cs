@@ -35,7 +35,7 @@ public class CreatureValidationTest
     {
         using TempMods mods = new();
         mods.Manifest("alpha").Write("alpha/data/map.jsonc", """
-            { "maps": [ { "id": "alpha:m", "width": 4, "height": 4, "spawn": { "creature": "alpha:ghost" },
+            { "maps": [ { "id": "alpha:m", "width": 4, "height": 4, "spawn": { "points": [ { "x": 1, "y": 1 } ], "creature": "alpha:ghost" },
               "creatures": [ { "creature": "alpha:ghost", "x": 1, "y": 1 }, { "creature": "alpha:ghost", "x": 9, "y": 1, "count": 0 } ] } ] }
             """);
 

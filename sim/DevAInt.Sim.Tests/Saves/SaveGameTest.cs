@@ -20,7 +20,7 @@ public sealed class SaveGameTest : IDisposable
         {
           "floors": [ { "id": "test:stone", "color": "#777777" } ],
           "stats": [ { "id": "test:mana", "min": 0, "max": 10, "rate": 0.5 } ],
-          "maps": [ { "id": "test:strip", "width": 300, "height": 8, "spawn": { "x": 5, "y": 4, "items": ["core:apple"] },
+          "maps": [ { "id": "test:strip", "width": 300, "height": 8, "spawn": { "points": [ { "x": 5, "y": 4 } ], "items": ["core:apple"] },
             "build": [ { "floor": "core:wood_floor", "x": 0, "y": 0, "w": 300, "h": 8 },
                        { "walls": "core:wood_wall", "x": 2, "y": 2, "w": 4, "h": 4 },
                        { "door": "core:wood_door", "x": 3, "y": 5, "side": "south" } ] } ]

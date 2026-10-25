@@ -141,7 +141,7 @@ internal static class Program
             stats[i] = new StatSet(table);
         }
 
-        LuaHost lua = new(table, id => stats[id], new ConsoleLog());
+        LuaHost lua = new(table, id => stats[id], () => [], new ConsoleLog());
         lua.Load(loaded.Mods);
         MoodleChange change = new(table.MoodleIndex("core:hungry"), 0, 1);
         Measure($"{Entities} stat_threshold hook calls", () =>
@@ -189,7 +189,7 @@ internal static class Program
             }
         }
 
-        string map = $$"""{ "maps": [ { "id": "bench:huge", "width": 4096, "height": 4096, "spawn": { "x": 1, "y": 1 }, "build": [ {{build}} ] } ] }""";
+        string map = $$"""{ "maps": [ { "id": "bench:huge", "width": 4096, "height": 4096, "spawn": { "points": [ { "x": 1, "y": 1 } ] }, "build": [ {{build}} ] } ] }""";
         Directory.CreateDirectory(Path.Combine(mods, "bench", "data"));
         File.WriteAllText(Path.Combine(mods, "bench", "data", "maps.jsonc"), map);
     }
