@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using DevAInt.Sim.Creatures;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Stats;
@@ -63,8 +64,8 @@ public sealed class Replica(ClientTables tables)
     /// <summary>Своя сущность сменилась: прежняя умерла.</summary>
     public event Action? OwnEntityChanged;
 
-    /// <summary>Удар прошёл: id атакующего и цели.</summary>
-    public event Action<long, long>? Attacked;
+    /// <summary>Удар или толчок прошёл: id атакующего, цели и вид.</summary>
+    public event Action<long, long, AttackKind>? Attacked;
 
     /// <summary>Сущность появилась.</summary>
     public event Action<ReplicaEntity>? EntitySpawned;
@@ -247,7 +248,7 @@ public sealed class Replica(ClientTables tables)
                 break;
             case AttackMessage attack:
                 // Цель могла уже исчезнуть в этом же пакете, удар показывается тем, кто остался
-                Attacked?.Invoke(attack.Attacker, attack.Target);
+                Attacked?.Invoke(attack.Attacker, attack.Target, attack.Kind);
                 break;
             case ActionEndedMessage ended:
                 ReplicaEntity finished = Existing(ended.Entity);

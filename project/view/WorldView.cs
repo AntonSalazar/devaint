@@ -179,11 +179,14 @@ public partial class WorldView : Node3D
         }
     }
 
-    /// <summary>Удар прошёл: выпад атакующего и вспышка цели, если они видны.</summary>
-    private void OnAttacked(long attacker, long target)
+    /// <summary>Удар или толчок прошёл: выпад атакующего, а при ударе ещё и вспышка цели, если они видны.</summary>
+    private void OnAttacked(long attacker, long target, AttackKind kind)
     {
         Entity(attacker)?.PlayAttack();
-        Entity(target)?.PlayHit();
+        if (kind == AttackKind.Strike)
+        {
+            Entity(target)?.PlayHit();
+        }
     }
 
     /// <summary>Цвет капсулы из вида существа; у сущности без вида - серый.</summary>

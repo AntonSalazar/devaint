@@ -156,4 +156,19 @@ public class WorldViewTest : TestCase
         Check(_view.Entity(dummy)!.IsFlashing, "target flashes");
         CheckNear(1, own.Facing.Z, Tolerance, "own faces south");
     }
+
+    /// <summary>Толчок по сети: свой выпад, но цель не вспыхивает, урона нет.</summary>
+    public void TestShoveLungesWithoutFlash()
+    {
+        _game.Tick();
+        long dummy = _game.Sim.CreateEntity(new WorldPos(6.5, 7.3, 0), "core:human");
+        _game.Tick();
+
+        _game.Client.SendControl(_game.Sim.ControlTable.Index("core:shove"), true);
+        _game.Tick();
+        _view.Advance(EntityView.LungeSeconds / 2);
+
+        Check(_view.Entity(_game.Client.Replica.OwnEntityId)!.LungeOffset > 0.1f, "own lunges");
+        Check(!_view.Entity(dummy)!.IsFlashing, "shoved target does not flash");
+    }
 }

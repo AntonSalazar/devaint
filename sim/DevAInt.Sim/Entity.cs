@@ -29,6 +29,12 @@ public sealed class Entity(long id, StatSet stats, WorldPos position, CreatureDe
     /// <summary>Точка под курсором игрока на земле, null пока клиент её не прислал.</summary>
     public WorldPos? AimPoint { get; internal set; }
 
+    /// <summary>Тик, до которого сущность оглушена: не думает, не ходит и не атакует.</summary>
+    public long StunnedUntilTick { get; internal set; }
+
+    /// <summary>Тик, с которого толчок снова готов.</summary>
+    public long ShoveReadyTick { get; internal set; }
+
     /// <summary>Тик, с которого атака снова готова.</summary>
     public long AttackReadyTick { get; internal set; }
 
@@ -55,6 +61,12 @@ public sealed class Entity(long id, StatSet stats, WorldPos position, CreatureDe
 
     /// <summary>Игрок просит атаковать на этом тике.</summary>
     internal bool AttackRequested { get; set; }
+
+    /// <summary>Игрок просит толкнуть на этом тике.</summary>
+    internal bool ShoveRequested { get; set; }
+
+    /// <summary>Отлёт после толчка: направление, скорость в метрах в секунду и тик конца, null - не отлетает.</summary>
+    internal (double X, double Y, double Speed, long UntilTick)? Knock { get; set; }
 
     /// <summary>Зажатые действия управления по номерам из ControlTable.</summary>
     internal HashSet<int> HeldControls { get; } = [];

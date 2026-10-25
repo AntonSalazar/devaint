@@ -12,6 +12,9 @@ public enum ControlAction
     /// <summary>Удар существа по ближайшему впереди.</summary>
     Attack,
 
+    /// <summary>Толчок ближайшего впереди.</summary>
+    Shove,
+
     /// <summary>Первое применение первого подходящего предмета.</summary>
     UseItem,
 

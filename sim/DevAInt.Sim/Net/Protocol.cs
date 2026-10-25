@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using DevAInt.Sim.Creatures;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Mods;
 
@@ -240,6 +241,7 @@ public static class Protocol
                 writer.WriteByte((byte)ServerType.Attack);
                 writer.WriteVarInt(attack.Attacker);
                 writer.WriteVarInt(attack.Target);
+                writer.WriteByte((byte)attack.Kind);
                 break;
             case OwnEntityMessage own:
                 writer.WriteByte((byte)ServerType.OwnEntity);
@@ -275,9 +277,16 @@ public static class Protocol
             ServerType.ActionStarted => new ActionStartedMessage(reader.ReadVarInt(), reader.ReadCount(MaxList), reader.ReadVarInt(), reader.ReadCount(int.MaxValue)),
             ServerType.ActionEnded => new ActionEndedMessage(reader.ReadVarInt(), reader.ReadBool()),
             ServerType.OwnEntity => new OwnEntityMessage(reader.ReadVarInt()),
-            ServerType.Attack => new AttackMessage(reader.ReadVarInt(), reader.ReadVarInt()),
+            ServerType.Attack => new AttackMessage(reader.ReadVarInt(), reader.ReadVarInt(), ReadAttackKind(reader)),
             _ => throw new ProtocolException($"unknown server message type {type}"),
         };
+    }
+
+    /// <summary>Вид удара из байта; неизвестный - ProtocolException.</summary>
+    private static AttackKind ReadAttackKind(PacketReader reader)
+    {
+        byte kind = reader.ReadByte();
+        return Enum.IsDefined((AttackKind)kind) ? (AttackKind)kind : throw new ProtocolException($"attack kind {kind} is unknown");
     }
 
     /// <summary>Приветствие; ускорение времени должно быть конечным и больше нуля.</summary>

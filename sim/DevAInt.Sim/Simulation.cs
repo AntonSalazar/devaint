@@ -39,7 +39,7 @@ public sealed class Simulation
     private readonly Random _random = new(0);
 
     /// <summary>Удары на последнем тике.</summary>
-    private readonly List<(long Attacker, long Target)> _attacks = [];
+    private readonly List<(long Attacker, long Target, AttackKind Kind)> _attacks = [];
 
     /// <summary>Lua-моды.</summary>
     private readonly LuaHost _lua;
@@ -111,7 +111,7 @@ public sealed class Simulation
     public IReadOnlyList<Entity> Died => _died;
 
     /// <summary>Удары, которые прошли на последнем тике: кто и кого.</summary>
-    public IReadOnlyList<(long Attacker, long Target)> Attacks => _attacks;
+    public IReadOnlyList<(long Attacker, long Target, AttackKind Kind)> Attacks => _attacks;
 
     /// <summary>Полы и стены по номерам.</summary>
     public WorldTable WorldTable { get; }
@@ -236,6 +236,9 @@ public sealed class Simulation
             case ControlAction.Attack:
                 entity.AttackRequested = true;
                 break;
+            case ControlAction.Shove:
+                entity.ShoveRequested = true;
+                break;
             case ControlAction.UseItem:
                 UseFirstItem(entity);
                 break;
@@ -288,7 +291,7 @@ public sealed class Simulation
         foreach (Entity entity in _order)
         {
             // Движение идёт в секундах симуляции, статы - в игровых минутах; ускорение действует на оба
-            entity.Position = Movement.Step(World, entity.Position, entity.Input, Clock.SecondsPerTick, entity.Body);
+            entity.Position = Move(entity);
             UpdateFacing(entity);
 
             // Действие до статов: мудлы от съеденного видны в этом же тике
@@ -312,7 +315,7 @@ public sealed class Simulation
     }
 
     /// <summary>Запись прошедшего удара для рассылки клиентам.</summary>
-    internal void RecordAttack(Entity attacker, Entity target) => _attacks.Add((attacker.Id, target.Id));
+    internal void RecordAttack(Entity attacker, Entity target, AttackKind kind) => _attacks.Add((attacker.Id, target.Id, kind));
 
     /// <summary>Сущность из сохранения со своим id; счётчики id сдвигаются за неё и её предметы.</summary>
     internal void RestoreEntity(Entity entity)
@@ -407,6 +410,12 @@ public sealed class Simulation
         {
             if (entity.Creature?.Brain is BrainDef brain)
             {
+                if (IsStunned(entity))
+                {
+                    entity.Input = MoveInput.None;
+                    continue;
+                }
+
                 Brain.Think(this, entity, brain, Candidates(brain));
             }
         }
@@ -432,14 +441,44 @@ public sealed class Simulation
     /// <summary>Атаки, которые попросили игроки: ближайшая сущность впереди.</summary>
     private void AttackAll()
     {
-        foreach (Entity entity in _order.Where(entity => entity.AttackRequested))
+        foreach (Entity entity in _order.Where(entity => entity.AttackRequested || entity.ShoveRequested))
         {
-            entity.AttackRequested = false;
-            if (Combat.FrontTarget(this, entity) is Entity target)
+            // Оглушённый ни бить, ни толкать не может, а просьба на этот тик пропадает
+            bool stunned = IsStunned(entity);
+            if (entity.AttackRequested && !stunned && Combat.StrikeTarget(this, entity) is Entity target)
             {
                 Combat.TryAttack(this, entity, target);
             }
+
+            if (entity.ShoveRequested && !stunned && entity.Creature?.Shove is ShoveDef shove
+                && Combat.FrontTarget(this, entity, shove.Range, _ => true) is Entity shoved)
+            {
+                Combat.TryShove(this, entity, shoved);
+            }
+
+            entity.AttackRequested = false;
+            entity.ShoveRequested = false;
         }
+    }
+
+    /// <summary>Оглушена ли сущность на текущем тике.</summary>
+    private bool IsStunned(Entity entity) => Clock.Tick < entity.StunnedUntilTick;
+
+    /// <summary>Новая позиция за тик: отлёт после толчка, оглушённый стоит, остальные идут по вводу.</summary>
+    private WorldPos Move(Entity entity)
+    {
+        if (entity.Knock is (double x, double y, double speed, long until))
+        {
+            if (Clock.Tick <= until)
+            {
+                // Отлёт идёт через то же движение, поэтому стена останавливает его, как и ходьбу
+                return Movement.Step(World, entity.Position, new MoveInput(x, y), Clock.SecondsPerTick, entity.Body with { Speed = speed });
+            }
+
+            entity.Knock = null;
+        }
+
+        return IsStunned(entity) ? entity.Position : Movement.Step(World, entity.Position, entity.Input, Clock.SecondsPerTick, entity.Body);
     }
 
     /// <summary>Смерть существ, у которых смертельный стат дошёл до порога: они уходят из мира в Died.</summary>

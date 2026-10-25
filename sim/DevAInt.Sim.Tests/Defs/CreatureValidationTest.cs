@@ -16,6 +16,7 @@ public class CreatureValidationTest
     [InlineData("""{ "id": "alpha:c", "attack": { "range": 0, "seconds": 1, "stat": "alpha:hp", "add": -1 } }""", "attack: range 0 must be positive")]
     [InlineData("""{ "id": "alpha:c", "attack": { "range": 1, "seconds": 1, "stat": "alpha:nope", "add": -1 } }""", "attack: unknown stat alpha:nope")]
     [InlineData("""{ "id": "alpha:c", "brain": { "sight": 5, "targets": ["alpha:nobody"] } }""", "brain: unknown target creature alpha:nobody")]
+    [InlineData("""{ "id": "alpha:c", "shove": { "range": 1, "seconds": 1, "push": -1, "stun": 1 } }""", "shove: push -1 must not be negative")]
     public void BadCreatureIsError(string creature, string message)
     {
         using TempMods mods = new();

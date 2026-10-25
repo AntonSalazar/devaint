@@ -121,13 +121,16 @@ internal static class Brain
     private static double Distance(WorldPos a, WorldPos b) => Math.Sqrt(((a.X - b.X) * (a.X - b.X)) + ((a.Y - b.Y) * (a.Y - b.Y)));
 }
 
-/// <summary>Атака: дальность, перезарядка и изменение стата цели.</summary>
+/// <summary>Атака и толчок: дальность, перезарядка, урон, отлёт и оглушение цели.</summary>
 internal static class Combat
 {
+    /// <summary>За сколько секунд симуляции цель отлетает после толчка.</summary>
+    private const double KnockSeconds = 0.2;
+
     /// <summary>Атака по цели, если атака готова, цель на дистанции и у неё есть нужный стат; true - удар прошёл.</summary>
     public static bool TryAttack(Simulation sim, Entity attacker, Entity target)
     {
-        if (attacker.Creature?.Attack is not AttackDef attack || sim.Clock.Tick < attacker.AttackReadyTick || !InRange(attacker, target, attack))
+        if (attacker.Creature?.Attack is not AttackDef attack || sim.Clock.Tick < attacker.AttackReadyTick || !InRange(attacker, target, attack.Range))
         {
             return false;
         }
@@ -138,19 +141,35 @@ internal static class Combat
         }
 
         target.Stats.SetValue(stat, target.Stats.Value(stat) + attack.Add);
-        sim.RecordAttack(attacker, target);
-        attacker.AttackReadyTick = sim.Clock.Tick + Math.Max(1, (int)Math.Ceiling(attack.Seconds / sim.Clock.SecondsPerTick));
+        sim.RecordAttack(attacker, target, AttackKind.Strike);
+        attacker.AttackReadyTick = sim.Clock.Tick + Ticks(sim, attack.Seconds);
         return true;
     }
 
-    /// <summary>Ближайшая сущность впереди на дистанции атаки, у которой есть стат атаки, или null.</summary>
-    public static Entity? FrontTarget(Simulation sim, Entity attacker)
+    /// <summary>Толчок цели: она отлетает от толкающего и оглушена; true - толчок прошёл.</summary>
+    public static bool TryShove(Simulation sim, Entity shover, Entity target)
     {
-        if (attacker.Creature?.Attack is not AttackDef attack || !sim.StatTable.TryStatIndex(attack.Stat, out int stat))
+        if (shover.Creature?.Shove is not ShoveDef shove || sim.Clock.Tick < shover.ShoveReadyTick || !InRange(shover, target, shove.Range))
         {
-            return null;
+            return false;
         }
 
+        // Отлёт от толкающего; если стоят в одной точке - туда, куда толкающий смотрит
+        double dx = target.Position.X - shover.Position.X;
+        double dy = target.Position.Y - shover.Position.Y;
+        double length = Math.Sqrt((dx * dx) + (dy * dy));
+        (double x, double y) = length > 1e-6 ? (dx / length, dy / length) : shover.Facing;
+        int knockTicks = Ticks(sim, KnockSeconds);
+        target.Knock = (x, y, shove.Push / (knockTicks * sim.Clock.SecondsPerTick), sim.Clock.Tick + knockTicks);
+        target.StunnedUntilTick = Math.Max(target.StunnedUntilTick, sim.Clock.Tick + Ticks(sim, shove.Stun));
+        shover.ShoveReadyTick = sim.Clock.Tick + Ticks(sim, shove.Seconds);
+        sim.RecordAttack(shover, target, AttackKind.Shove);
+        return true;
+    }
+
+    /// <summary>Ближайшая сущность впереди на дистанции range, подходящая под accept, или null.</summary>
+    public static Entity? FrontTarget(Simulation sim, Entity attacker, double range, Func<Entity, bool> accept)
+    {
         Entity? best = null;
         double bestDistance = double.MaxValue;
         foreach (Entity other in sim.Entities)
@@ -161,7 +180,7 @@ internal static class Combat
 
             // Впереди - в полуплоскости взгляда: сзади удар не достаёт
             bool ahead = (dx * attacker.Facing.X) + (dy * attacker.Facing.Y) >= 0;
-            if (other != attacker && ahead && distance < bestDistance && InRange(attacker, other, attack) && other.Stats.IsActive(stat))
+            if (other != attacker && ahead && distance < bestDistance && InRange(attacker, other, range) && accept(other))
             {
                 (best, bestDistance) = (other, distance);
             }
@@ -170,11 +189,25 @@ internal static class Combat
         return best;
     }
 
-    /// <summary>Цель на том же этаже и на дистанции атаки от центра до центра.</summary>
-    private static bool InRange(Entity attacker, Entity target, AttackDef attack)
+    /// <summary>Ближайшая цель удара впереди: на дистанции атаки и со статом атаки, или null.</summary>
+    public static Entity? StrikeTarget(Simulation sim, Entity attacker)
+    {
+        if (attacker.Creature?.Attack is not AttackDef attack || !sim.StatTable.TryStatIndex(attack.Stat, out int stat))
+        {
+            return null;
+        }
+
+        return FrontTarget(sim, attacker, attack.Range, other => other.Stats.IsActive(stat));
+    }
+
+    /// <summary>Тиков на seconds секунд симуляции, не меньше одного.</summary>
+    private static int Ticks(Simulation sim, double seconds) => Math.Max(1, (int)Math.Ceiling(seconds / sim.Clock.SecondsPerTick));
+
+    /// <summary>Цель на том же этаже и на дистанции range от центра до центра.</summary>
+    private static bool InRange(Entity attacker, Entity target, double range)
     {
         double dx = target.Position.X - attacker.Position.X;
         double dy = target.Position.Y - attacker.Position.Y;
-        return attacker.Position.Z == target.Position.Z && (dx * dx) + (dy * dy) <= attack.Range * attack.Range;
+        return attacker.Position.Z == target.Position.Z && (dx * dx) + (dy * dy) <= range * range;
     }
 }

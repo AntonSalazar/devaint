@@ -25,6 +25,9 @@ public sealed record CreatureDef : IDef
     /// <summary>Атака или null, если существо не атакует.</summary>
     public AttackDef? Attack { get; init; }
 
+    /// <summary>Толчок или null, если существо не толкается.</summary>
+    public ShoveDef? Shove { get; init; }
+
     /// <summary>Поведение или null, если существом управляет игрок.</summary>
     public BrainDef? Brain { get; init; }
 
@@ -58,6 +61,11 @@ public sealed record CreatureDef : IDef
         foreach (string problem in Attack?.Validate(defs) ?? [])
         {
             yield return $"attack: {problem}";
+        }
+
+        foreach (string problem in Shove?.Validate() ?? [])
+        {
+            yield return $"shove: {problem}";
         }
 
         foreach (string problem in Brain?.Validate(defs) ?? [])
@@ -98,6 +106,46 @@ public sealed record AttackDef
         if (!defs.TryGet<StatDef>(Stat, out _))
         {
             yield return $"unknown stat {Stat}";
+        }
+    }
+}
+
+/// <summary>Толчок: дальность, перезарядка, на сколько отлетает цель и на сколько она оглушена.</summary>
+public sealed record ShoveDef
+{
+    /// <summary>Дальность в метрах от центра до центра.</summary>
+    public required double Range { get; init; }
+
+    /// <summary>Перезарядка в секундах симуляции.</summary>
+    public required double Seconds { get; init; }
+
+    /// <summary>На сколько метров отлетает цель.</summary>
+    public required double Push { get; init; }
+
+    /// <summary>На сколько секунд симуляции цель оглушена: не думает, не ходит и не атакует.</summary>
+    public required double Stun { get; init; }
+
+    /// <summary>Проблемы толчка.</summary>
+    internal IEnumerable<string> Validate()
+    {
+        if (Range <= 0)
+        {
+            yield return $"range {Range} must be positive";
+        }
+
+        if (Seconds <= 0)
+        {
+            yield return $"seconds {Seconds} must be positive";
+        }
+
+        if (Push < 0)
+        {
+            yield return $"push {Push} must not be negative";
+        }
+
+        if (Stun < 0)
+        {
+            yield return $"stun {Stun} must not be negative";
         }
     }
 }

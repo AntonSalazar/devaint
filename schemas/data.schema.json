@@ -448,6 +448,33 @@
             ],
             "additionalProperties": false
           },
+          "shove": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "range": {
+                "type": "number"
+              },
+              "seconds": {
+                "type": "number"
+              },
+              "push": {
+                "type": "number"
+              },
+              "stun": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "range",
+              "seconds",
+              "push",
+              "stun"
+            ],
+            "additionalProperties": false
+          },
           "brain": {
             "type": [
               "object",
@@ -526,6 +553,7 @@
             "enum": [
               "aim",
               "attack",
+              "shove",
               "useItem",
               "lua"
             ]

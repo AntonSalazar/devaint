@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using DevAInt.Sim.Creatures;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Mods;
 
@@ -35,8 +36,8 @@ public sealed record ChunkUnloadMessage(int ChunkX, int ChunkY) : ServerMessage;
 /// <summary>Сущность появилась у клиента: позиция, номер вида из CreatureTable или -1 и уровни всех мудлов.</summary>
 public sealed record EntitySpawnMessage(long Id, float X, float Y, int Z, int Creature, IReadOnlyList<int> MoodleLevels) : ServerMessage;
 
-/// <summary>Удар прошёл: кто ударил и кого, для выпада и вспышки на клиенте.</summary>
-public sealed record AttackMessage(long Attacker, long Target) : ServerMessage;
+/// <summary>Удар или толчок прошёл: кто, кого и как, для выпада и вспышки на клиенте.</summary>
+public sealed record AttackMessage(long Attacker, long Target, AttackKind Kind = AttackKind.Strike) : ServerMessage;
 
 /// <summary>Своя сущность сменилась: прежняя умерла, у игрока новый персонаж.</summary>
 public sealed record OwnEntityMessage(long EntityId) : ServerMessage;

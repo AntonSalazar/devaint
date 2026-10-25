@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using DevAInt.Sim.Creatures;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Items;
 using DevAInt.Sim.Logging;
@@ -406,11 +407,11 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
         }
 
         // Удары до исчезновений: цель, убитая этим ударом, ещё известна клиенту
-        foreach ((long attacker, long target) in _sim.Attacks)
+        foreach ((long attacker, long target, AttackKind kind) in _sim.Attacks)
         {
             if (client.Known.ContainsKey(attacker))
             {
-                messages.Add(new AttackMessage(attacker, target));
+                messages.Add(new AttackMessage(attacker, target, kind));
             }
         }
 
