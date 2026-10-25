@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using DevAInt.Sim.Creatures;
+using DevAInt.Sim.Defs;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Logging;
 using DevAInt.Sim.Lua;
@@ -54,6 +56,7 @@ internal static class Program
             WriteHugeMap(temp);
             MeasureSave(temp, "bench:huge", Entities);
             MeasureZombies(temp);
+            MeasureVision(temp);
             return 0;
         }
         finally
@@ -252,6 +255,22 @@ internal static class Program
             }
 
             sim.Tick();
+        });
+    }
+
+    /// <summary>Расчёт видимости человека из core среди комнат большой карты: одна видимость на кадр клиента.</summary>
+    private static void MeasureVision(string mods)
+    {
+        ModLoadResult loaded = ModLoader.Load(mods, ["core", "zombies", "bench"]);
+        Simulation sim = new(loaded.Ok ? loaded : throw new InvalidOperationException(string.Join("\n", loaded.Errors)), new ConsoleLog(), "bench:huge");
+        VisionDef vision = sim.CreatureTable.Creature(sim.CreatureTable.Index("core:human")).Vision!;
+        VisibilityMap map = new();
+        double angle = 0;
+        Measure($"vision {vision.Angle} deg, {vision.Range} m among rooms", () =>
+        {
+            // Взгляд поворачивается каждый раз, чтобы конус задевал разные стены
+            angle += 0.1;
+            Vision.Compute(sim.World, new WorldPos(2050.5, 2050.5, 0), (Math.Cos(angle), Math.Sin(angle)), vision, map);
         });
     }
 

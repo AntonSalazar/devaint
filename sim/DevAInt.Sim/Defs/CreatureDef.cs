@@ -28,6 +28,9 @@ public sealed record CreatureDef : IDef
     /// <summary>Толчок или null, если существо не толкается.</summary>
     public ShoveDef? Shove { get; init; }
 
+    /// <summary>Обзор существа или null, если оно не видит; по нему клиент рисует, что видно.</summary>
+    public VisionDef? Vision { get; init; }
+
     /// <summary>Поведение или null, если существом управляет игрок.</summary>
     public BrainDef? Brain { get; init; }
 
@@ -68,6 +71,11 @@ public sealed record CreatureDef : IDef
             yield return $"shove: {problem}";
         }
 
+        foreach (string problem in Vision?.Validate() ?? [])
+        {
+            yield return $"vision: {problem}";
+        }
+
         foreach (string problem in Brain?.Validate(defs) ?? [])
         {
             yield return $"brain: {problem}";
@@ -106,6 +114,38 @@ public sealed record AttackDef
         if (!defs.TryGet<StatDef>(Stat, out _))
         {
             yield return $"unknown stat {Stat}";
+        }
+    }
+}
+
+/// <summary>Обзор: ширина конуса в градусах, дальность и радиус вокруг, который виден в любую сторону.</summary>
+public sealed record VisionDef
+{
+    /// <summary>Ширина конуса взгляда в градусах, 360 - видно во все стороны.</summary>
+    public required double Angle { get; init; }
+
+    /// <summary>Дальность в метрах.</summary>
+    public required double Range { get; init; }
+
+    /// <summary>Радиус в метрах вокруг, где конус не важен, но стены по-прежнему загораживают.</summary>
+    public double Near { get; init; }
+
+    /// <summary>Проблемы обзора.</summary>
+    internal IEnumerable<string> Validate()
+    {
+        if (Angle is <= 0 or > 360)
+        {
+            yield return $"angle {Angle} must be within 0..360";
+        }
+
+        if (Range <= 0)
+        {
+            yield return $"range {Range} must be positive";
+        }
+
+        if (Near < 0 || Near > Range)
+        {
+            yield return $"near {Near} must be within 0..range";
         }
     }
 }

@@ -475,6 +475,28 @@
             ],
             "additionalProperties": false
           },
+          "vision": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "angle": {
+                "type": "number"
+              },
+              "range": {
+                "type": "number"
+              },
+              "near": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "angle",
+              "range"
+            ],
+            "additionalProperties": false
+          },
           "brain": {
             "type": [
               "object",
