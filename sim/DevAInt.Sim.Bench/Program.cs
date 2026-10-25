@@ -272,6 +272,14 @@ internal static class Program
             angle += 0.1;
             Vision.Compute(sim.World, new WorldPos(2050.5, 2050.5, 0), (Math.Cos(angle), Math.Sin(angle)), vision, map);
         });
+
+        // Пересчёт на клиенте целиком: видимость и отметка в памяти тумана
+        VisionTracker tracker = new();
+        Measure("vision with fog memory", () =>
+        {
+            angle += 0.1;
+            tracker.Update(sim.World, new WorldPos(2050.5, 2050.5, 0), (Math.Cos(angle), Math.Sin(angle)), vision);
+        });
     }
 
     /// <summary>Время действия в миллисекундах.</summary>

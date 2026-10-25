@@ -16,6 +16,9 @@ public partial class EntityView : Node3D
     /// <summary>Длительность красной вспышки при попадании в секундах.</summary>
     public const double FlashSeconds = 0.2;
 
+    /// <summary>За сколько секунд существо появляется или исчезает при входе в видимость и выходе из неё.</summary>
+    public const double FadeSeconds = 0.25;
+
     /// <summary>Рост капсулы.</summary>
     private const float Height = 1.7f;
 
@@ -57,6 +60,9 @@ public partial class EntityView : Node3D
     /// <summary>Сколько секунд осталось вспышке.</summary>
     private double _flash;
 
+    /// <summary>К чему идёт проявление: видно ли существо по видимости своего персонажа.</summary>
+    private float _shownTarget = 1;
+
     /// <summary>Откуда идёт интерполяция.</summary>
     private Vector3 _from;
 
@@ -92,6 +98,12 @@ public partial class EntityView : Node3D
 
     /// <summary>Идёт ли вспышка попадания.</summary>
     public bool IsFlashing => _flash > 0;
+
+    /// <summary>Насколько существо проявлено: 0 - скрыто, 1 - видно целиком.</summary>
+    public float Shown { get; private set; } = 1;
+
+    /// <summary>Видно ли существо своему персонажу: оно плавно появляется или исчезает.</summary>
+    public void SetSeen(bool seen) => _shownTarget = seen ? 1 : 0;
 
     /// <summary>Настройка: id, своя ли сущность, начальная позиция и цвет вида.</summary>
     public void Init(long entityId, bool own, Vector3 position, Color color)
@@ -187,6 +199,14 @@ public partial class EntityView : Node3D
         {
             _flash = Mathf.Max(0, _flash - delta);
             _material.AlbedoColor = _flash > 0 ? _flashColor : _color;
+        }
+
+        // Прозрачность у всей видимой части и полосы действия; совсем скрытое не рисуется вовсе
+        Shown = Mathf.MoveToward(Shown, _shownTarget, (float)(delta / FadeSeconds));
+        Visible = Shown > 0;
+        foreach (Node child in _visual.GetChildren())
+        {
+            ((GeometryInstance3D)child).Transparency = 1 - Shown;
         }
     }
 

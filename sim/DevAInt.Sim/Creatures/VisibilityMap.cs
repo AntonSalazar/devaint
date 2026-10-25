@@ -6,6 +6,9 @@ namespace DevAInt.Sim.Creatures;
 /// <summary>Видимость клеток вокруг глаз: доля каждой клетки от 0 до 1 в квадрате радиуса обзора.</summary>
 public sealed class VisibilityMap
 {
+    /// <summary>Доля видимости, начиная с которой клетка считается видной, например для показа чужих существ.</summary>
+    public const float VisibleThreshold = 0.5f;
+
     /// <summary>Доли видимости по клеткам квадрата построчно.</summary>
     private float[] _coverage = [];
 

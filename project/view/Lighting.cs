@@ -6,6 +6,9 @@ public static class Lighting
     /// <summary>Дальность теней солнца: камера в 20 м от персонажа плюс глубина кадра.</summary>
     public const float ShadowDistance = 30f;
 
+    /// <summary>Цвет фона за картой, им же залито неизведанное.</summary>
+    public static readonly Color Background = new(0.08f, 0.09f, 0.11f);
+
     /// <summary>Окружение: тёмный фон и мягкий рассеянный свет.</summary>
     public static WorldEnvironment CreateEnvironment()
     {
@@ -15,7 +18,7 @@ public static class Lighting
             Environment = new Environment
             {
                 BackgroundMode = Environment.BGMode.Color,
-                BackgroundColor = new Color(0.08f, 0.09f, 0.11f),
+                BackgroundColor = Background,
                 AmbientLightSource = Environment.AmbientSource.Color,
                 AmbientLightColor = new Color(0.75f, 0.78f, 0.85f),
                 AmbientLightEnergy = 0.6f,

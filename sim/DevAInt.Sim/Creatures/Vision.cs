@@ -18,7 +18,7 @@ public static class Vision
         map.Reset(center, radius);
 
         // Сравнение косинусов вместо углов: точка в конусе, если косинус угла до взгляда не меньше косинуса полуширины
-        double halfCos = vision.Angle >= 360 ? -1 : Math.Cos(vision.Angle * Math.PI / 360);
+        double halfCos = HalfCos(vision);
         for (int dy = -radius; dy <= radius; dy++)
         {
             for (int dx = -radius; dx <= radius; dx++)
@@ -28,7 +28,7 @@ public static class Vision
                 foreach ((double sx, double sy) in _samples)
                 {
                     WorldPos point = new(cell.X + sx, cell.Y + sy, cell.Z);
-                    if (InView(eye, point, facing, vision, halfCos) && Sight.Clear(world, eye, point))
+                    if (Sees(world, eye, point, facing, vision, halfCos))
                     {
                         seen++;
                     }
@@ -41,6 +41,13 @@ public static class Vision
         // Своя клетка видна всегда: глаза стоят в ней
         map.Set(0, 0, 1);
     }
+
+    /// <summary>Косинус половины ширины конуса обзора.</summary>
+    internal static double HalfCos(VisionDef vision) => vision.Angle >= 360 ? -1 : Math.Cos(vision.Angle * Math.PI / 360);
+
+    /// <summary>Видят ли глаза точку: она в обзоре и стены не загораживают.</summary>
+    internal static bool Sees(World world, WorldPos eye, WorldPos point, (double X, double Y) facing, VisionDef vision, double halfCos) =>
+        InView(eye, point, facing, vision, halfCos) && Sight.Clear(world, eye, point);
 
     /// <summary>Точка в пределах дальности и в конусе взгляда или в радиусе вокруг.</summary>
     private static bool InView(WorldPos eye, WorldPos point, (double X, double Y) facing, VisionDef vision, double halfCos)

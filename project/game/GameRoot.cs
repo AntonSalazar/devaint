@@ -1,6 +1,8 @@
 using System;
 using System.Linq;
 using DevAInt.Sim;
+using DevAInt.Sim.Creatures;
+using DevAInt.Sim.Defs;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Logging;
 using DevAInt.Sim.Mods;
@@ -25,6 +27,9 @@ public partial class GameRoot : Node3D
     /// <summary>Счётчик времени до тиков.</summary>
     private readonly TickTimer _timer = new();
 
+    /// <summary>Видимость своего персонажа и память тумана войны.</summary>
+    private readonly VisionTracker _vision = new();
+
     /// <summary>Сервер в этом же процессе, null при игре по сети.</summary>
     private GameServer? _server;
 
@@ -45,6 +50,15 @@ public partial class GameRoot : Node3D
 
     /// <summary>Действия управления из данных модов.</summary>
     private GameControls? _controls;
+
+    /// <summary>Таблицы номеров клиента, для обзора своего существа.</summary>
+    private ClientTables? _tables;
+
+    /// <summary>Затемнение кадра по видимости.</summary>
+    private VisibilityOverlay? _overlay;
+
+    /// <summary>Обзор своего существа или null, если затемнения нет.</summary>
+    private VisionDef? _ownVision;
 
     /// <summary>Камера уже встала на свою капсулу.</summary>
     private bool _cameraPlaced;
@@ -179,6 +193,8 @@ public partial class GameRoot : Node3D
             {
                 _view.MoveOwn(own);
             }
+
+            UpdateVision();
         }
 
         // По сети пакеты приходят и между тиками: чужие сущности не должны ждать своего тика
@@ -189,6 +205,7 @@ public partial class GameRoot : Node3D
 
         _controls?.Poll(_client);
         _view.Advance(delta, _timer.Fraction);
+        LookOwn();
         FollowOwn(delta);
         _hud.Refresh(delta);
     }
@@ -232,6 +249,7 @@ public partial class GameRoot : Node3D
     /// <summary>Свет, вид мира, камера и HUD.</summary>
     private void BuildScene(ClientTables tables, WorldTable world)
     {
+        _tables = tables;
         AddChild(Lighting.CreateEnvironment());
         AddChild(Lighting.CreateSun());
         _view = new WorldView();
@@ -243,9 +261,49 @@ public partial class GameRoot : Node3D
         _camera = new IsoCamera();
         _camera.Init(Vector3.Zero);
         AddChild(_camera);
+        _overlay = new VisibilityOverlay();
+        _overlay.Init();
+        _overlay.Visible = false;
+        AddChild(_overlay);
+
+        // Открытая или закрытая дверь меняет, что видно, даже если персонаж стоит
+        _client.Replica.EdgeChanged += (_, _) => _vision.Invalidate();
         _hud = new Hud();
         _hud.Init(new HudModel(tables.Stats, tables.Items, _client.Replica));
         AddChild(_hud);
+    }
+
+    /// <summary>Видимость своего персонажа раз в тик: затемнение кадра и чужие существа только в видимом.</summary>
+    private void UpdateVision()
+    {
+        Replica replica = _client!.Replica;
+        int creature = replica.Entity(replica.OwnEntityId)?.Creature ?? -1;
+        VisionDef? vision = creature >= 0 ? _tables!.Creatures.Creature(creature).Vision : null;
+        _ownVision = vision;
+        if (vision is null || _client.OwnPosition is not WorldPos eye || _view!.Entity(replica.OwnEntityId) is not EntityView own || replica.World is not World world)
+        {
+            // Существо без обзора видит всё, затемнения нет
+            _overlay!.Visible = false;
+            _view!.UpdateVisibility(null);
+            return;
+        }
+
+        if (_vision.Update(world, eye, (own.Facing.X, own.Facing.Z), vision))
+        {
+            _overlay!.Refresh(world, _vision.Seen, _vision.Map.Center);
+        }
+
+        _overlay!.Visible = true;
+        _view.UpdateVisibility(_vision.Map);
+    }
+
+    /// <summary>Глаза для затемнения каждый кадр по плавному положению и взгляду своей капсулы.</summary>
+    private void LookOwn()
+    {
+        if (_overlay!.Visible && _ownVision is not null && _view!.Entity(_client!.Replica.OwnEntityId) is EntityView own)
+        {
+            _overlay.Look(own.Position, own.Facing, _ownVision);
+        }
     }
 
     /// <summary>Приём пакетов; при ошибке протокола игра выходит, результат false.</summary>

@@ -71,6 +71,19 @@ public partial class WorldView : Node3D
         }
     }
 
+    /// <summary>Чужие существа видны, только если их клетка видна своему персонажу хотя бы наполовину; null - видно всё.</summary>
+    public void UpdateVisibility(VisibilityMap? map)
+    {
+        foreach (EntityView entity in _entities.Values)
+        {
+            if (!entity.Own)
+            {
+                CellPos cell = new WorldPos(entity.Position.X, entity.Position.Z, Mathf.RoundToInt(entity.Position.Y / ViewMath.FloorHeight)).Cell;
+                entity.SetSeen(map is null || map.Coverage(cell) >= VisibilityMap.VisibleThreshold);
+            }
+        }
+    }
+
     /// <summary>Опущено ли ребро сейчас, для тестов.</summary>
     public bool IsCut(WallKey key) => _cut.Contains(key);
 
