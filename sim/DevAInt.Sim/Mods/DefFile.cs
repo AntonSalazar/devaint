@@ -14,6 +14,8 @@ internal sealed class DefFile
         ["stats"] = typeof(StatDef),
         ["floors"] = typeof(FloorDef),
         ["walls"] = typeof(WallDef),
+        ["doors"] = typeof(DoorDef),
+        ["windows"] = typeof(WindowDef),
         ["objects"] = typeof(ObjectDef),
         ["maps"] = typeof(MapDef),
         ["actions"] = typeof(ActionDef),
@@ -35,6 +37,12 @@ internal sealed class DefFile
 
     /// <summary>Стены и двери на рёбрах.</summary>
     public List<WallDef?>? Walls { get; init; }
+
+    /// <summary>Двери для дверных проёмов.</summary>
+    public List<DoorDef?>? Doors { get; init; }
+
+    /// <summary>Окна для оконных рам.</summary>
+    public List<WindowDef?>? Windows { get; init; }
 
     /// <summary>Объекты мира.</summary>
     public List<ObjectDef?>? Objects { get; init; }

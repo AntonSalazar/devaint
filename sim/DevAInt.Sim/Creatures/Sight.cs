@@ -3,7 +3,7 @@ using DevAInt.Sim.Grid;
 
 namespace DevAInt.Sim.Creatures;
 
-/// <summary>Видимость между точками: стены, закрытые двери и высокие объекты загораживают, отсутствие пола - нет.</summary>
+/// <summary>Видимость между точками: стены, закрытые двери и высокие объекты загораживают, окна и отсутствие пола - нет.</summary>
 public static class Sight
 {
     /// <summary>Свободна ли прямая между точками одного этажа.</summary>
@@ -34,7 +34,7 @@ public static class Sight
             bool alongX = nextX < nextY;
             double at = alongX ? nextX : nextY;
             Side side = alongX ? (stepX > 0 ? Side.East : Side.West) : (stepY > 0 ? Side.South : Side.North);
-            if (!world.GetEdge(cell, side).IsPassable)
+            if (!world.GetEdge(cell, side).IsTransparent)
             {
                 return at;
             }

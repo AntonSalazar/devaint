@@ -49,6 +49,9 @@ internal sealed record SaveIdLists
     /// <summary>Объекты мира, номер в файле на единицу больше места.</summary>
     public List<string> Objects { get; init; } = [];
 
+    /// <summary>Створки - двери и окна, номер в файле на единицу больше места.</summary>
+    public List<string> Fills { get; init; } = [];
+
     /// <summary>Статы.</summary>
     public List<string> Stats { get; init; } = [];
 

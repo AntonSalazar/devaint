@@ -137,4 +137,4 @@ public sealed record ObjectData(long Id, ushort Def, CellPos Cell, int Rotation)
 }
 
 /// <summary>Один слой этажа чанка в снимке.</summary>
-public sealed record ChunkLevelData(int Z, ushort[] Floors, ushort[] NorthWalls, ushort[] WestWalls, ushort[] Flags);
+public sealed record ChunkLevelData(int Z, ushort[] Floors, ushort[] NorthWalls, ushort[] WestWalls, ushort[] Flags, ushort[] NorthFills, ushort[] WestFills);

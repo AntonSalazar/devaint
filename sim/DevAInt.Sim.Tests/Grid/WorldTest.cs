@@ -1,4 +1,5 @@
 using System;
+using DevAInt.Sim.Defs;
 using DevAInt.Sim.Grid;
 using Xunit;
 
@@ -120,7 +121,31 @@ public class WorldTest
         world.SetEdge(a, Side.East, new Edge(5, false));
         Assert.False(world.CanCross(a, Side.East));
 
-        world.SetEdge(a, Side.East, new Edge(5, true));
+        world.SetEdge(a, Side.East, new Edge(5, false, 3, WallKind.DoorFrame));
+        Assert.False(world.CanCross(a, Side.East));
+
+        world.SetEdge(a, Side.East, new Edge(5, true, 3, WallKind.DoorFrame));
         Assert.True(world.CanCross(a, Side.East));
+
+        world.SetEdge(a, Side.East, new Edge(5, false, 0, WallKind.DoorFrame));
+        Assert.True(world.CanCross(a, Side.East), "empty door frame");
+
+        world.SetEdge(a, Side.East, new Edge(5, true, 3, WallKind.WindowFrame));
+        Assert.False(world.CanCross(a, Side.East), "open window still holds");
+        Assert.Equal(new Edge(5, true, 3, WallKind.WindowFrame), world.GetEdge(a.Neighbor(Side.East), Side.West));
+    }
+
+    /// <summary>Сквозь ребро видно, если оно пустое, это окно или проём без двери или с открытой дверью.</summary>
+    [Theory]
+    [InlineData(WallKind.Wall, 0, false, false)]
+    [InlineData(WallKind.DoorFrame, 0, false, true)]
+    [InlineData(WallKind.DoorFrame, 1, false, false)]
+    [InlineData(WallKind.DoorFrame, 1, true, true)]
+    [InlineData(WallKind.WindowFrame, 1, false, true)]
+    [InlineData(WallKind.WindowFrame, 0, false, true)]
+    public void EdgeTransparency(WallKind kind, ushort fill, bool open, bool transparent)
+    {
+        Assert.Equal(transparent, new Edge(1, open, fill, kind).IsTransparent);
+        Assert.True(Edge.None.IsTransparent && Edge.None.IsPassable);
     }
 }

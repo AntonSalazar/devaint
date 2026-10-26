@@ -1,4 +1,6 @@
-// Полы, стены и двери. Цвет - пока моделей и текстур нет, build - из чего и сколько секунд строится игроком.
+// Полы, стены и створки. Стена бывает сплошной, с дверным проёмом или с оконной рамой, как в Project Zomboid:
+// дверь и окно ставятся в проём и раму отдельно и открываются на E. Цвет - пока моделей и текстур нет,
+// build - из чего и сколько секунд строится игроком.
 {
   "$schema": "../../../schemas/data.schema.json",
   "floors": [
@@ -7,7 +9,18 @@
   "walls": [
     { "id": "core:wood_wall", "kind": "wall", "color": "#c8b89a",
       "build": { "inputs": [ { "item": "core:plank", "count": 3 }, { "item": "core:nails", "count": 4 } ], "tools": ["core:hammer"], "seconds": 10 } },
-    { "id": "core:wood_door", "kind": "door", "color": "#6b3f22",
+    { "id": "core:wood_doorframe", "kind": "doorFrame", "color": "#c8b89a",
+      "build": { "inputs": [ { "item": "core:plank", "count": 2 }, { "item": "core:nails", "count": 2 } ], "tools": ["core:hammer"], "seconds": 8 } },
+    { "id": "core:wood_windowframe", "kind": "windowFrame", "color": "#c8b89a",
+      "build": { "inputs": [ { "item": "core:plank", "count": 3 }, { "item": "core:nails", "count": 3 } ], "tools": ["core:hammer"], "seconds": 10 } },
+  ],
+  "doors": [
+    { "id": "core:wood_door", "frame": "core:wood_doorframe", "color": "#6b3f22",
       "build": { "inputs": [ { "item": "core:plank", "count": 4 }, { "item": "core:nails", "count": 4 } ], "tools": ["core:hammer"], "seconds": 10 } },
+  ],
+  "windows": [
+    // Стекло прозрачное: через окно видно и закрытое, но пройти нельзя
+    { "id": "core:wood_window", "frame": "core:wood_windowframe", "color": "#a9d6e5",
+      "build": { "inputs": [ { "item": "core:glass_pane" }, { "item": "core:plank" }, { "item": "core:nails", "count": 2 } ], "tools": ["core:hammer"], "seconds": 8 } },
   ],
 }

@@ -1,3 +1,5 @@
+using DevAInt.Sim.Defs;
+
 namespace DevAInt.Sim.Grid;
 
 /// <summary>Сторона клетки: x растёт на восток, y на юг.</summary>
@@ -32,12 +34,15 @@ public readonly record struct CellPos(int X, int Y, int Z)
     }
 }
 
-/// <summary>Ребро клетки: номер стены, 0 - пусто, и флаг открытой двери.</summary>
-public readonly record struct Edge(ushort Wall, bool Open)
+/// <summary>Ребро клетки: номер стены, 0 - пусто, открыта ли створка, номер створки - двери или окна, 0 - нет, и вид стены.</summary>
+public readonly record struct Edge(ushort Wall, bool Open, ushort Fill = 0, WallKind Kind = WallKind.Wall)
 {
     /// <summary>Пустое ребро.</summary>
     public static readonly Edge None = default;
 
-    /// <summary>Можно ли пройти: ребро пустое или на нём открытая дверь.</summary>
-    public bool IsPassable => Wall == 0 || Open;
+    /// <summary>Можно ли пройти: ребро пустое или это проём без двери или с открытой дверью; через окно не пройти.</summary>
+    public bool IsPassable => Wall == 0 || (Kind == WallKind.DoorFrame && (Fill == 0 || Open));
+
+    /// <summary>Видно ли насквозь: ребро пустое, оконная рама или проём без двери или с открытой дверью.</summary>
+    public bool IsTransparent => Wall == 0 || Kind == WallKind.WindowFrame || (Kind == WallKind.DoorFrame && (Fill == 0 || Open));
 }

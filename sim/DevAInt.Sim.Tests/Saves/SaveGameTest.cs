@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Items;
 using DevAInt.Sim.Mods;
@@ -147,6 +149,7 @@ public sealed class SaveGameTest : IDisposable
     [InlineData(2)]
     [InlineData(3)]
     [InlineData(4)]
+    [InlineData(5)]
     public void OldFormatIsUpgraded(byte format)
     {
         Simulation original = NewSim();
@@ -158,11 +161,12 @@ public sealed class SaveGameTest : IDisposable
 
         new SaveGame(SaveDir).Save(original);
         string meta = Path.Combine(SaveDir, "meta.json");
+        (int frame, int legacyDoor) = AddLegacyDoor(meta);
         File.WriteAllText(meta, File.ReadAllText(meta).Replace($"\"format\": {SaveGame.FormatVersion}", $"\"format\": {format}"));
         string[] regions = Directory.GetFiles(Path.Combine(SaveDir, "regions"));
         foreach (string region in regions)
         {
-            SaveFile.WriteBinary(region, "DVRG", Downgrade(SaveFile.ReadBinary(region, "DVRG"), format));
+            SaveFile.WriteBinary(region, "DVRG", Downgrade(SaveFile.ReadBinary(region, "DVRG"), format, frame, legacyDoor));
         }
 
         // В настоящем старом сохранении версия стоит и в каждом двоичном файле, не только в мете
@@ -183,6 +187,8 @@ public sealed class SaveGameTest : IDisposable
         Assert.NotNull(reload.LoadPlayer(upgraded, "anna", _log));
         AssertSameWorld(original, old);
         AssertSameWorld(original, upgraded);
+        Assert.Equal(original.World.GetEdge(new CellPos(3, 5, 0), Side.South), old.World.GetEdge(new CellPos(3, 5, 0), Side.South));
+        Assert.Equal(original.World.GetEdge(new CellPos(3, 5, 0), Side.South), upgraded.World.GetEdge(new CellPos(3, 5, 0), Side.South));
         Assert.Equal(original.World.Objects.OrderBy(obj => obj.Id), upgraded.World.Objects.OrderBy(obj => obj.Id));
         Assert.Contains($"\"format\": {SaveGame.FormatVersion}", File.ReadAllText(meta));
         Assert.All(regions, file => Assert.Equal(SaveGame.FormatVersion, File.ReadAllBytes(file)[4]));
@@ -462,8 +468,43 @@ public sealed class SaveGameTest : IDisposable
         return obj.Id;
     }
 
-    /// <summary>Регион текущего формата без сущностей и предметов в контейнерах в байтах старого формата: в 4 у сущностей нет вида действия, в 3 нет счётчика предметов у объекта, в 2 нет и объектов.</summary>
-    private static byte[] Downgrade(byte[] payload, byte format)
+    /// <summary>Слой до формата 6: без массивов створок, дверь в проёме - старая дверь-стена с номером legacyDoor, флаги - только открытость.</summary>
+    private static void WriteOldLevel(PacketWriter writer, ChunkLevelData level, int frame, int legacyDoor)
+    {
+        foreach (ushort[] walls in new[] { level.NorthWalls, level.WestWalls })
+        {
+            ushort[] fills = walls == level.NorthWalls ? level.NorthFills : level.WestFills;
+            for (int i = 0; i < walls.Length; i++)
+            {
+                walls[i] = walls[i] == frame && fills[i] != 0 ? (ushort)legacyDoor : walls[i];
+            }
+        }
+
+        for (int i = 0; i < level.Flags.Length; i++)
+        {
+            level.Flags[i] &= 3;
+        }
+
+        writer.WriteVarInt(level.Z);
+        writer.WriteRuns(level.Floors);
+        writer.WriteRuns(level.NorthWalls);
+        writer.WriteRuns(level.WestWalls);
+        writer.WriteRuns(level.Flags);
+    }
+
+    /// <summary>В таблицу стен меты добавляется старая дверь-стена core:wood_door: номер рамы двери и номер этой старой стены.</summary>
+    private static (int Frame, int LegacyDoor) AddLegacyDoor(string meta)
+    {
+        JsonNode root = JsonNode.Parse(File.ReadAllText(meta))!;
+        JsonArray walls = root["ids"]!["walls"]!.AsArray();
+        int frame = walls.Select(node => node!.GetValue<string>()).ToList().IndexOf("core:wood_doorframe") + 1;
+        walls.Add("core:wood_door");
+        File.WriteAllText(meta, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        return (frame, walls.Count);
+    }
+
+    /// <summary>Регион текущего формата без сущностей и предметов в контейнерах в байтах старого формата: до 6 у рёбер нет створок, в 4 у сущностей нет вида действия, в 3 нет счётчика предметов у объекта, в 2 нет и объектов.</summary>
+    private static byte[] Downgrade(byte[] payload, byte format, int frame, int legacyDoor)
     {
         PacketReader reader = new(payload);
         PacketWriter writer = new();
@@ -477,7 +518,7 @@ public sealed class SaveGameTest : IDisposable
             writer.WriteVarUInt(levels);
             for (ulong level = 0; level < levels; level++)
             {
-                ChunkCodec.Write(writer, ChunkCodec.Read(reader));
+                WriteOldLevel(writer, ChunkCodec.Read(reader), frame, legacyDoor);
             }
 
             ulong objects = reader.ReadVarUInt();

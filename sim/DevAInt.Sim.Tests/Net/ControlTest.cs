@@ -1,3 +1,4 @@
+using System.Linq;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Motion;
@@ -74,18 +75,47 @@ public class ControlTest
         Assert.Equal(75, run.Sim.Entity(dummy).Stats.Value(health));
     }
 
-    /// <summary>E начинает первое применение первого предмета: игрок ест яблоко.</summary>
+    /// <summary>E открывает и закрывает дверь впереди; применение предмета на E больше не висит.</summary>
     [Fact]
-    public void UseItemStartsAction()
+    public void InteractTogglesDoorAhead()
     {
         NetRun run = new();
         GameClient client = run.Connect();
         run.Tick(1, client);
+        Entity own = run.Sim.Entity(client.Replica.OwnEntityId);
+        own.Position = new WorldPos(6.5, 8.4, 0);
+        own.Facing = (0, 1);
+        int interact = run.Sim.ControlTable.Index("core:interact");
 
-        client.SendControl(run.Sim.ControlTable.Index("core:use_item"), true);
+        client.SendControl(interact, true);
+        run.Tick(1, client);
+        bool opened = run.Sim.World.GetEdge(new CellPos(6, 8, 0), Side.South).Open;
+        bool clientSees = client.Replica.World!.GetEdge(new CellPos(6, 8, 0), Side.South).Open;
+        client.SendControl(interact, true);
         run.Tick(1, client);
 
-        Assert.Equal("core:eat", run.Sim.Entity(client.Replica.OwnEntityId).Action?.Action.Id);
+        Assert.True(opened, "door opened");
+        Assert.True(clientSees, "client sees it open");
+        Assert.False(run.Sim.World.GetEdge(new CellPos(6, 8, 0), Side.South).Open, "door closed again");
+        Assert.Null(own.Action);
+        Assert.DoesNotContain(Enumerable.Range(0, run.Sim.ControlTable.Count), i => run.Sim.ControlTable.Control(i).Id == "core:use_item");
+    }
+
+    /// <summary>Мод может повесить применение предмета на свою клавишу: действие ядра useItem осталось.</summary>
+    [Fact]
+    public void ModControlUsesItem()
+    {
+        using TempMods mods = new();
+        mods.CopyRepoMod("core");
+        mods.Manifest("test", depends: "core").Write("test/data/controls.jsonc", """{ "controls": [ { "id": "test:use", "keys": ["key_u"], "does": "useItem" } ] }""");
+        ModLoadResult loaded = mods.Load("core", "test");
+        Assert.True(loaded.Ok, string.Join("\n", loaded.Errors));
+        Simulation sim = new(loaded, new ListLog(), "core:starter_room");
+        long anna = sim.SpawnPlayer("anna");
+
+        sim.Control(anna, sim.ControlTable.Index("test:use"), true);
+
+        Assert.Equal("core:eat", sim.Entity(anna).Action?.Action.Id);
     }
 
     /// <summary>Номер действия вне таблицы - мусорный пакет, подключение разрывается.</summary>

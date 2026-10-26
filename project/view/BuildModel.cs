@@ -18,7 +18,7 @@ public static class BuildModel
     /// <summary>Радиус тела существа без вида, как в sim.</summary>
     private const double DefaultRadius = 0.3;
 
-    /// <summary>Пункты меню: строящиеся объекты, затем стены и двери, последним - разбор; готовность - по своему инвентарю.</summary>
+    /// <summary>Пункты меню: строящиеся объекты, затем стены, проёмы и рамы, двери и окна, последним - разбор; готовность - по своему инвентарю.</summary>
     public static List<BuildOption> Options(Replica replica, ClientTables tables)
     {
         Dictionary<string, int> counts = Counts(replica, tables.Items);
@@ -39,11 +39,19 @@ public static class BuildModel
             }
         }
 
+        for (ushort i = 1; i <= tables.World.FillCount; i++)
+        {
+            if (tables.World.Fill(i).Build is BuildDef build)
+            {
+                options.Add(Option(BuildKind.Fill, i, tables.World.Fill(i).Id, build, counts));
+            }
+        }
+
         options.Add(new BuildOption(BuildKind.RemoveObject, 0, GameLocale.Text(RemoveTitle, "Remove"), string.Empty, true));
         return options;
     }
 
-    /// <summary>Цель пункта в точке пола point: клетка под ней, для стены - ближнее ребро этой клетки; разбор - объект в клетке, иначе стена на ближнем ребре; null - разбирать нечего.</summary>
+    /// <summary>Цель пункта в точке пола point: клетка под ней, для стены и створки - ближнее ребро этой клетки; разбор - объект в клетке, иначе створка, иначе стена на ближнем ребре; null - разбирать нечего.</summary>
     public static BuildTarget? Target(BuildOption option, World world, WorldPos point, int rotation)
     {
         CellPos cell = point.Cell;
@@ -52,7 +60,9 @@ public static class BuildModel
         {
             BuildKind.Object => new BuildTarget(BuildKind.Object, option.Def, cell, rotation),
             BuildKind.Wall => new BuildTarget(BuildKind.Wall, option.Def, cell, (int)side),
+            BuildKind.Fill => new BuildTarget(BuildKind.Fill, option.Def, cell, (int)side),
             _ when world.ObjectAt(cell) is not null => new BuildTarget(BuildKind.RemoveObject, 0, cell, 0),
+            _ when world.GetEdge(cell, side).Fill != 0 => new BuildTarget(BuildKind.RemoveFill, 0, cell, (int)side),
             _ when world.GetEdge(cell, side).Wall != 0 => new BuildTarget(BuildKind.RemoveWall, 0, cell, (int)side),
             _ => null,
         };

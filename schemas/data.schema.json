@@ -145,7 +145,8 @@
           "kind": {
             "enum": [
               "wall",
-              "door"
+              "doorFrame",
+              "windowFrame"
             ]
           },
           "color": {
@@ -194,6 +195,112 @@
         "required": [
           "id",
           "kind"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "doors": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "object",
+        "properties": {
+          "frameKind": {
+            "enum": [
+              "wall",
+              "doorFrame",
+              "windowFrame"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "frame": {
+            "type": "string"
+          },
+          "build": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "inputs": {
+                "$ref": "#/properties/walls/items/properties/build/properties/inputs"
+              },
+              "tools": {
+                "$ref": "#/properties/walls/items/properties/build/properties/tools"
+              },
+              "seconds": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "seconds"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "frame"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "windows": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "object",
+        "properties": {
+          "frameKind": {
+            "enum": [
+              "wall",
+              "doorFrame",
+              "windowFrame"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "frame": {
+            "type": "string"
+          },
+          "build": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "inputs": {
+                "$ref": "#/properties/walls/items/properties/build/properties/inputs"
+              },
+              "tools": {
+                "$ref": "#/properties/walls/items/properties/build/properties/tools"
+              },
+              "seconds": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "seconds"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "frame"
         ],
         "additionalProperties": false
       }
@@ -262,6 +369,9 @@
               "seconds"
             ],
             "additionalProperties": false
+          },
+          "stairs": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -305,6 +415,12 @@
                   ]
                 },
                 "door": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "window": {
                   "type": [
                     "string",
                     "null"
@@ -765,7 +881,8 @@
               "attack",
               "shove",
               "useItem",
-              "lua"
+              "lua",
+              "interact"
             ]
           }
         },

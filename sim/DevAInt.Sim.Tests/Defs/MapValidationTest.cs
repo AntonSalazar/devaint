@@ -7,10 +7,12 @@ namespace DevAInt.Sim.Tests.Defs;
 /// <summary>Тесты смысловой проверки карт после загрузки модов.</summary>
 public class MapValidationTest
 {
-    /// <summary>Полы, стены и двери мода alpha для проверок.</summary>
+    /// <summary>Полы, стены, проёмы, двери и окна мода alpha для проверок.</summary>
     private const string World = """
         { "floors": [ { "id": "alpha:floor" } ],
-          "walls": [ { "id": "alpha:wall", "kind": "wall" }, { "id": "alpha:door", "kind": "door" } ] }
+          "walls": [ { "id": "alpha:wall", "kind": "wall" }, { "id": "alpha:doorframe", "kind": "doorFrame" }, { "id": "alpha:windowframe", "kind": "windowFrame" } ],
+          "doors": [ { "id": "alpha:door", "frame": "alpha:doorframe" } ],
+          "windows": [ { "id": "alpha:window", "frame": "alpha:windowframe" } ] }
         """;
 
     /// <summary>Верная карта загружается без ошибок.</summary>
@@ -20,7 +22,8 @@ public class MapValidationTest
         ModLoadResult result = Load("""
             { "floor": "alpha:floor", "x": 0, "y": 0, "w": 4, "h": 4 },
             { "walls": "alpha:wall", "x": 0, "y": 0, "w": 4, "h": 4, "z": 1 },
-            { "door": "alpha:door", "x": 0, "y": 0, "side": "west", "open": true }
+            { "door": "alpha:door", "x": 0, "y": 0, "side": "west", "open": true },
+            { "window": "alpha:window", "x": 1, "y": 0, "side": "north" }
             """);
 
         Assert.True(result.Ok, string.Join("\n", result.Errors));
@@ -28,15 +31,16 @@ public class MapValidationTest
 
     /// <summary>Неверная операция даёт ошибку с номером операции.</summary>
     [Theory]
-    [InlineData("""{ "x": 0, "y": 0 }""", "build[0]: needs exactly one of floor, walls, door, object")]
-    [InlineData("""{ "floor": "alpha:floor", "walls": "alpha:wall", "x": 0, "y": 0 }""", "build[0]: needs exactly one of floor, walls, door, object")]
+    [InlineData("""{ "x": 0, "y": 0 }""", "build[0]: needs exactly one of floor, walls, door, window, object")]
+    [InlineData("""{ "floor": "alpha:floor", "walls": "alpha:wall", "x": 0, "y": 0 }""", "build[0]: needs exactly one of floor, walls, door, window, object")]
     [InlineData("""{ "floor": "alpha:floor", "x": 6, "y": 0, "w": 3 }""", "build[0]: rect 6,0 3x1 is outside the map 8x8")]
     [InlineData("""{ "floor": "alpha:floor", "x": 0, "y": 0, "z": 9 }""", "build[0]: z 9 must be within -2..8")]
     [InlineData("""{ "floor": "alpha:nope", "x": 0, "y": 0 }""", "build[0]: unknown floor alpha:nope")]
-    [InlineData("""{ "walls": "alpha:door", "x": 0, "y": 0 }""", "build[0]: unknown wall alpha:door")]
+    [InlineData("""{ "walls": "alpha:doorframe", "x": 0, "y": 0 }""", "build[0]: unknown wall alpha:doorframe")]
     [InlineData("""{ "door": "alpha:wall", "x": 0, "y": 0, "side": "north" }""", "build[0]: unknown door alpha:wall")]
-    [InlineData("""{ "door": "alpha:door", "x": 0, "y": 0 }""", "build[0]: side is required for door and only for door")]
-    [InlineData("""{ "floor": "alpha:floor", "x": 0, "y": 0, "open": true }""", "build[0]: open is only for door")]
+    [InlineData("""{ "door": "alpha:door", "x": 0, "y": 0 }""", "build[0]: side is required for door and window and only for them")]
+    [InlineData("""{ "window": "alpha:door", "x": 0, "y": 0, "side": "north" }""", "build[0]: unknown window alpha:door")]
+    [InlineData("""{ "floor": "alpha:floor", "x": 0, "y": 0, "open": true }""", "build[0]: open is only for door and window")]
     [InlineData("""{ "object": "alpha:nope", "x": 0, "y": 0 }""", "build[0]: unknown object alpha:nope")]
     [InlineData("""{ "floor": "alpha:floor", "x": 0, "y": 0, "rotation": 1 }""", "build[0]: rotation is only for object")]
     public void BadOpIsError(string op, string message)
@@ -82,6 +86,20 @@ public class MapValidationTest
 
         Assert.Equal(id, error.JsonPath);
         Assert.Contains("must look like #rrggbb", error.Message);
+    }
+
+    /// <summary>Дверь ставится только в дверной проём: рама другого вида - ошибка двери.</summary>
+    [Fact]
+    public void DoorNeedsDoorFrame()
+    {
+        using TempMods mods = new();
+        mods.Manifest("alpha").Write("alpha/data/world.jsonc", """
+            { "walls": [ { "id": "alpha:wall", "kind": "wall" } ], "doors": [ { "id": "alpha:door", "frame": "alpha:wall" } ] }
+            """);
+
+        ModError error = Assert.Single(mods.Load("alpha").Errors);
+
+        Assert.Equal("frame alpha:wall must be a wall of kind DoorFrame", error.Message);
     }
 
     /// <summary>Мод alpha с картой 8 на 8 и операциями build.</summary>

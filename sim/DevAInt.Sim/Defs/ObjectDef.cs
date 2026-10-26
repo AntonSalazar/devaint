@@ -35,6 +35,9 @@ public sealed record ObjectDef : IDef
     /// <summary>Как объект строится игроком, null - не строится и не разбирается.</summary>
     public BuildDef? Build { get; init; }
 
+    /// <summary>Лестница на этаж выше: шириной в клетку, по ней можно ходить, без поворота поднимается на север.</summary>
+    public bool Stairs { get; init; }
+
     /// <inheritdoc/>
     public IEnumerable<string> Validate(DefDatabase defs)
     {
@@ -61,6 +64,11 @@ public sealed record ObjectDef : IDef
         foreach (string problem in Build?.Validate(defs) ?? [])
         {
             yield return problem;
+        }
+
+        if (Stairs && (W != 1 || H < 2 || BlocksMove))
+        {
+            yield return "stairs must be 1 cell wide, at least 2 long and must not block walking";
         }
     }
 }

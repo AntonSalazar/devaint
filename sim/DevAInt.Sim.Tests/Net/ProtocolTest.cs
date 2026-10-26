@@ -23,6 +23,7 @@ public class ProtocolTest
             new EntityRemoveMessage(long.MaxValue),
             new FloorChangeMessage(new CellPos(4095, 0, 8), 65_535),
             new EdgeChangeMessage(new CellPos(32, 31, 0), true, new Edge(9, true)),
+            new EdgeChangeMessage(new CellPos(1, 2, 3), false, new Edge(4, false, 7, Sim.Defs.WallKind.WindowFrame)),
             new AttackMessage(3, long.MaxValue),
             new AttackMessage(4, 5, Sim.Creatures.AttackKind.Shove),
             new OwnEntityMessage(12),
@@ -45,7 +46,9 @@ public class ProtocolTest
     {
         ushort[] floors = new ushort[1024];
         floors[5] = 2;
-        ChunkLevelData level = new(-1, floors, new ushort[1024], new ushort[1024], new ushort[1024]);
+        ushort[] fills = new ushort[1024];
+        fills[7] = 4;
+        ChunkLevelData level = new(-1, floors, new ushort[1024], new ushort[1024], new ushort[1024], new ushort[1024], fills);
         level.Flags[1023] = 3;
         ServerFrame frame = new(1,
         [
@@ -62,6 +65,7 @@ public class ProtocolTest
         Assert.Equal((1, 2, -1), (snapshot.ChunkX, snapshot.ChunkY, readLevel.Z));
         Assert.Equal(floors, readLevel.Floors);
         Assert.Equal(3, readLevel.Flags[1023]);
+        Assert.Equal(fills, readLevel.WestFills);
         Assert.Equal(new ObjectData(7, 3, new CellPos(40, 70, -1), 3), Assert.Single(snapshot.Objects));
 
         EntitySpawnMessage spawn = Assert.IsType<EntitySpawnMessage>(read.Messages[1]);

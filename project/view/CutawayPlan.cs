@@ -22,7 +22,7 @@ public static class CutawayPlan
     public static HashSet<WallKey> Compute(World world, Vector3 feet, Vector3 back, IEnumerable<WallInstance> walls)
     {
         HashSet<WallKey> cut = [];
-        CellPos cell = new(Mathf.FloorToInt(feet.X), Mathf.FloorToInt(feet.Z), Mathf.RoundToInt(feet.Y / ViewMath.FloorHeight));
+        CellPos cell = new(Mathf.FloorToInt(feet.X), Mathf.FloorToInt(feet.Z), ViewMath.Level(feet.Y));
         if (Rooms.Find(world, cell) is HashSet<CellPos> room)
         {
             AddRoomWalls(world, room, back, cut);
@@ -47,7 +47,8 @@ public static class CutawayPlan
         foreach (ObjectInstance obj in objects)
         {
             bool near = obj.Transform.Origin.DistanceTo(feet) <= OccluderRange;
-            if (obj.Height >= CutObjectHeight && near && Cutaway.OccludesBox(obj.Transform, feet, back))
+            // Плита лестницы повёрнута, а проверка перекрытия - для боксов без поворота; лестница персонажа и не прячет
+            if (!obj.IsStairs && obj.Height >= CutObjectHeight && near && Cutaway.OccludesBox(obj.Transform, feet, back))
             {
                 cut.Add(obj.Id);
             }

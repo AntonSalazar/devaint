@@ -37,14 +37,16 @@ public class StarterRoomTest
         Assert.False(_world.CanCross(new CellPos(5, 4, 0), Side.North));
     }
 
-    /// <summary>Дверь в южной стене закрыта и стоит на нужном ребре.</summary>
+    /// <summary>Дверь в южной стене закрыта и стоит в дверном проёме на нужном ребре.</summary>
     [Fact]
     public void DoorIsClosedOnSouthWall()
     {
         CellPos doorCell = new(6, 8, 0);
         Edge door = _world.GetEdge(doorCell, Side.South);
 
-        Assert.Equal(WallKind.Door, _table.Wall(door.Wall).Kind);
+        Assert.Equal(WallKind.DoorFrame, _table.Wall(door.Wall).Kind);
+        Assert.Equal(WallKind.DoorFrame, door.Kind);
+        Assert.Equal("core:wood_door", _table.Fill(door.Fill).Id);
         Assert.False(door.Open);
         Assert.False(_world.CanCross(doorCell, Side.South));
         Assert.Equal(door, _world.GetEdge(doorCell.Neighbor(Side.South), Side.North));
@@ -65,7 +67,7 @@ public class StarterRoomTest
         Assert.True(world.CanCross(doorCell.Neighbor(Side.South), Side.North));
     }
 
-    /// <summary>ASCII-дамп показывает двор, комнату и закрытую дверь.</summary>
+    /// <summary>ASCII-дамп показывает двор, комнату, закрытую дверь и окно в восточной стене.</summary>
     [Fact]
     public void AsciiShowsRoom()
     {
@@ -78,7 +80,7 @@ public class StarterRoomTest
                |           |
             . .|. . . . . .|. .
                |           |
-            . .|. . . . . .|. .
+            . .|. . . . . .W. .
                |           |
             . .|. . . . . .|. .
                |           |
@@ -92,10 +94,10 @@ public class StarterRoomTest
 
             """;
 
-        Assert.Equal(expected.Replace("\r\n", "\n"), WorldDump.Ascii(_world, _table));
+        Assert.Equal(expected.Replace("\r\n", "\n"), WorldDump.Ascii(_world));
     }
 
     /// <summary>Пустой этаж даёт пустой дамп.</summary>
     [Fact]
-    public void EmptyLevelIsEmpty() => Assert.Equal(string.Empty, WorldDump.Ascii(_world, _table, z: 1));
+    public void EmptyLevelIsEmpty() => Assert.Equal(string.Empty, WorldDump.Ascii(_world, z: 2));
 }

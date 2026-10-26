@@ -326,6 +326,8 @@ public sealed class Replica(ClientTables tables)
             data.Floors.CopyTo(level.Floors, 0);
             data.NorthWalls.CopyTo(level.NorthWalls, 0);
             data.WestWalls.CopyTo(level.WestWalls, 0);
+            data.NorthFills.CopyTo(level.NorthFills, 0);
+            data.WestFills.CopyTo(level.WestFills, 0);
             for (int i = 0; i < data.Flags.Length; i++)
             {
                 level.Flags[i] = (byte)data.Flags[i];

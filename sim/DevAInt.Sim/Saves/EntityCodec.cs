@@ -173,6 +173,7 @@ internal static class EntityCodec
         {
             BuildKind.Object => ids.Objects.NumberOf(world.Object(build.Def).Id),
             BuildKind.Wall => ids.Walls.NumberOf(world.Wall(build.Def).Id),
+            BuildKind.Fill => ids.Fills.NumberOf(world.Fill(build.Def).Id),
             _ => 0,
         };
         writer.WriteVarUInt((ulong)number);
@@ -199,6 +200,7 @@ internal static class EntityCodec
         {
             BuildKind.Object => tables.World.TryObjectIndex(ids.Objects.IdAt(number), out def),
             BuildKind.Wall => tables.World.TryWallIndex(ids.Walls.IdAt(number), out def),
+            BuildKind.Fill => tables.World.TryFillIndex(ids.Fills.IdAt(number), out def),
             _ => true,
         };
         return known ? new BuildTarget((BuildKind)kind, def, cell, turn) : null;

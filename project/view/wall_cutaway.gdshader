@@ -8,8 +8,12 @@ render_mode cull_disabled;
 // и пишет признак в красный канал своих данных экземпляра MultiMesh.
 // Тени этот шейдер не отбрасывает: целые стены для теней рисует отдельный узел.
 
-// Высота пенька, который остаётся от опущенной стены.
+// Высота пенька, который остаётся от опущенной стены, над полом этажа: перемычка над проёмом
+// выше пенька и при срезе пропадает целиком, а не висит в воздухе.
 uniform float cut_height = 0.3;
+
+// Высота этажа: пол этажа куска - кратное ей ниже его низа.
+uniform float floor_height = 3.0;
 
 varying vec3 world_position;
 varying float cut;
@@ -20,7 +24,8 @@ void vertex() {
 	cut = INSTANCE_CUSTOM.r;
 
 	// У MultiMesh матрица модели включает положение экземпляра: начало - центр куска, ось Y - высота
-	base_y = (MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).y - length(MODEL_MATRIX[1].xyz) * 0.5;
+	float bottom = (MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).y - length(MODEL_MATRIX[1].xyz) * 0.5;
+	base_y = floor((bottom + 0.01) / floor_height) * floor_height;
 }
 
 void fragment() {

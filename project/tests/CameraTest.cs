@@ -129,6 +129,21 @@ public class CameraTest : TestCase
         camera.Free();
     }
 
+    /// <summary>Стена ровно там, куда камера хочет встать: камера всё равно останавливается перед ней с зазором, а не в ней.</summary>
+    public void TestShoulderStopsBeforeWallAtExactDistance()
+    {
+        World world = new(16, 16);
+        world.SetEdge(new CellPos(5, 3, 0), Side.North, new Edge(1, false));
+        ShoulderCamera camera = Shoulder();
+
+        // Ноги на 5.5, камера на 2.5 м сзади - ровно на линии стены z = 3
+        camera.Follow(_feet, world, false, 0);
+
+        // Зазор отмеряется вдоль луча к камере, а он идёт под углом из-за сдвига на плечо: по перпендикуляру чуть меньше
+        Check(camera.Position.Z > 3.15, $"camera z {camera.Position.Z} keeps the margin before the wall");
+        camera.Free();
+    }
+
     /// <summary>От первого лица камера в глазах и смотрит по взгляду, прицел сужает угол обзора.</summary>
     public void TestFirstPersonInEyes()
     {

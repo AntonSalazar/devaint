@@ -16,11 +16,14 @@ namespace DevAInt.Sim.Saves;
 /// <summary>Сохранение в папке: meta.json, регионы чанков с сущностями и персонажи игроков отдельными файлами.</summary>
 public sealed partial class SaveGame(string directory)
 {
-    /// <summary>Версия формата файлов сохранения: в 3 у чанков появились объекты, в 4 - содержимое контейнеров, в 5 - вид идущего действия.</summary>
-    public const byte FormatVersion = 5;
+    /// <summary>Версия формата файлов сохранения: в 3 у чанков появились объекты, в 4 - содержимое контейнеров, в 5 - вид идущего действия, в 6 - створки в рёбрах.</summary>
+    public const byte FormatVersion = 6;
 
     /// <summary>Самый старый формат, который ещё читается: 2, без объектов в регионах.</summary>
     public const byte OldestFormat = 2;
+
+    /// <summary>Первый формат со створками - дверями и окнами - отдельно от стен.</summary>
+    private const byte FormatWithFills = 6;
 
     /// <summary>Первый формат с содержимым контейнеров.</summary>
     private const byte FormatWithContainers = 4;
@@ -77,6 +80,7 @@ public sealed partial class SaveGame(string directory)
         ushort[] floors = ToSaveNumbers(sim.WorldTable.FloorCount, i => sim.WorldTable.Floor(i).Id, _ids.Floors);
         ushort[] walls = ToSaveNumbers(sim.WorldTable.WallCount, i => sim.WorldTable.Wall(i).Id, _ids.Walls);
         ushort[] objects = ToSaveNumbers(sim.WorldTable.ObjectCount, i => sim.WorldTable.Object(i).Id, _ids.Objects);
+        ushort[] fills = ToSaveNumbers(sim.WorldTable.FillCount, i => sim.WorldTable.Fill(i).Id, _ids.Fills);
         RegisterIds(sim);
 
         // Мета первой и с полной таблицей id: если запись оборвётся дальше, старые и новые файлы
@@ -88,7 +92,7 @@ public sealed partial class SaveGame(string directory)
         HashSet<(int X, int Y)> regions = [.. sim.World.DirtyRegions, .. entities.Keys, .. _entityRegions];
         foreach ((int X, int Y) region in regions)
         {
-            WriteRegion(sim, region, entities.GetValueOrDefault(region) ?? [], new SaveNumbers(floors, walls, objects));
+            WriteRegion(sim, region, entities.GetValueOrDefault(region) ?? [], new SaveNumbers(floors, walls, objects, fills));
         }
 
         foreach (Entity player in sim.Entities.Where(entity => entity.PlayerId is not null))
@@ -346,6 +350,8 @@ public sealed partial class SaveGame(string directory)
                 Renumber(data.Floors, numbers.Floors);
                 Renumber(data.NorthWalls, numbers.Walls);
                 Renumber(data.WestWalls, numbers.Walls);
+                Renumber(data.NorthFills, numbers.Fills);
+                Renumber(data.WestFills, numbers.Fills);
                 ChunkCodec.Write(writer, data);
             }
 
@@ -438,7 +444,7 @@ public sealed partial class SaveGame(string directory)
     }
 
     /// <summary>Номера сохранения для номеров таблицы мира: полы, стены и объекты.</summary>
-    private sealed record SaveNumbers(ushort[] Floors, ushort[] Walls, ushort[] Objects);
+    private sealed record SaveNumbers(ushort[] Floors, ushort[] Walls, ushort[] Objects, ushort[] Fills);
 
     /// <summary>Чтение регионов в мир: слои чанков с переводом номеров, объекты, если они есть в формате, сущности и id, которых нет в модах.</summary>
     private sealed class RegionReader(World world, SaveIds ids, SaveTables tables, ISimLog log)
@@ -448,6 +454,12 @@ public sealed partial class SaveGame(string directory)
 
         /// <summary>Номера стен сохранения в номера текущих модов, -1 если стены нет в модах.</summary>
         private readonly int[] _walls = FromSaveNumbers(ids.Walls, id => tables.World.TryWallIndex(id, out ushort index) ? index : -1);
+
+        /// <summary>Номера створок сохранения в номера текущих модов, -1 если створки нет в модах.</summary>
+        private readonly int[] _fills = FromSaveNumbers(ids.Fills, id => tables.World.TryFillIndex(id, out ushort index) ? index : -1);
+
+        /// <summary>До формата 6 дверь была стеной: номер стены сохранения, который теперь дверь, - её рама и сама дверь, иначе нули.</summary>
+        private readonly (ushort Frame, ushort Door)[] _legacyDoors = LegacyDoors(ids.Walls, tables.World);
 
         /// <summary>Номера объектов сохранения в номера текущих модов, -1 если объекта нет в модах.</summary>
         private readonly int[] _objects = FromSaveNumbers(ids.Objects, id => tables.World.TryObjectIndex(id, out ushort index) ? index : -1);
@@ -483,6 +495,22 @@ public sealed partial class SaveGame(string directory)
             });
         }
 
+        /// <summary>Рама и дверь старой двери-стены, если номер стены сохранения теперь дверь, иначе нули.</summary>
+        private static (ushort Frame, ushort Door)[] LegacyDoors(SaveIdList walls, WorldTable table)
+        {
+            (ushort Frame, ushort Door)[] doors = new (ushort Frame, ushort Door)[walls.Ids.Count + 1];
+            for (int i = 0; i < walls.Ids.Count; i++)
+            {
+                string id = walls.Ids[i];
+                if (!table.TryWallIndex(id, out _) && table.TryFillIndex(id, out ushort door) && table.TryWallIndex(table.Fill(door).Frame, out ushort frame))
+                {
+                    doors[i + 1] = (frame, door);
+                }
+            }
+
+            return doors;
+        }
+
         /// <summary>Перевод номеров сохранения в номера модов через id.</summary>
         private static int[] FromSaveNumbers(SaveIdList ids, Func<string, int> current)
         {
@@ -509,7 +537,7 @@ public sealed partial class SaveGame(string directory)
             int levels = reader.ReadCount(World.LevelCount);
             for (int i = 0; i < levels; i++)
             {
-                ReadLevel(ChunkCodec.Read(reader), chunkX, chunkY);
+                ReadLevel(ChunkCodec.Read(reader, format >= FormatWithFills), chunkX, chunkY, format);
             }
 
             int objects = format >= FormatWithObjects ? reader.ReadCount(MaxObjects) : 0;
@@ -526,7 +554,7 @@ public sealed partial class SaveGame(string directory)
         }
 
         /// <summary>Слой этажа в мир с переводом номеров полов и стен.</summary>
-        private void ReadLevel(ChunkLevelData data, int chunkX, int chunkY)
+        private void ReadLevel(ChunkLevelData data, int chunkX, int chunkY, byte format)
         {
             if (data.Z is < World.MinLevel or > World.MaxLevel)
             {
@@ -537,13 +565,34 @@ public sealed partial class SaveGame(string directory)
             for (int i = 0; i < data.Floors.Length; i++)
             {
                 level.Floors[i] = Translate(data.Floors[i], _floors, ids.Floors);
-                level.NorthWalls[i] = Translate(data.NorthWalls[i], _walls, ids.Walls);
-                level.WestWalls[i] = Translate(data.WestWalls[i], _walls, ids.Walls);
-                level.Flags[i] = data.Flags[i] <= (ChunkLevel.NorthOpen | ChunkLevel.WestOpen)
-                    ? (byte)data.Flags[i]
-                    : throw new ProtocolException($"edge flags {data.Flags[i]} are not valid");
+                (level.NorthWalls[i], level.NorthFills[i]) = TranslateEdge(data.NorthWalls[i], data.NorthFills[i], format);
+                (level.WestWalls[i], level.WestFills[i]) = TranslateEdge(data.WestWalls[i], data.WestFills[i], format);
+                if (data.Flags[i] > byte.MaxValue >> 2)
+                {
+                    throw new ProtocolException($"edge flags {data.Flags[i]} are not valid");
+                }
+
+                // Открытость створок - из файла, вид стены - из текущих модов: мод мог поменять вид, а файл старый
+                int open = data.Flags[i] & (ChunkLevel.NorthOpen | ChunkLevel.WestOpen);
+                int north = (int)KindOf(level.NorthWalls[i]) << ChunkLevel.NorthKindShift;
+                int west = (int)KindOf(level.WestWalls[i]) << ChunkLevel.WestKindShift;
+                level.Flags[i] = (byte)(open | north | west);
             }
         }
+
+        /// <summary>Стена и створка ребра в номерах модов; до формата 6 бывшая дверь-стена становится рамой с дверью.</summary>
+        private (ushort Wall, ushort Fill) TranslateEdge(ushort wall, ushort fill, byte format)
+        {
+            if (format < FormatWithFills)
+            {
+                return wall < _legacyDoors.Length && _legacyDoors[wall].Frame != 0 ? _legacyDoors[wall] : (Translate(wall, _walls, ids.Walls), (ushort)0);
+            }
+
+            return (Translate(wall, _walls, ids.Walls), Translate(fill, _fills, ids.Fills));
+        }
+
+        /// <summary>Вид стены по номеру мода, у пустого ребра - сплошная.</summary>
+        private WallKind KindOf(ushort wall) => wall == 0 ? WallKind.Wall : tables.World.Wall(wall).Kind;
 
         /// <summary>Объект чанка: id, номер вида, клетка внутри чанка, поворот и с формата 4 - предметы контейнера.</summary>
         private void ReadObject(PacketReader reader, int chunkX, int chunkY, byte format)

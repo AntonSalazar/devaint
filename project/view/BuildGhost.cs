@@ -37,6 +37,10 @@ public partial class BuildGhost : MeshInstance3D
                 return ObjectBox(WorldObject.Create(0, target.Def, def, target.Cell, target.Turn), (float)def.Height);
             case BuildKind.RemoveObject:
                 return world.ObjectAt(target.Cell) is WorldObject obj ? ObjectBox(obj, (float)table.Object(obj.Def).Height) : null;
+            case BuildKind.Fill:
+                return PaneBox(target.Cell, target.Side, table.Fill(target.Def).FrameKind);
+            case BuildKind.RemoveFill:
+                return PaneBox(target.Cell, target.Side, world.GetEdge(target.Cell, target.Side).Kind);
             default:
                 return WallBox(target.Cell, target.Side);
         }
@@ -71,15 +75,25 @@ public partial class BuildGhost : MeshInstance3D
         return new Transform3D(Basis.Identity.Scaled(size), center);
     }
 
-    /// <summary>Бокс стены на ребре side клетки.</summary>
-    private static Transform3D WallBox(CellPos cell, Side side)
+    /// <summary>Бокс створки на ребре: дверь от пола до верха проёма, окно от подоконника до верха рамы.</summary>
+    private static Transform3D PaneBox(CellPos cell, Side side, WallKind frame)
+    {
+        bool door = frame == WallKind.DoorFrame;
+        return EdgeBox(cell, side, door ? 0 : ChunkMesh.SillHeight, door ? ChunkMesh.DoorHeight : ChunkMesh.WindowTop);
+    }
+
+    /// <summary>Бокс стены на ребре side клетки во всю высоту этажа.</summary>
+    private static Transform3D WallBox(CellPos cell, Side side) => EdgeBox(cell, side, 0, ChunkMesh.WallHeight);
+
+    /// <summary>Бокс на ребре side клетки от высоты bottom до top.</summary>
+    private static Transform3D EdgeBox(CellPos cell, Side side, float bottom, float top)
     {
         // Северное и южное ребро идут вдоль X, западное и восточное - вдоль Z
         bool alongX = side is Side.North or Side.South;
         float x = cell.X + (side == Side.East ? 1 : alongX ? 0.5f : 0);
         float z = cell.Y + (side == Side.South ? 1 : alongX ? 0 : 0.5f);
-        Vector3 size = alongX ? new Vector3(1, ChunkMesh.WallHeight, ChunkMesh.WallThickness * 2) : new Vector3(ChunkMesh.WallThickness * 2, ChunkMesh.WallHeight, 1);
-        Vector3 center = ViewMath.ToGodot(x, z, cell.Z) + (Vector3.Up * ChunkMesh.WallHeight / 2);
+        Vector3 size = alongX ? new Vector3(1, top - bottom, ChunkMesh.WallThickness * 2) : new Vector3(ChunkMesh.WallThickness * 2, top - bottom, 1);
+        Vector3 center = ViewMath.ToGodot(x, z, cell.Z) + (Vector3.Up * (bottom + top) / 2);
         return new Transform3D(Basis.Identity.Scaled(size), center);
     }
 }

@@ -13,6 +13,12 @@ public sealed class WorldTable
     /// <summary>Стены по номерам, номер 0 не используется.</summary>
     private readonly List<WallDef?> _walls = [null];
 
+    /// <summary>Створки, двери и окна, по номерам, номер 0 не используется.</summary>
+    private readonly List<FillDef?> _fills = [null];
+
+    /// <summary>Номер створки по id.</summary>
+    private readonly Dictionary<string, ushort> _fillIndex = [];
+
     /// <summary>Объекты по номерам, номер 0 не используется.</summary>
     private readonly List<ObjectDef?> _objects = [null];
 
@@ -38,6 +44,11 @@ public sealed class WorldTable
             _wallIndex[wall.Id] = Add(_walls, wall);
         }
 
+        foreach (FillDef fill in defs.All<FillDef>())
+        {
+            _fillIndex[fill.Id] = Add(_fills, fill);
+        }
+
         foreach (ObjectDef obj in defs.All<ObjectDef>())
         {
             _objectIndex[obj.Id] = Add(_objects, obj);
@@ -50,8 +61,20 @@ public sealed class WorldTable
     /// <summary>Число стен, номера от 1 до WallCount.</summary>
     public int WallCount => _walls.Count - 1;
 
+    /// <summary>Число створок, номера от 1 до FillCount.</summary>
+    public int FillCount => _fills.Count - 1;
+
     /// <summary>Число объектов, номера от 1 до ObjectCount.</summary>
     public int ObjectCount => _objects.Count - 1;
+
+    /// <summary>Створка по номеру.</summary>
+    public FillDef Fill(ushort index) => _fills[index]!;
+
+    /// <summary>Номер створки по id, исключение если её нет.</summary>
+    public ushort FillIndex(string id) => _fillIndex[id];
+
+    /// <summary>Номер створки по id, false если её нет.</summary>
+    public bool TryFillIndex(string id, out ushort index) => _fillIndex.TryGetValue(id, out index);
 
     /// <summary>Пол по номеру.</summary>
     public FloorDef Floor(ushort index) => _floors[index]!;

@@ -28,7 +28,7 @@ public class GameControlsTest : TestCase
 
         CheckEqual(2, InputMap.ActionGetEvents("core:aim").Count, "aim keys");
         Check(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Pressed = true }.IsAction("core:attack"), "left mouse attacks");
-        Check(new InputEventKey { PhysicalKeycode = Key.E, Pressed = true }.IsAction("core:use_item"), "e uses item");
+        Check(new InputEventKey { PhysicalKeycode = Key.E, Pressed = true }.IsAction("core:interact"), "e opens and closes");
         Check(!controls.IsAiming(), "not aiming without keys");
         CheckEqual(0, log.Errors.Count, "no errors");
     }

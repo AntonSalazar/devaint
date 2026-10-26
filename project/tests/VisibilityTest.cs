@@ -29,7 +29,8 @@ public class VisibilityTest : TestCase
         world.SetEdge(new CellPos(30, 20, 0), Side.North, new Edge(1, false));
         world.SetEdge(new CellPos(30, 20, 0), Side.West, new Edge(1, false));
         world.SetEdge(new CellPos(31, 20, 0), Side.East, new Edge(1, false));
-        world.SetEdge(new CellPos(33, 20, 0), Side.West, new Edge(1, true));
+        world.SetEdge(new CellPos(33, 20, 0), Side.West, new Edge(1, true, 1, WallKind.DoorFrame));
+        world.SetEdge(new CellPos(34, 20, 0), Side.North, new Edge(1, false, 1, WallKind.WindowFrame));
         world.SetFloor(new CellPos(35, 20, 0), 1);
         world.PlaceObject(WorldObject.Create(1, 1, new ObjectDef { Id = "test:wardrobe", BlocksSight = true }, new CellPos(35, 20, 0), 0));
         CellPos origin = Origin(30, 30);
@@ -39,6 +40,7 @@ public class VisibilityTest : TestCase
         CheckEqual((byte)(VisibilityOverlay.NorthWall | VisibilityOverlay.WestWall), Wall(texels, origin, 30, 20), "north and west walls");
         CheckEqual(VisibilityOverlay.WestWall, Wall(texels, origin, 32, 20), "east wall is the west wall of the neighbour");
         CheckEqual((byte)0, Wall(texels, origin, 33, 20), "open door does not block");
+        CheckEqual((byte)0, Wall(texels, origin, 34, 20), "window does not block sight");
         CheckEqual(VisibilityOverlay.SightBlock, Wall(texels, origin, 35, 20), "wardrobe blocks sight");
     }
 

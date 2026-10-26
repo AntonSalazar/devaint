@@ -135,7 +135,7 @@ public sealed record CreatureSpawnDef
     public int Count { get; init; } = 1;
 }
 
-/// <summary>Операция построения: ровно одно из floor, walls, door, object и прямоугольник или клетка.</summary>
+/// <summary>Операция построения: ровно одно из floor, walls, door, window, object и прямоугольник или клетка.</summary>
 public sealed record MapOpDef
 {
     /// <summary>Пол на все клетки прямоугольника.</summary>
@@ -144,8 +144,11 @@ public sealed record MapOpDef
     /// <summary>Стены по контуру прямоугольника.</summary>
     public string? Walls { get; init; }
 
-    /// <summary>Дверь на ребре side клетки x, y.</summary>
+    /// <summary>Дверь в своём дверном проёме на ребре side клетки x, y: проём ставится вместе с ней.</summary>
     public string? Door { get; init; }
+
+    /// <summary>Окно в своей оконной раме на ребре side клетки x, y: рама ставится вместе с ним.</summary>
+    public string? Window { get; init; }
 
     /// <summary>Объект северо-западной клеткой в x, y с поворотом rotation.</summary>
     public string? Object { get; init; }
@@ -171,19 +174,19 @@ public sealed record MapOpDef
     /// <summary>Высота прямоугольника.</summary>
     public int H { get; init; } = 1;
 
-    /// <summary>Сторона клетки для двери.</summary>
+    /// <summary>Сторона клетки для двери или окна.</summary>
     public Side? Side { get; init; }
 
-    /// <summary>Открыта ли дверь при постройке.</summary>
+    /// <summary>Открыта ли дверь или окно при постройке.</summary>
     public bool Open { get; init; }
 
     /// <summary>Проблемы операции на этой карте.</summary>
     internal IEnumerable<string> Validate(MapDef map, DefDatabase defs)
     {
-        int kinds = (Floor is null ? 0 : 1) + (Walls is null ? 0 : 1) + (Door is null ? 0 : 1) + (Object is null ? 0 : 1);
+        int kinds = (Floor is null ? 0 : 1) + (Walls is null ? 0 : 1) + (Door is null ? 0 : 1) + (Window is null ? 0 : 1) + (Object is null ? 0 : 1);
         if (kinds != 1)
         {
-            yield return "needs exactly one of floor, walls, door, object";
+            yield return "needs exactly one of floor, walls, door, window, object";
             yield break;
         }
 
@@ -207,19 +210,25 @@ public sealed record MapOpDef
             yield return $"unknown wall {Walls}";
         }
 
-        if (Door is not null && (!defs.TryGet<WallDef>(Door, out WallDef? door) || door.Kind != WallKind.Door))
+        if (Door is not null && !defs.TryGet<DoorDef>(Door, out _))
         {
             yield return $"unknown door {Door}";
         }
 
-        if ((Door is null) != (Side is null))
+        if (Window is not null && !defs.TryGet<WindowDef>(Window, out _))
         {
-            yield return "side is required for door and only for door";
+            yield return $"unknown window {Window}";
         }
 
-        if (Open && Door is null)
+        bool fill = Door is not null || Window is not null;
+        if (fill != (Side is not null))
         {
-            yield return "open is only for door";
+            yield return "side is required for door and window and only for them";
+        }
+
+        if (Open && !fill)
+        {
+            yield return "open is only for door and window";
         }
 
         ObjectDef? obj = null;

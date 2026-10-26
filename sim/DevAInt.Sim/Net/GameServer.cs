@@ -230,8 +230,13 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
             case BuildMessage build:
                 // Номер вида сверяется с таблицей: иначе Building обратился бы за её край
                 BuildTarget target = build.Target;
-                int count = target.Kind == BuildKind.Object ? _sim.WorldTable.ObjectCount : _sim.WorldTable.WallCount;
-                bool placing = target.Kind is BuildKind.Object or BuildKind.Wall;
+                int count = target.Kind switch
+                {
+                    BuildKind.Object => _sim.WorldTable.ObjectCount,
+                    BuildKind.Fill => _sim.WorldTable.FillCount,
+                    _ => _sim.WorldTable.WallCount,
+                };
+                bool placing = target.Kind is BuildKind.Object or BuildKind.Wall or BuildKind.Fill;
                 if (placing && (target.Def < 1 || target.Def > count))
                 {
                     throw new ProtocolException($"build kind {target.Def} is out of range");
@@ -520,6 +525,8 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
             { Recipe: RecipeDef recipe } => (recipe.Id, string.Empty),
             { Build: { Kind: BuildKind.Object } build } => (action.Action.Id, table.Object(build.Def).Id),
             { Build: { Kind: BuildKind.Wall } build } => (action.Action.Id, table.Wall(build.Def).Id),
+            { Build: { Kind: BuildKind.Fill } build } => (action.Action.Id, table.Fill(build.Def).Id),
+            { Build: { Kind: BuildKind.RemoveFill } build } => (RemoveVerb, world.GetEdge(build.Cell, build.Side).Fill is ushort fill and > 0 ? table.Fill(fill).Id : string.Empty),
             { Build: { Kind: BuildKind.RemoveObject } build } => (RemoveVerb, world.ObjectAt(build.Cell) is WorldObject obj ? table.Object(obj.Def).Id : string.Empty),
             { Build: BuildTarget build } => (RemoveVerb, table.Wall(world.GetEdge(build.Cell, build.Side).Wall) is WallDef wall ? wall.Id : string.Empty),
             _ => (action.Action.Id, entity.Inventory.Find(action.ItemId)?.Def.Id ?? string.Empty),

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using DevAInt.Sim.Defs;
 using DevAInt.Sim.Items;
 
 namespace DevAInt.Sim.Grid;
@@ -173,6 +174,9 @@ public sealed class World
     /// <summary>Объекты, чья северо-западная клетка лежит в чанке.</summary>
     public IReadOnlyList<WorldObject> ChunkObjects(int chunkX, int chunkY) => _chunks[(chunkY * ChunksX) + chunkX].Objects;
 
+    /// <summary>Есть ли у чанка слой этажа z: на этаже что-то появлялось - пол, ребро или объект.</summary>
+    public bool HasLevel(int chunkX, int chunkY, int z) => _chunks[(chunkY * ChunksX) + chunkX].Level(z) is not null;
+
     /// <summary>Объект по id или null.</summary>
     public WorldObject? FindObject(long id) => _objects.GetValueOrDefault(id);
 
@@ -283,9 +287,10 @@ public sealed class World
         }
 
         int index = LocalIndex(owner);
+        byte flags = level.Flags[index];
         return north
-            ? new Edge(level.NorthWalls[index], (level.Flags[index] & ChunkLevel.NorthOpen) != 0)
-            : new Edge(level.WestWalls[index], (level.Flags[index] & ChunkLevel.WestOpen) != 0);
+            ? new Edge(level.NorthWalls[index], (flags & ChunkLevel.NorthOpen) != 0, level.NorthFills[index], (WallKind)((flags >> ChunkLevel.NorthKindShift) & 3))
+            : new Edge(level.WestWalls[index], (flags & ChunkLevel.WestOpen) != 0, level.WestFills[index], (WallKind)((flags >> ChunkLevel.WestKindShift) & 3));
     }
 
     /// <summary>Установка северного или западного ребра клетки-владельца в хранении.</summary>
@@ -294,9 +299,15 @@ public sealed class World
         Require(InStorage(owner), owner);
         ChunkLevel level = GetOrCreateLevel(owner);
         int index = LocalIndex(owner);
-        byte flag = north ? ChunkLevel.NorthOpen : ChunkLevel.WestOpen;
+        byte open = north ? ChunkLevel.NorthOpen : ChunkLevel.WestOpen;
+        int shift = north ? ChunkLevel.NorthKindShift : ChunkLevel.WestKindShift;
         (north ? level.NorthWalls : level.WestWalls)[index] = edge.Wall;
-        level.Flags[index] = edge.Open ? (byte)(level.Flags[index] | flag) : (byte)(level.Flags[index] & ~flag);
+        (north ? level.NorthFills : level.WestFills)[index] = edge.Fill;
+
+        // Флаги этого ребра - бит открытой створки и два бита вида стены, флаги второго ребра клетки остаются
+        int flags = level.Flags[index] & ~open & ~(3 << shift);
+        flags |= (edge.Open ? open : 0) | ((int)edge.Kind << shift);
+        level.Flags[index] = (byte)flags;
         _changes.Add(new WorldChange(owner, north ? WorldChangeKind.NorthEdge : WorldChangeKind.WestEdge));
         _dirtyRegions.Add(RegionOf(owner));
     }
@@ -316,6 +327,12 @@ public sealed class World
         _changes.Add(new WorldChange(obj.Cell, WorldChangeKind.ObjectPlaced, obj));
         _dirtyRegions.Add(RegionOf(obj.Cell));
     }
+
+    /// <summary>Есть ли у клеток a или b метка верха лестницы или проёма над ним: только у таких рёбер лестница что-то меняет.</summary>
+    internal bool NearStairs(CellPos a, CellPos b) => ((ObjectFlags(a) | ObjectFlags(b)) & ChunkLevel.StairsEdge) != 0;
+
+    /// <summary>Флаги объекта на клетке для горячих проверок движения: ChunkLevel.Occupied, MoveBlocked, SightBlocked, StairsEdge.</summary>
+    internal byte CellFlags(CellPos cell) => ObjectFlags(cell);
 
     /// <summary>Очистка журнала изменений после рассылки.</summary>
     internal void ClearChanges() => _changes.Clear();
@@ -427,6 +444,15 @@ public sealed class World
     /// <summary>Установка или снятие флагов объекта на всех его клетках в хранении.</summary>
     private void MarkCells(WorldObject obj, bool set)
     {
+        // Метка лестницы: проверка ребра на лестницу идёт в движении для каждого ребра, а без метки она
+        // искала объект на двух этажах и замедлила ходьбу тысячи тел с 1220 до 1750 мкс
+        if (obj.IsStairs)
+        {
+            CellPos top = Motion.Stairs.Top(obj);
+            Mark(top, set ? ChunkLevel.StairsEdge : (byte)0);
+            Mark(top with { Z = top.Z + 1 }, set ? ChunkLevel.StairsEdge : (byte)0);
+        }
+
         byte flags = (byte)(ChunkLevel.Occupied | (obj.BlocksMove ? ChunkLevel.MoveBlocked : 0) | (obj.BlocksSight ? ChunkLevel.SightBlocked : 0));
         for (int y = obj.Cell.Y; y < obj.Cell.Y + obj.Depth; y++)
         {
@@ -440,9 +466,24 @@ public sealed class World
 
                 ChunkLevel level = GetOrCreateLevel(cell);
                 level.ObjectFlags ??= new byte[ChunkSize * ChunkSize];
-                level.ObjectFlags[LocalIndex(cell)] = set ? flags : (byte)0;
+                byte stairs = (byte)(level.ObjectFlags[LocalIndex(cell)] & ChunkLevel.StairsEdge);
+                level.ObjectFlags[LocalIndex(cell)] = set ? (byte)(flags | stairs) : (byte)0;
             }
         }
+    }
+
+    /// <summary>Метка лестницы на клетке в хранении: ставится mark или снимается при 0, остальные флаги клетки не трогаются.</summary>
+    private void Mark(CellPos cell, byte mark)
+    {
+        if (!InStorage(cell))
+        {
+            return;
+        }
+
+        ChunkLevel level = GetOrCreateLevel(cell);
+        level.ObjectFlags ??= new byte[ChunkSize * ChunkSize];
+        int index = LocalIndex(cell);
+        level.ObjectFlags[index] = (byte)((level.ObjectFlags[index] & ~ChunkLevel.StairsEdge) | mark);
     }
 
     /// <summary>Чанк клетки из хранения.</summary>

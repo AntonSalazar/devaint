@@ -18,6 +18,9 @@ internal static class Brain
     /// <summary>Расстояние до центра клетки пути, на котором она считается пройденной.</summary>
     private const double WaypointReach = 0.15;
 
+    /// <summary>Цель, ушедшая на соседний этаж не дальше этого по плоскости, не теряется: существо видело, как она пошла по лестнице.</summary>
+    private const double FollowAcrossFloors = 3.5;
+
     /// <summary>Доля дальности атаки, на которой существо останавливается, чтобы не дрожать на границе.</summary>
     private const double StopFraction = 0.8;
 
@@ -26,9 +29,12 @@ internal static class Brain
     {
         BrainState state = self.Brain!;
         long tick = sim.Clock.Tick;
-        if (tick >= state.ScanTick || state.Target is not Entity current || !Sees(sim.World, self, current, brain))
+        if (tick >= state.ScanTick || state.Target is not Entity current || !(Sees(sim.World, self, current, brain) || FollowsUpOrDown(self, current)))
         {
-            state.Target = FindTarget(sim.World, self, brain, candidates);
+            // Поиск видит только свой этаж: цель, которая только что ушла по лестнице, остаётся прежней
+            Entity? found = FindTarget(sim.World, self, brain, candidates);
+            bool keep = found is null && state.Target is Entity old && FollowsUpOrDown(self, old);
+            state.Target = keep ? state.Target : found;
             state.ScanTick = tick + ScanTicks;
         }
 
@@ -37,7 +43,7 @@ internal static class Brain
             state.LastSeen = target.Position;
             double distance = Distance(self.Position, target.Position);
             AttackDef? attack = self.Creature?.Attack;
-            if (attack is not null && distance <= attack.Range * StopFraction)
+            if (attack is not null && distance <= attack.Range * StopFraction && self.Position.Z == target.Position.Z)
             {
                 self.Input = MoveInput.None;
                 Combat.TryAttack(sim, self, target);
@@ -78,6 +84,10 @@ internal static class Brain
 
         return best;
     }
+
+    /// <summary>Цель только что ушла на соседний этаж рядом с существом: оно идёт за ней по лестнице, а не теряет.</summary>
+    private static bool FollowsUpOrDown(Entity self, Entity target) =>
+        Math.Abs(self.Position.Z - target.Position.Z) == 1 && Distance(self.Position, target.Position) <= FollowAcrossFloors;
 
     /// <summary>Видна ли сущность: тот же этаж, в радиусе зрения и без стен между ними.</summary>
     private static bool Sees(World world, Entity self, Entity other, BrainDef brain) => self.Position.Z == other.Position.Z && Distance(self.Position, other.Position) <= brain.Sight && Sight.Clear(world, self.Position, other.Position);

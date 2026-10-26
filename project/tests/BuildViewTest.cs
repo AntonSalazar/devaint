@@ -12,7 +12,7 @@ public class BuildViewTest : TestCase
     /// <summary>Допуск координат.</summary>
     private const double Tolerance = 1e-4;
 
-    /// <summary>Ящик, стена, дверь и разбор; ящик готов, только когда есть доски, гвозди и молоток.</summary>
+    /// <summary>Ящик, лестница, стена, проём, рама, дверь, окно и разбор; ящик готов, только когда есть доски, гвозди и молоток.</summary>
     public void TestOptions()
     {
         GameFixture game = new();
@@ -24,7 +24,7 @@ public class BuildViewTest : TestCase
 
         List<BuildOption> after = BuildModel.Options(game.Client.Replica, tables);
 
-        CheckEqual("Object Wall Wall RemoveObject", string.Join(" ", after.Select(option => option.Kind)), "kinds");
+        CheckEqual("Object Object Wall Wall Wall Fill Fill RemoveObject", string.Join(" ", after.Select(option => option.Kind)), "kinds");
         Check(!before[0].Ready, "crate is not ready without materials");
         Check(after[0].Ready, "crate is ready with materials");
         Check(after[^1].Ready, "remove is always offered");

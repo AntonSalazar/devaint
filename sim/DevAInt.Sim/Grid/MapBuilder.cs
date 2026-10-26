@@ -21,6 +21,13 @@ public static class MapBuilder
             {
                 Outline(world, op, new Edge(table.WallIndex(walls), false));
             }
+            else if ((op.Door ?? op.Window) is string fillId)
+            {
+                // Створка встаёт в свой проём или раму: стена ребра - рама из определения створки
+                ushort fill = table.FillIndex(fillId);
+                FillDef def = table.Fill(fill);
+                world.SetEdge(new CellPos(op.X, op.Y, op.Z), op.Side!.Value, new Edge(table.WallIndex(def.Frame), op.Open, fill, def.FrameKind));
+            }
             else if (op.Object is string id)
             {
                 // Место зависит от прошлых операций, поэтому его проверяет постройка, а не проверка карты при загрузке
@@ -33,10 +40,6 @@ public static class MapBuilder
                 }
 
                 world.PlaceObject(obj);
-            }
-            else
-            {
-                world.SetEdge(new CellPos(op.X, op.Y, op.Z), op.Side!.Value, new Edge(table.WallIndex(op.Door!), op.Open));
             }
         }
 

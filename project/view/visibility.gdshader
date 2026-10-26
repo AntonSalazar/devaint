@@ -26,6 +26,10 @@ uniform float half_angle = 3.14159;
 uniform float range = 25.0;
 uniform float near = 1.5;
 
+// Высоты своего этажа: пиксели ниже и выше не затемняются, туман и видимость считаются для своего этажа.
+uniform float floor_bottom = -0.05;
+uniform float floor_top = 2.95;
+
 // Цвет места, которое не видел никогда.
 uniform vec3 unexplored : source_color = vec3(0.0);
 
@@ -122,12 +126,12 @@ void fragment() {
 	float raw = texture(depth, SCREEN_UV).r;
 
 	// Глубина обратная: дальняя плоскость - 0, там ничего не нарисовано
-	if (raw <= 0.0) {
+	vec4 view = INV_PROJECTION_MATRIX * vec4(SCREEN_UV * 2.0 - 1.0, raw, 1.0);
+	view.xyz /= view.w;
+	vec3 world = (INV_VIEW_MATRIX * vec4(view.xyz, 1.0)).xyz;
+	if (raw <= 0.0 || world.y < floor_bottom || world.y >= floor_top) {
 		ALBEDO = color;
 	} else {
-		vec4 view = INV_PROJECTION_MATRIX * vec4(SCREEN_UV * 2.0 - 1.0, raw, 1.0);
-		view.xyz /= view.w;
-		vec3 world = (INV_VIEW_MATRIX * vec4(view.xyz, 1.0)).xyz;
 		float visible = in_view(world.xz);
 
 		// Луч дорогой: только для точек, которые вообще в обзоре

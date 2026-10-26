@@ -35,17 +35,18 @@ public class VisionTest
         Assert.Equal(0, map.Coverage(new CellPos(20, 30, 1)));
     }
 
-    /// <summary>Стена загораживает клетки за собой, открытая дверь пропускает взгляд, закрытая - нет.</summary>
+    /// <summary>Стена загораживает клетки за собой, открытая дверь и окно пропускают взгляд, закрытая дверь - нет.</summary>
     [Theory]
-    [InlineData(Wall, false, 0f)]
-    [InlineData(Door, false, 0f)]
-    [InlineData(Door, true, 1f)]
-    public void WallsAndDoors(ushort wall, bool open, float expected)
+    [InlineData(WallKind.Wall, 0, false, 0f)]
+    [InlineData(WallKind.DoorFrame, 1, false, 0f)]
+    [InlineData(WallKind.DoorFrame, 1, true, 1f)]
+    [InlineData(WallKind.WindowFrame, 1, false, 1f)]
+    public void WallsDoorsAndWindows(WallKind kind, ushort fill, bool open, float expected)
     {
         World world = Field(40, 40);
         for (int x = 15; x <= 25; x++)
         {
-            world.SetEdge(Cell(x, 23), Side.North, new Edge(x == 20 ? wall : Wall, x == 20 && open));
+            world.SetEdge(Cell(x, 23), Side.North, x == 20 ? new Edge(Door, open, fill, kind) : new Edge(Wall, false));
         }
 
         VisibilityMap map = Compute(world, _eye);

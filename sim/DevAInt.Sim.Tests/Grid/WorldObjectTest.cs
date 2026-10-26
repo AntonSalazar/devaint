@@ -164,7 +164,7 @@ public class WorldObjectTest
 
         Assert.Equal(2, world.Objects.Count);
         Assert.Equal("map test:map: build[2]: object core:crate: cell 1,2,0 is taken by another object", Assert.Single(log.Errors));
-        Assert.Equal(3, starter.Objects.Count);
+        Assert.Equal(4, starter.Objects.Count);
         Assert.True(starter.BlocksSight(Cell(9, 4)), "wardrobe in the north east corner");
     }
 

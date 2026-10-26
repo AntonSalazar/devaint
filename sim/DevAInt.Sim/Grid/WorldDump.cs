@@ -8,10 +8,10 @@ namespace DevAInt.Sim.Grid;
 public static class WorldDump
 {
     // Сетка дампа вдвое подробнее клеток: нечётные x и y - клетки, чётные - рёбра и углы между ними.
-    // Пол ".", стена "-" и "|", закрытая дверь "D", открытая "/", угол "+" там, где сходятся стены.
+    // Пол ".", стена "-" и "|", закрытая дверь "D", открытая дверь или пустой проём "/", окно "W", угол "+" там, где сходятся стены.
 
     /// <summary>Этаж z, обрезанный по занятым клеткам и рёбрам; пустая строка, если на этаже ничего нет.</summary>
-    public static string Ascii(World world, WorldTable table, int z = 0)
+    public static string Ascii(World world, int z = 0)
     {
         int gridWidth = (2 * world.Width) + 1;
         int gridHeight = (2 * world.Height) + 1;
@@ -25,7 +25,7 @@ public static class WorldDump
         {
             for (int gx = 0; gx < gridWidth; gx++)
             {
-                char symbol = Symbol(world, table, gx, gy, z);
+                char symbol = Symbol(world, gx, gy, z);
                 grid[gx, gy] = symbol;
                 if (symbol != ' ')
                 {
@@ -67,7 +67,7 @@ public static class WorldDump
     }
 
     /// <summary>Символ клетки или ребра; углы пока пробел.</summary>
-    private static char Symbol(World world, WorldTable table, int gx, int gy, int z)
+    private static char Symbol(World world, int gx, int gy, int z)
     {
         bool oddX = gx % 2 == 1;
         bool oddY = gy % 2 == 1;
@@ -89,9 +89,15 @@ public static class WorldDump
             return ' ';
         }
 
-        if (table.Wall(edge.Wall).Kind == WallKind.Door)
+        // Проём: закрытая дверь D, открытая дверь или пустой проём /; оконная рама W
+        if (edge.Kind == WallKind.DoorFrame)
         {
-            return edge.Open ? '/' : 'D';
+            return edge.IsPassable ? '/' : 'D';
+        }
+
+        if (edge.Kind == WallKind.WindowFrame)
+        {
+            return 'W';
         }
 
         return oddX ? '-' : '|';
@@ -115,6 +121,6 @@ public static class WorldDump
     private static bool IsWall(char[,] grid, int gx, int gy)
     {
         bool inside = gx >= 0 && gy >= 0 && gx < grid.GetLength(0) && gy < grid.GetLength(1);
-        return inside && grid[gx, gy] is '-' or '|' or 'D' or '/';
+        return inside && grid[gx, gy] is '-' or '|' or 'D' or '/' or 'W';
     }
 }

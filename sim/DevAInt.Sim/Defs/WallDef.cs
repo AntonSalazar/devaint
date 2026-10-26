@@ -2,23 +2,26 @@ using System.Collections.Generic;
 
 namespace DevAInt.Sim.Defs;
 
-/// <summary>Вид стены на ребре клетки.</summary>
-public enum WallKind
+/// <summary>Вид стены на ребре клетки: сплошная, с дверным проёмом или с оконной рамой, как в Project Zomboid.</summary>
+public enum WallKind : byte
 {
     /// <summary>Сплошная стена.</summary>
     Wall,
 
-    /// <summary>Дверь, открыта или закрыта.</summary>
-    Door,
+    /// <summary>Стена с дверным проёмом: без двери проход открыт, дверь ставится отдельно.</summary>
+    DoorFrame,
+
+    /// <summary>Стена с оконной рамой: через неё видно, но не пройти; окно ставится отдельно.</summary>
+    WindowFrame,
 }
 
-/// <summary>Определение стены или двери на ребре клетки.</summary>
+/// <summary>Определение стены на ребре клетки: сплошной, с дверным проёмом или с оконной рамой.</summary>
 public sealed record WallDef : IDef
 {
     /// <inheritdoc/>
     public required string Id { get; init; }
 
-    /// <summary>Вид: стена или дверь.</summary>
+    /// <summary>Вид: сплошная стена, дверной проём или оконная рама.</summary>
     public required WallKind Kind { get; init; }
 
     /// <summary>Цвет в виде #rrggbb, пока моделей и текстур нет.</summary>

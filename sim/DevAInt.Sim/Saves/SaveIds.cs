@@ -12,6 +12,7 @@ internal sealed class SaveIds
         Floors = new SaveIdList(lists.Floors, first: 1);
         Walls = new SaveIdList(lists.Walls, first: 1);
         Objects = new SaveIdList(lists.Objects, first: 1);
+        Fills = new SaveIdList(lists.Fills, first: 1);
         Stats = new SaveIdList(lists.Stats, first: 0);
         Items = new SaveIdList(lists.Items, first: 0);
         Actions = new SaveIdList(lists.Actions, first: 0);
@@ -27,6 +28,9 @@ internal sealed class SaveIds
 
     /// <summary>Объекты мира, номера с единицы.</summary>
     public SaveIdList Objects { get; }
+
+    /// <summary>Створки - двери и окна, номера с единицы.</summary>
+    public SaveIdList Fills { get; }
 
     /// <summary>Статы.</summary>
     public SaveIdList Stats { get; }
@@ -49,6 +53,7 @@ internal sealed class SaveIds
         Floors = [.. Floors.Ids],
         Walls = [.. Walls.Ids],
         Objects = [.. Objects.Ids],
+        Fills = [.. Fills.Ids],
         Stats = [.. Stats.Ids],
         Items = [.. Items.Ids],
         Actions = [.. Actions.Ids],

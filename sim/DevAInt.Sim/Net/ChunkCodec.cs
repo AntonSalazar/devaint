@@ -13,10 +13,10 @@ internal static class ChunkCodec
     public static ChunkLevelData Copy(int z, ChunkLevel level)
     {
         ushort[] flags = [.. level.Flags.Select(flag => (ushort)flag)];
-        return new ChunkLevelData(z, [.. level.Floors], [.. level.NorthWalls], [.. level.WestWalls], flags);
+        return new ChunkLevelData(z, [.. level.Floors], [.. level.NorthWalls], [.. level.WestWalls], flags, [.. level.NorthFills], [.. level.WestFills]);
     }
 
-    /// <summary>Этаж и четыре массива сериями.</summary>
+    /// <summary>Этаж и шесть массивов сериями.</summary>
     public static void Write(PacketWriter writer, ChunkLevelData level)
     {
         writer.WriteVarInt(level.Z);
@@ -24,17 +24,25 @@ internal static class ChunkCodec
         writer.WriteRuns(level.NorthWalls);
         writer.WriteRuns(level.WestWalls);
         writer.WriteRuns(level.Flags);
+        writer.WriteRuns(level.NorthFills);
+        writer.WriteRuns(level.WestFills);
     }
 
-    /// <summary>Слой из байт; этаж проверяет тот, кто знает мир.</summary>
-    public static ChunkLevelData Read(PacketReader reader)
+    /// <summary>Слой из байт; withFills - в данных есть створки, в сохранениях до формата 6 их нет. Этаж проверяет тот, кто знает мир.</summary>
+    public static ChunkLevelData Read(PacketReader reader, bool withFills = true)
     {
         int z = (int)reader.ReadVarInt();
-        ChunkLevelData level = new(z, new ushort[Cells], new ushort[Cells], new ushort[Cells], new ushort[Cells]);
+        ChunkLevelData level = new(z, new ushort[Cells], new ushort[Cells], new ushort[Cells], new ushort[Cells], new ushort[Cells], new ushort[Cells]);
         reader.ReadRuns(level.Floors);
         reader.ReadRuns(level.NorthWalls);
         reader.ReadRuns(level.WestWalls);
         reader.ReadRuns(level.Flags);
+        if (withFills)
+        {
+            reader.ReadRuns(level.NorthFills);
+            reader.ReadRuns(level.WestFills);
+        }
+
         return level;
     }
 }

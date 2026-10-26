@@ -1,5 +1,7 @@
 using System.IO;
 using System.Linq;
+using DevAInt.Sim.Creatures;
+using DevAInt.Sim.Defs;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Items;
 using DevAInt.Sim.Mods;
@@ -140,6 +142,64 @@ public class BuildTest
         run.Tick(82, client);
 
         Assert.NotNull(client.Replica.World!.ObjectAt(new CellPos(7, 6, 0)));
+    }
+
+    /// <summary>Сначала дверной проём на ребре, потом дверь в него; окно в дверной проём не встаёт; снятая дверь возвращает половину.</summary>
+    [Fact]
+    public void FrameThenDoor()
+    {
+        (Simulation sim, long builder) = Builder();
+        GiveMaterials(sim, builder);
+        CellPos cell = new(6, 6, 0);
+        BuildTarget frame = new(BuildKind.Wall, sim.WorldTable.WallIndex("core:wood_doorframe"), cell, (int)Side.South);
+        BuildTarget door = new(BuildKind.Fill, sim.WorldTable.FillIndex("core:wood_door"), cell, (int)Side.South);
+        BuildTarget window = door with { Def = sim.WorldTable.FillIndex("core:wood_window") };
+
+        sim.StartBuild(builder, frame);
+        TicksUntilDone(sim, builder);
+        bool walkable = sim.World.CanCross(cell, Side.South);
+        string? wrong = Building.Problem(sim.World, sim.WorldTable, window, sim.Entity(builder).Position, []);
+        sim.StartBuild(builder, door);
+        TicksUntilDone(sim, builder);
+        Edge built = sim.World.GetEdge(cell, Side.South);
+        bool holds = !sim.World.CanCross(cell, Side.South);
+        string? wallWithDoor = Building.Problem(sim.World, sim.WorldTable, new BuildTarget(BuildKind.RemoveWall, 0, cell, (int)Side.South), sim.Entity(builder).Position, []);
+        int planks = Items(sim, builder).Count(item => item == "core:plank");
+        sim.StartBuild(builder, new BuildTarget(BuildKind.RemoveFill, 0, cell, (int)Side.South));
+        TicksUntilDone(sim, builder);
+
+        Assert.True(walkable, "an empty door frame lets through");
+        Assert.Equal("needs a window frame", wrong);
+        Assert.Equal((WallKind.DoorFrame, sim.WorldTable.FillIndex("core:wood_door"), false), (built.Kind, built.Fill, built.Open));
+        Assert.True(holds, "closed door holds");
+        Assert.Equal("remove the door or window first", wallWithDoor);
+        Assert.Equal(0, sim.World.GetEdge(cell, Side.South).Fill);
+        Assert.Equal(planks + 2, Items(sim, builder).Count(item => item == "core:plank"));
+    }
+
+    /// <summary>Окно на E открывается и закрывается, но и открытое не пропускает; дверь не закрыть, пока в проёме кто-то стоит.</summary>
+    [Fact]
+    public void InteractWithWindowAndDoor()
+    {
+        (Simulation sim, long builder) = Builder();
+        Entity me = sim.Entity(builder);
+        me.Position = new WorldPos(9.5, 6.5, 0);
+        me.Facing = (1, 0);
+
+        bool toggled = sim.Interact(builder);
+        Edge window = sim.World.GetEdge(new CellPos(9, 6, 0), Side.East);
+        me.Position = new WorldPos(6.5, 8.4, 0);
+        me.Facing = (0, 1);
+        sim.Interact(builder);
+        long other = sim.CreateEntity(new WorldPos(6.5, 9.0, 0), "core:human");
+        bool closed = sim.Interact(builder);
+
+        Assert.True(toggled && window.Open, "window opened");
+        Assert.False(sim.World.CanCross(new CellPos(9, 6, 0), Side.East), "an open window still holds");
+        Assert.True(Sight.Clear(sim.World, new WorldPos(9.5, 6.5, 0), new WorldPos(11.5, 6.5, 0)), "seen through the window");
+        Assert.False(closed, "door does not close on someone in the doorway");
+        Assert.True(sim.World.GetEdge(new CellPos(6, 8, 0), Side.South).Open);
+        Assert.NotEqual(0, other);
     }
 
     /// <summary>Подпись действия у клиента: съесть яблоко, построить ящик, разобрать ящик - id что делается и над чем.</summary>

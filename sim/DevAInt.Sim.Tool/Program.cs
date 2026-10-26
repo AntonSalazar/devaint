@@ -64,7 +64,7 @@ internal static class Program
         }
 
         WorldTable table = new(result.Defs);
-        Console.Write(WorldDump.Ascii(MapBuilder.Build(map, table), table, z));
+        Console.Write(WorldDump.Ascii(MapBuilder.Build(map, table), z));
         return 0;
     }
 }

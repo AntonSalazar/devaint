@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using DevAInt.Sim.Creatures;
+using DevAInt.Sim.Defs;
 using DevAInt.Sim.Grid;
 using Xunit;
 
@@ -54,7 +55,7 @@ public class NavigationTest
         Assert.False(new Pathfinder().Find(world, Cell(5, 8), Cell(5, 4), path));
         Assert.Equal(Cell(5, 7), path.Last());
 
-        world.SetEdge(Cell(5, 6), Side.South, new Edge(Door, true));
+        world.SetEdge(Cell(5, 6), Side.South, DoorEdge(open: true));
         Assert.True(new Pathfinder().Find(world, Cell(5, 8), Cell(5, 4), path));
         Assert.Contains(Cell(5, 6), path);
     }
@@ -106,7 +107,7 @@ public class NavigationTest
         Assert.False(Sight.Clear(world, inside, outside));
         Assert.False(Sight.Clear(world, WorldPos.CenterOf(Cell(4, 4)), WorldPos.CenterOf(Cell(8, 9))));
 
-        world.SetEdge(Cell(5, 6), Side.South, new Edge(Door, true));
+        world.SetEdge(Cell(5, 6), Side.South, DoorEdge(open: true));
         Assert.True(Sight.Clear(world, inside, outside));
         Assert.False(Sight.Clear(world, inside, outside with { Z = 1 }));
     }
@@ -160,6 +161,9 @@ public class NavigationTest
         return world;
     }
 
+    /// <summary>Дверь в дверном проёме, открытая или закрытая.</summary>
+    private static Edge DoorEdge(bool open) => new(Door, open, 1, WallKind.DoorFrame);
+
     /// <summary>Поле 10 на 10 с комнатой 3..7 на 2..6 и дверью в южной стене у клетки 5,6.</summary>
     private static World Room(bool doorOpen)
     {
@@ -176,7 +180,7 @@ public class NavigationTest
             world.SetEdge(Cell(7, y), Side.East, new Edge(Wall, false));
         }
 
-        world.SetEdge(Cell(5, 6), Side.South, new Edge(Door, doorOpen));
+        world.SetEdge(Cell(5, 6), Side.South, DoorEdge(doorOpen));
         return world;
     }
 }

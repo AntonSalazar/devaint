@@ -32,8 +32,9 @@ public static class Rooms
                     continue;
                 }
 
+                // Проём над лестницей без пола - часть комнаты, а не выход на улицу
                 CellPos next = cell.Neighbor(side);
-                if (!world.IsWalkable(next))
+                if (!world.IsWalkable(next) && !IsStairwell(world, next))
                 {
                     return null;
                 }
@@ -52,4 +53,7 @@ public static class Rooms
 
         return room;
     }
+
+    /// <summary>Клетка - проём над лестницей: под ней этажом ниже стоит лестница.</summary>
+    private static bool IsStairwell(World world, CellPos cell) => world.ObjectAt(cell with { Z = cell.Z - 1 }) is { IsStairs: true };
 }

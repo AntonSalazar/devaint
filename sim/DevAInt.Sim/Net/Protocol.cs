@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using DevAInt.Sim.Creatures;
+using DevAInt.Sim.Defs;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Items;
 using DevAInt.Sim.Mods;
@@ -276,6 +277,8 @@ public static class Protocol
                 writer.WriteBool(edge.North);
                 writer.WriteVarUInt(edge.Edge.Wall);
                 writer.WriteBool(edge.Edge.Open);
+                writer.WriteVarUInt(edge.Edge.Fill);
+                writer.WriteByte((byte)edge.Edge.Kind);
                 break;
             case OwnInventoryMessage inventory:
                 writer.WriteByte((byte)ServerType.OwnInventory);
@@ -334,7 +337,7 @@ public static class Protocol
             ServerType.EntityRemove => new EntityRemoveMessage(reader.ReadVarInt()),
             ServerType.OwnStats => ReadOwnStats(reader),
             ServerType.FloorChange => new FloorChangeMessage(ReadCell(reader), ReadUShort(reader)),
-            ServerType.EdgeChange => new EdgeChangeMessage(ReadCell(reader), reader.ReadBool(), new Edge(ReadUShort(reader), reader.ReadBool())),
+            ServerType.EdgeChange => new EdgeChangeMessage(ReadCell(reader), reader.ReadBool(), ReadEdge(reader)),
             ServerType.OwnInventory => new OwnInventoryMessage(ReadItems(reader)),
             ServerType.Container => new ContainerMessage(reader.ReadVarInt(), ReadItems(reader)),
             ServerType.ContainerClose => new ContainerCloseMessage(reader.ReadVarInt()),
@@ -397,6 +400,16 @@ public static class Protocol
         }
 
         return new ChunkSnapshotMessage(chunkX, chunkY, levels, objects);
+    }
+
+    /// <summary>Ребро: стена, открыто ли, створка и вид стены; неизвестный вид - ProtocolException.</summary>
+    private static Edge ReadEdge(PacketReader reader)
+    {
+        ushort wall = ReadUShort(reader);
+        bool open = reader.ReadBool();
+        ushort fill = ReadUShort(reader);
+        byte kind = reader.ReadByte();
+        return Enum.IsDefined((WallKind)kind) ? new Edge(wall, open, fill, (WallKind)kind) : throw new ProtocolException($"wall kind {kind} is unknown");
     }
 
     /// <summary>Объект: id, номер вида, клетка и поворот байтом.</summary>

@@ -2,20 +2,20 @@ using System.Collections.Generic;
 using DevAInt.Sim.Grid;
 using Godot;
 
-/// <summary>Отображение одного чанка: меш полов, боксы стен и объектов; перестраивается целиком при любом изменении.</summary>
+/// <summary>Отображение одного чанка: узел на каждый непустой этаж; перестраивается целиком при любом изменении.</summary>
 public partial class ChunkView : Node3D
 {
-    /// <summary>Общий материал с цветом из вершин или экземпляров.</summary>
-    private static readonly StandardMaterial3D _material = new() { VertexColorUseAsAlbedo = true };
+    /// <summary>Пустой срез стен.</summary>
+    private static readonly HashSet<WallKey> _noWalls = [];
 
-    /// <summary>Узел полов.</summary>
-    private readonly MeshInstance3D _floors = new() { Name = "Floors", MaterialOverride = _material };
+    /// <summary>Пустой срез объектов.</summary>
+    private static readonly HashSet<long> _noObjects = [];
 
-    /// <summary>Опущенные куски по номерам последнего ApplyCut.</summary>
-    private bool[] _cut = [];
+    /// <summary>Этажи чанка, в которых что-то есть.</summary>
+    private readonly SortedDictionary<int, LevelView> _levels = [];
 
-    /// <summary>Опущенные объекты по номерам последнего ApplyCut.</summary>
-    private bool[] _cutObjects = [];
+    /// <summary>Самый верхний видимый этаж, null - видны все.</summary>
+    private int? _top;
 
     /// <summary>Чанк по x.</summary>
     public int ChunkX { get; private set; }
@@ -23,46 +23,40 @@ public partial class ChunkView : Node3D
     /// <summary>Чанк по y.</summary>
     public int ChunkY { get; private set; }
 
-    /// <summary>Стены и двери последней постройки.</summary>
-    public IReadOnlyList<WallInstance> Walls { get; private set; } = [];
+    /// <summary>Непустые этажи чанка снизу вверх.</summary>
+    public IEnumerable<LevelView> Levels => _levels.Values;
 
-    /// <summary>Объекты последней постройки.</summary>
-    public IReadOnlyList<ObjectInstance> Objects { get; private set; } = [];
-
-    /// <summary>Есть ли полы в последней постройке.</summary>
-    public bool HasFloors => _floors.Mesh is not null;
-
-    /// <summary>Видимые стены, для тестов.</summary>
-    public MultiMeshInstance3D VisibleWalls { get; } = new()
+    /// <summary>Стены всех этажей, для тестов.</summary>
+    public IReadOnlyList<WallInstance> Walls
     {
-        Name = "Walls",
-        MaterialOverride = Cutaway.Material,
-        CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-    };
+        get
+        {
+            List<WallInstance> walls = [];
+            foreach (LevelView level in _levels.Values)
+            {
+                walls.AddRange(level.Walls);
+            }
 
-    /// <summary>Стены для теней, для тестов.</summary>
-    public MultiMeshInstance3D ShadowWalls { get; } = new()
-    {
-        Name = "WallShadows",
-        MaterialOverride = _material,
-        CastShadow = GeometryInstance3D.ShadowCastingSetting.ShadowsOnly,
-    };
+            return walls;
+        }
+    }
 
-    /// <summary>Видимые объекты со срезом, для тестов.</summary>
-    public MultiMeshInstance3D VisibleObjects { get; } = new()
+    /// <summary>Есть ли полы хоть на одном этаже.</summary>
+    public bool HasFloors
     {
-        Name = "Objects",
-        MaterialOverride = Cutaway.Material,
-        CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-    };
+        get
+        {
+            foreach (LevelView level in _levels.Values)
+            {
+                if (level.HasFloors)
+                {
+                    return true;
+                }
+            }
 
-    /// <summary>Объекты для теней целиком, для тестов.</summary>
-    public MultiMeshInstance3D ShadowObjects { get; } = new()
-    {
-        Name = "ObjectShadows",
-        MaterialOverride = _material,
-        CastShadow = GeometryInstance3D.ShadowCastingSetting.ShadowsOnly,
-    };
+            return false;
+        }
+    }
 
     /// <summary>Свои данные экземпляра для шейдера среза: красный канал 1 - кусок опущен, 0 - целый.</summary>
     public static Color CutData(bool cut) =>
@@ -74,75 +68,61 @@ public partial class ChunkView : Node3D
     {
         (ChunkX, ChunkY) = (chunkX, chunkY);
         Name = $"Chunk_{chunkX}_{chunkY}";
-        AddChild(_floors);
-        AddChild(VisibleWalls);
-        AddChild(ShadowWalls);
-        AddChild(VisibleObjects);
-        AddChild(ShadowObjects);
     }
 
-    /// <summary>Перестройка полов, стен и объектов по текущему миру реплики.</summary>
+    /// <summary>Этаж z или null, если на нём пусто.</summary>
+    public LevelView? Level(int z) => _levels.GetValueOrDefault(z);
+
+    /// <summary>Перестройка всех этажей по текущему миру реплики: пустые этажи узлов не держат.</summary>
     public void Rebuild(World world, WorldTable table)
     {
-        _floors.Mesh = ChunkMesh.BuildFloors(world, table, ChunkX, ChunkY);
-        Walls = ChunkMesh.BuildWalls(world, table, ChunkX, ChunkY);
-        Objects = ChunkMesh.BuildObjects(world, table, ChunkX, ChunkY);
-        MultiMesh walls = Boxes(Walls.Count);
-        for (int i = 0; i < Walls.Count; i++)
+        for (int z = World.MinLevel; z <= World.MaxLevel; z++)
         {
-            walls.SetInstanceTransform(i, Walls[i].Transform);
-            walls.SetInstanceColor(i, Walls[i].Color);
-        }
+            if (!world.HasLevel(ChunkX, ChunkY, z) && !_levels.ContainsKey(z))
+            {
+                continue;
+            }
 
-        MultiMesh objects = Boxes(Objects.Count);
-        for (int i = 0; i < Objects.Count; i++)
-        {
-            objects.SetInstanceTransform(i, Objects[i].Transform);
-            objects.SetInstanceColor(i, Objects[i].Color);
-        }
-
-        VisibleWalls.Multimesh = walls;
-        ShadowWalls.Multimesh = walls;
-        VisibleObjects.Multimesh = objects;
-        ShadowObjects.Multimesh = objects;
-    }
-
-    /// <summary>Срез кусков стен на рёбрах из cut и объектов с id из cutObjects, остальные целые.</summary>
-    public void ApplyCut(IReadOnlySet<WallKey> cut, IReadOnlySet<long> cutObjects)
-    {
-        _cut = new bool[Walls.Count];
-        for (int i = 0; i < Walls.Count; i++)
-        {
-            _cut[i] = cut.Contains(Walls[i].Key);
-            VisibleWalls.Multimesh.SetInstanceCustomData(i, CutData(_cut[i]));
-        }
-
-        _cutObjects = new bool[Objects.Count];
-        for (int i = 0; i < Objects.Count; i++)
-        {
-            _cutObjects[i] = cutObjects.Contains(Objects[i].Id);
-            VisibleObjects.Multimesh.SetInstanceCustomData(i, CutData(_cutObjects[i]));
+            LevelView level = _levels.GetValueOrDefault(z) ?? NewLevel(z);
+            level.Rebuild(world, table, ChunkX, ChunkY);
+            if (level.IsEmpty)
+            {
+                _levels.Remove(z);
+                level.QueueFree();
+            }
+            else
+            {
+                _levels[z] = level;
+                level.Visible = _top is not int top || z <= top;
+            }
         }
     }
 
-    /// <summary>Опущен ли кусок с номером index, для тестов; headless-отрисовка данные экземпляров не хранит.</summary>
-    public bool IsCut(int index) => index < _cut.Length && _cut[index];
-
-    /// <summary>Опущен ли объект с номером index, для тестов.</summary>
-    public bool IsObjectCut(int index) => index < _cutObjects.Length && _cutObjects[index];
-
-    /// <summary>Пустой MultiMesh единичных боксов на count экземпляров с цветом и своими данными для среза.</summary>
-    private static MultiMesh Boxes(int count)
+    /// <summary>Видны только этажи не выше top, как в изометрии Project Zomboid; null - видны все.</summary>
+    public void ShowUpTo(int? top)
     {
-        return new MultiMesh
+        _top = top;
+        foreach (LevelView level in _levels.Values)
         {
-            TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
-            UseColors = true,
+            level.Visible = top is not int limit || level.Z <= limit;
+        }
+    }
 
-            // Красный канал своих данных - срезан ли бокс; его читает шейдер среза
-            UseCustomData = true,
-            Mesh = new BoxMesh { Size = Vector3.One },
-            InstanceCount = count,
-        };
+    /// <summary>Срез стен и объектов на этаже z, остальные этажи целые.</summary>
+    public void ApplyCut(int z, IReadOnlySet<WallKey> cut, IReadOnlySet<long> cutObjects)
+    {
+        foreach (LevelView level in _levels.Values)
+        {
+            level.ApplyCut(level.Z == z ? cut : _noWalls, level.Z == z ? cutObjects : _noObjects);
+        }
+    }
+
+    /// <summary>Новый узел этажа в дереве чанка.</summary>
+    private LevelView NewLevel(int z)
+    {
+        LevelView level = new();
+        level.Init(z);
+        AddChild(level);
+        return level;
     }
 }

@@ -2,14 +2,15 @@ using System;
 using System.Collections.Generic;
 using DevAInt.Sim.Defs;
 using DevAInt.Sim.Grid;
+using DevAInt.Sim.Motion;
 using Godot;
 using Side = DevAInt.Sim.Grid.Side;
 
-/// <summary>Стена или дверь чанка: положение бокса, цвет и вид.</summary>
-public readonly record struct WallInstance(Transform3D Transform, Color Color, bool IsDoor, bool Open, WallKey Key);
+/// <summary>Кусок стены, дверь или стекло окна чанка: положение бокса, цвет, вид и ребро.</summary>
+public readonly record struct WallInstance(Transform3D Transform, Color Color, bool IsDoor, bool Open, WallKey Key, bool IsGlass = false);
 
-/// <summary>Объект мира чанка: положение бокса, цвет, id и высота.</summary>
-public readonly record struct ObjectInstance(Transform3D Transform, Color Color, long Id, float Height);
+/// <summary>Объект мира чанка: положение бокса, цвет, id, высота и лестница ли это: лестница - наклонная плита, её срез не трогает.</summary>
+public readonly record struct ObjectInstance(Transform3D Transform, Color Color, long Id, float Height, bool IsStairs = false);
 
 /// <summary>Ребро клетки, на котором стоит кусок стены: клетка-владелец и северное ли это ребро.</summary>
 public readonly record struct WallKey(CellPos Owner, bool North);
@@ -17,11 +18,23 @@ public readonly record struct WallKey(CellPos Owner, bool North);
 /// <summary>Геометрия чанка из данных мира: квады полов, боксы стен и объектов.</summary>
 public static class ChunkMesh
 {
-    /// <summary>Высота стены.</summary>
-    public const float WallHeight = 2.4f;
+    /// <summary>Высота стены: во весь этаж, чтобы стены доходили до пола этажа выше и он не висел в воздухе.</summary>
+    public const float WallHeight = ViewMath.FloorHeight;
 
     /// <summary>Толщина стены.</summary>
     public const float WallThickness = 0.1f;
+
+    /// <summary>Высота двери и низ перемычки над дверным проёмом.</summary>
+    public const float DoorHeight = 2.2f;
+
+    /// <summary>Высота подоконника: низ окна.</summary>
+    public const float SillHeight = 0.9f;
+
+    /// <summary>Верх окна и низ перемычки над ним.</summary>
+    public const float WindowTop = 2.0f;
+
+    /// <summary>Толщина стекла окна.</summary>
+    public const float GlassThickness = 0.02f;
 
     /// <summary>Толщина двери: тоньше стены, чтобы на стыке грани стены стояли перед гранями двери, а не в одной плоскости с ними.</summary>
     public const float DoorThickness = 0.06f;
@@ -35,13 +48,16 @@ public static class ChunkMesh
     /// <summary>Угол открытой двери от закрытого положения.</summary>
     private const float OpenDoorAngle = 80f;
 
-    /// <summary>Меш полов чанка с цветами вершин, null если полов нет.</summary>
-    public static ArrayMesh? BuildFloors(World world, WorldTable table, int chunkX, int chunkY)
+    /// <summary>Толщина плиты лестницы.</summary>
+    private const float StairsThickness = 0.15f;
+
+    /// <summary>Меш полов этажа z чанка с цветами вершин, null если полов нет.</summary>
+    public static ArrayMesh? BuildFloors(World world, WorldTable table, int chunkX, int chunkY, int z)
     {
         SurfaceTool tool = new();
         tool.Begin(Mesh.PrimitiveType.Triangles);
         int quads = 0;
-        foreach (CellPos cell in Cells(world, chunkX, chunkY, insideOnly: true))
+        foreach (CellPos cell in Cells(world, chunkX, chunkY, insideOnly: true, z))
         {
             ushort floor = world.Floor(cell);
             if (floor == 0)
@@ -56,11 +72,11 @@ public static class ChunkMesh
         return quads == 0 ? null : tool.Commit();
     }
 
-    /// <summary>Стены и двери на северных и западных рёбрах клеток чанка.</summary>
-    public static List<WallInstance> BuildWalls(World world, WorldTable table, int chunkX, int chunkY)
+    /// <summary>Стены и двери на северных и западных рёбрах клеток этажа z чанка.</summary>
+    public static List<WallInstance> BuildWalls(World world, WorldTable table, int chunkX, int chunkY, int z)
     {
         List<WallInstance> walls = [];
-        foreach (CellPos cell in Cells(world, chunkX, chunkY, insideOnly: false))
+        foreach (CellPos cell in Cells(world, chunkX, chunkY, insideOnly: false, z))
         {
             AddWall(walls, table, world.GetEdge(cell, Side.North), cell, north: true);
             AddWall(walls, table, world.GetEdge(cell, Side.West), cell, north: false);
@@ -69,13 +85,24 @@ public static class ChunkMesh
         return walls;
     }
 
-    /// <summary>Боксы объектов, чья северо-западная клетка лежит в чанке: на всю площадь клеток без зазора и на высоту вида.</summary>
-    public static List<ObjectInstance> BuildObjects(World world, WorldTable table, int chunkX, int chunkY)
+    /// <summary>Боксы объектов этажа z, чья северо-западная клетка лежит в чанке: на всю площадь клеток без зазора и на высоту вида; лестница - наклонная плита.</summary>
+    public static List<ObjectInstance> BuildObjects(World world, WorldTable table, int chunkX, int chunkY, int z)
     {
         List<ObjectInstance> objects = [];
         foreach (WorldObject obj in world.ChunkObjects(chunkX, chunkY))
         {
+            if (obj.Cell.Z != z)
+            {
+                continue;
+            }
+
             ObjectDef def = table.Object(obj.Def);
+            if (obj.IsStairs)
+            {
+                objects.Add(new ObjectInstance(StairsSlab(obj), Color.FromHtml(def.Color), obj.Id, ViewMath.FloorHeight, IsStairs: true));
+                continue;
+            }
+
             float height = (float)def.Height;
             Vector3 size = new(obj.Width - ObjectGap, height, obj.Depth - ObjectGap);
             Vector3 center = ViewMath.ToGodot(obj.Cell.X + (obj.Width / 2f), obj.Cell.Y + (obj.Depth / 2f), obj.Cell.Z) + (Vector3.Up * height / 2);
@@ -85,25 +112,44 @@ public static class ChunkMesh
         return objects;
     }
 
-    /// <summary>Клетки чанка на всех этажах; insideOnly - только клетки карты, иначе и запас хранения под внешние рёбра.</summary>
-    private static IEnumerable<CellPos> Cells(World world, int chunkX, int chunkY, bool insideOnly)
+    /// <summary>Плита лестницы от низа у нижнего края до этажа выше у верхнего, во всю ширину клетки.</summary>
+    private static Transform3D StairsSlab(WorldObject stairs)
+    {
+        Vector3 up = Stairs.Up(stairs) switch
+        {
+            Side.North => Vector3.Forward,
+            Side.South => Vector3.Back,
+            Side.East => Vector3.Right,
+            _ => Vector3.Left,
+        };
+        float length = Math.Max(stairs.Width, stairs.Depth);
+        Vector3 along = ((up * length) + (Vector3.Up * ViewMath.FloorHeight)).Normalized();
+        Vector3 side = Vector3.Up.Cross(up).Normalized();
+        Vector3 normal = along.Cross(side).Normalized();
+        float slope = new Vector2(length, ViewMath.FloorHeight).Length();
+        Basis basis = new(side * (1 - ObjectGap), normal * StairsThickness, along * slope);
+
+        // Середина плиты - над серединой лестницы на половине высоты этажа
+        Vector3 center = ViewMath.ToGodot(stairs.Cell.X + (stairs.Width / 2f), stairs.Cell.Y + (stairs.Depth / 2f), stairs.Cell.Z) + (Vector3.Up * ViewMath.FloorHeight / 2);
+        return new Transform3D(basis, center);
+    }
+
+    /// <summary>Клетки этажа z чанка; insideOnly - только клетки карты, иначе и запас хранения под внешние рёбра.</summary>
+    private static IEnumerable<CellPos> Cells(World world, int chunkX, int chunkY, bool insideOnly, int z)
     {
         int extra = insideOnly ? 0 : 1;
         int maxX = Math.Min((chunkX + 1) * World.ChunkSize, world.Width + extra);
         int maxY = Math.Min((chunkY + 1) * World.ChunkSize, world.Height + extra);
-        for (int z = World.MinLevel; z <= World.MaxLevel; z++)
+        for (int y = chunkY * World.ChunkSize; y < maxY; y++)
         {
-            for (int y = chunkY * World.ChunkSize; y < maxY; y++)
+            for (int x = chunkX * World.ChunkSize; x < maxX; x++)
             {
-                for (int x = chunkX * World.ChunkSize; x < maxX; x++)
-                {
-                    yield return new CellPos(x, y, z);
-                }
+                yield return new CellPos(x, y, z);
             }
         }
     }
 
-    /// <summary>Бокс стены или двери по ребру; открытая дверь повёрнута вокруг петли в начале ребра.</summary>
+    /// <summary>Куски ребра по виду стены: сплошная стена; перемычка над проёмом и дверь; подоконник, перемычка и стекло окна.</summary>
     private static void AddWall(List<WallInstance> walls, WorldTable table, Edge edge, CellPos cell, bool north)
     {
         if (edge.Wall == 0)
@@ -111,39 +157,70 @@ public static class ChunkMesh
             return;
         }
 
-        WallDef wall = table.Wall(edge.Wall);
-        bool isDoor = wall.Kind == WallKind.Door;
+        Color color = Color.FromHtml(table.Wall(edge.Wall).Color);
+        Color fill = edge.Fill == 0 ? color : Color.FromHtml(table.Fill(edge.Fill).Color);
         Vector3 start = ViewMath.ToGodot(cell.X, cell.Y, cell.Z);
+        WallKey key = new(cell, north);
 
-        // Северное ребро идёт вдоль X, западное - вдоль Z; открытая дверь поворачивается внутрь клетки
+        // Северное ребро идёт вдоль X, западное - вдоль Z
         Vector3 along = north ? Vector3.Right : Vector3.Back;
-        Vector3 inside = north ? Vector3.Back : Vector3.Right;
-
-        // Стена длиннее ребра на толщину стены: соседние куски перекрываются, без стыков и щелей в углах.
-        // Дверь не удлиняется и тоньше стены: иначе её грани совпали бы с гранями соседних стен и мерцали
-        float length = 1f;
-        float thickness = DoorThickness;
-        if (!isDoor)
+        switch (edge.Kind)
         {
-            length = 1f + WallThickness;
-            thickness = WallThickness;
-            start -= along * WallThickness / 2;
+            case WallKind.DoorFrame:
+                walls.Add(Piece(start, along, DoorHeight, WallHeight, color, key));
+                if (edge.Fill != 0)
+                {
+                    walls.Add(Door(start, along, north ? Vector3.Back : Vector3.Right, edge.Open, fill, key));
+                }
+
+                break;
+            case WallKind.WindowFrame:
+                walls.Add(Piece(start, along, 0, SillHeight, color, key));
+                walls.Add(Piece(start, along, WindowTop, WallHeight, color, key));
+                if (edge.Fill != 0)
+                {
+                    // Открытое окно поднято вверх, как в Project Zomboid: верхняя половина стекла уходит за перемычку
+                    float lift = edge.Open ? (WindowTop - SillHeight) / 2 : 0;
+                    Transform3D pane = Segment(start, along, 1f, GlassThickness, SillHeight + lift, WindowTop - SillHeight);
+                    walls.Add(new WallInstance(pane, fill, false, edge.Open, key, IsGlass: true));
+                }
+
+                break;
+            default:
+                walls.Add(Piece(start, along, 0, WallHeight, color, key));
+                break;
         }
-        else if (edge.Open)
+    }
+
+    /// <summary>Кусок стены по всей длине ребра от высоты bottom до top.</summary>
+    private static WallInstance Piece(Vector3 start, Vector3 along, float bottom, float top, Color color, WallKey key)
+    {
+        // Кусок длиннее ребра на толщину стены: соседние куски перекрываются, без стыков и щелей в углах
+        Transform3D transform = Segment(start - (along * WallThickness / 2), along, 1f + WallThickness, WallThickness, bottom, top - bottom);
+        return new WallInstance(transform, color, false, false, key);
+    }
+
+    /// <summary>Дверь в проёме: закрытая - в плоскости ребра, открытая - повёрнута вокруг петли в начале ребра внутрь клетки.</summary>
+    private static WallInstance Door(Vector3 start, Vector3 along, Vector3 inside, bool open, Color color, WallKey key)
+    {
+        // Дверь не удлиняется и тоньше стены: иначе её грани совпали бы с гранями перемычки и мерцали
+        Vector3 direction = along;
+        float length = 1f;
+        if (open)
         {
             float angle = Mathf.DegToRad(OpenDoorAngle);
-            along = ((along * Mathf.Cos(angle)) + (inside * Mathf.Sin(angle))).Normalized();
+            direction = ((along * Mathf.Cos(angle)) + (inside * Mathf.Sin(angle))).Normalized();
             length = OpenDoorLength;
         }
 
-        walls.Add(new WallInstance(Segment(start, along, length, thickness), Color.FromHtml(wall.Color), isDoor, edge.Open, new WallKey(cell, north)));
+        return new WallInstance(Segment(start, direction, length, DoorThickness, 0, DoorHeight), color, true, open, key);
     }
 
-    /// <summary>Положение единичного бокса, растянутого вдоль direction на length от start, толщиной thickness.</summary>
-    private static Transform3D Segment(Vector3 start, Vector3 direction, float length, float thickness)
+    /// <summary>Положение единичного бокса, растянутого вдоль direction на length от start, толщиной thickness, от высоты bottom на height вверх.</summary>
+    private static Transform3D Segment(Vector3 start, Vector3 direction, float length, float thickness, float bottom, float height)
     {
-        Basis basis = new(direction * length, Vector3.Up * WallHeight, direction.Cross(Vector3.Up) * thickness);
-        Vector3 center = start + (direction * length / 2) + (Vector3.Up * WallHeight / 2);
+        Basis basis = new(direction * length, Vector3.Up * height, direction.Cross(Vector3.Up) * thickness);
+        Vector3 center = start + (direction * length / 2) + (Vector3.Up * (bottom + (height / 2)));
         return new Transform3D(basis, center);
     }
 

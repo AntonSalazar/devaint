@@ -37,6 +37,9 @@ public partial class IsoCamera : GameCamera
     /// <summary>Стены, закрывающие персонажа, срезаются.</summary>
     public override bool CutsWalls => true;
 
+    /// <summary>Этажи выше своего не рисуются.</summary>
+    public override bool HidesUpperFloors => true;
+
     /// <summary>Мышь свободна: прицел идёт за курсором.</summary>
     public override bool CapturesMouse => false;
 

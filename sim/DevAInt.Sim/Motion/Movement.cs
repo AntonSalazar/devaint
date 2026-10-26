@@ -3,7 +3,7 @@ using DevAInt.Sim.Grid;
 
 namespace DevAInt.Sim.Motion;
 
-/// <summary>Свободное движение круга по миру со столкновениями о непроходимые рёбра клеток.</summary>
+/// <summary>Свободное движение круга по миру со столкновениями о непроходимые рёбра клеток и с переходом между этажами по лестницам.</summary>
 public static class Movement
 {
     /// <summary>Наибольшее число проходов выталкивания за шаг: в углу комнаты нужно два.</summary>
@@ -25,14 +25,19 @@ public static class Movement
         int steps = (int)Math.Ceiling(distance / (body.Radius / 2));
         double x = from.X;
         double y = from.Y;
+        int z = from.Z;
         for (int i = 0; i < steps; i++)
         {
+            CellPos was = new WorldPos(x, y, z).Cell;
             x += dx / steps;
             y += dy / steps;
-            (x, y) = PushOut(world, x, y, from.Z, body.Radius);
+            (x, y) = PushOut(world, x, y, z, body.Radius);
+
+            // Шаг через верхний край лестницы меняет этаж: вверх с лестницы, вниз в проём над ней
+            z += Stairs.LevelChange(world, was, new WorldPos(x, y, z).Cell);
         }
 
-        return new WorldPos(x, y, from.Z);
+        return new WorldPos(x, y, z);
     }
 
     /// <summary>Выталкивание круга из всех непроходимых рёбер рядом; движение в стену пропадает, вдоль стены остаётся.</summary>
@@ -76,8 +81,21 @@ public static class Movement
     /// <summary>Нельзя пройти через ребро: стена, закрытая дверь или с какой-то стороны нет пола или стоит объект, который мешает ходить.</summary>
     private static bool IsBlocked(World world, CellPos cell, Side side)
     {
+        // Флаги обеих клеток читаются один раз: проверка идёт для каждого ребра у тела на каждом шаге,
+        // отдельные чтения для лестницы и для объектов замедлили ходьбу тысячи тел с 1220 до 1400 мкс
+        CellPos next = cell.Neighbor(side);
+        byte here = world.CellFlags(cell);
+        byte there = world.CellFlags(next);
+
+        // Верхний край лестницы решает этаж над ней: на нём стена этажа и пол выхода, а не то, что под ним
+        if (((here | there) & ChunkLevel.StairsEdge) != 0 && Stairs.TopEdgeExit(world, cell, side) is CellPos exit)
+        {
+            return !world.GetEdge(cell with { Z = exit.Z }, side).IsPassable || !world.IsFree(exit);
+        }
+
         bool wall = !world.GetEdge(cell, side).IsPassable;
-        return wall || !world.IsFree(cell) || !world.IsFree(cell.Neighbor(side));
+        bool blocked = ((here | there) & ChunkLevel.MoveBlocked) != 0;
+        return wall || blocked || !world.IsWalkable(cell) || !world.IsWalkable(next);
     }
 
     /// <summary>Выталкивание центра на радиус от ближайшей точки отрезка, true если было пересечение.</summary>

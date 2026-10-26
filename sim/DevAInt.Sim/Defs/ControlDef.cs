@@ -20,6 +20,9 @@ public enum ControlAction
 
     /// <summary>Хук control у модов: id действия и точка курсора.</summary>
     Lua,
+
+    /// <summary>Открыть или закрыть ближнюю дверь или окно впереди.</summary>
+    Interact,
 }
 
 /// <summary>Действие управления: клавиши по умолчанию, держится ли оно и что делает.</summary>

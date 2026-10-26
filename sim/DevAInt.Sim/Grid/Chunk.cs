@@ -40,6 +40,12 @@ internal sealed class ChunkLevel
     /// <summary>Флаг открытой двери на западном ребре.</summary>
     public const byte WestOpen = 2;
 
+    /// <summary>Сдвиг вида северной стены, WallKind, во флагах рёбер: два бита.</summary>
+    public const int NorthKindShift = 2;
+
+    /// <summary>Сдвиг вида западной стены, WallKind, во флагах рёбер: два бита.</summary>
+    public const int WestKindShift = 4;
+
     /// <summary>Флаг клетки: её занимает объект.</summary>
     public const byte Occupied = 1;
 
@@ -48,6 +54,9 @@ internal sealed class ChunkLevel
 
     /// <summary>Флаг клетки: объект закрывает обзор.</summary>
     public const byte SightBlocked = 4;
+
+    /// <summary>Флаг клетки: верх лестницы или проём над ним, её рёбра проверяет Stairs.</summary>
+    public const byte StairsEdge = 8;
 
     /// <summary>Номера полов, 0 - пола нет.</summary>
     public ushort[] Floors { get; } = new ushort[World.ChunkSize * World.ChunkSize];
@@ -58,7 +67,13 @@ internal sealed class ChunkLevel
     /// <summary>Номера стен на западных рёбрах.</summary>
     public ushort[] WestWalls { get; } = new ushort[World.ChunkSize * World.ChunkSize];
 
-    /// <summary>Флаги рёбер NorthOpen и WestOpen.</summary>
+    /// <summary>Номера створок на северных рёбрах, 0 - нет.</summary>
+    public ushort[] NorthFills { get; } = new ushort[World.ChunkSize * World.ChunkSize];
+
+    /// <summary>Номера створок на западных рёбрах, 0 - нет.</summary>
+    public ushort[] WestFills { get; } = new ushort[World.ChunkSize * World.ChunkSize];
+
+    /// <summary>Флаги рёбер NorthOpen и WestOpen и виды стен по сдвигам NorthKindShift и WestKindShift.</summary>
     public byte[] Flags { get; } = new byte[World.ChunkSize * World.ChunkSize];
 
     /// <summary>Флаги клеток Occupied, MoveBlocked и SightBlocked; создаются при первом объекте на слое.</summary>

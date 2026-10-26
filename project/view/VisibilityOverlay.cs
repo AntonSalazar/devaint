@@ -28,6 +28,9 @@ public partial class VisibilityOverlay : MeshInstance3D
     /// <summary>Бит текстуры стен: объект в клетке закрывает обзор, как шкаф.</summary>
     public const byte SightBlock = 4;
 
+    /// <summary>Запас по высоте ниже пола этажа: пол этажа и то, что на нём, относятся к нему.</summary>
+    private const float FloorMargin = 0.05f;
+
     /// <summary>Материал прохода.</summary>
     private readonly ShaderMaterial _material = new() { Shader = GD.Load<Shader>(ShaderPath) };
 
@@ -63,12 +66,12 @@ public partial class VisibilityOverlay : MeshInstance3D
 
                 // Каждая клетка хранит только северное и западное ребро: южное и восточное шейдер берёт у соседа
                 int walls = 0;
-                if (!world.GetEdge(cell, Side.North).IsPassable)
+                if (!world.GetEdge(cell, Side.North).IsTransparent)
                 {
                     walls |= NorthWall;
                 }
 
-                if (!world.GetEdge(cell, Side.West).IsPassable)
+                if (!world.GetEdge(cell, Side.West).IsTransparent)
                 {
                     walls |= WestWall;
                 }
@@ -141,6 +144,11 @@ public partial class VisibilityOverlay : MeshInstance3D
         _material.SetShaderParameter("half_angle", Mathf.DegToRad((float)vision.Angle / 2));
         _material.SetShaderParameter("range", (float)vision.Range);
         _material.SetShaderParameter("near", (float)vision.Near);
+
+        // Затемняется только свой этаж: пиксели других этажей видны по их памяти, как есть
+        int level = ViewMath.Level(eye.Y);
+        _material.SetShaderParameter("floor_bottom", (level * ViewMath.FloorHeight) - FloorMargin);
+        _material.SetShaderParameter("floor_top", ((level + 1) * ViewMath.FloorHeight) - FloorMargin);
     }
 
     /// <summary>Значение параметра шейдера, для тестов.</summary>

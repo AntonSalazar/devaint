@@ -338,6 +338,26 @@ public sealed class Simulation
         return ActionStart.Started;
     }
 
+    /// <summary>Открыть или закрыть ближнюю створку впереди на расстоянии руки; закрыть дверь нельзя, если в проёме кто-то стоит; true - створка сдвинулась.</summary>
+    public bool Interact(long entityId)
+    {
+        Entity entity = _entities[entityId];
+        if (Building.NearestFill(World, entity.Position, entity.Facing) is not (CellPos cell, Side side))
+        {
+            return false;
+        }
+
+        Edge edge = World.GetEdge(cell, side);
+        bool blocked = edge.Open && edge.Kind == WallKind.DoorFrame && _order.Any(other => other.Position.Z == cell.Z && Building.SegmentDistance(other.Position, cell, side) < other.Body.Radius);
+        if (blocked)
+        {
+            return false;
+        }
+
+        World.SetEdge(cell, side, edge with { Open = !edge.Open });
+        return true;
+    }
+
     /// <summary>Попытка начать постройку или разбор: место по правилам Building, материалы и инструменты в своём инвентаре, возврат разбора влезает по весу.</summary>
     public ActionStart StartBuild(long entityId, BuildTarget target)
     {
@@ -398,6 +418,9 @@ public sealed class Simulation
                 break;
             case ControlAction.UseItem:
                 UseFirstItem(entity);
+                break;
+            case ControlAction.Interact:
+                Interact(entityId);
                 break;
             case ControlAction.Lua:
                 WorldPos aim = entity.AimPoint ?? entity.Position;
@@ -743,7 +766,15 @@ public sealed class Simulation
                 break;
             case BuildKind.Wall:
                 Crafting.Take(entity.Inventory, def.Inputs);
-                World.SetEdge(target.Cell, target.Side, new Edge(target.Def, false));
+                World.SetEdge(target.Cell, target.Side, new Edge(target.Def, false, 0, WorldTable.Wall(target.Def).Kind));
+                break;
+            case BuildKind.Fill:
+                Crafting.Take(entity.Inventory, def.Inputs);
+                World.SetEdge(target.Cell, target.Side, World.GetEdge(target.Cell, target.Side) with { Fill = target.Def, Open = false });
+                break;
+            case BuildKind.RemoveFill:
+                World.SetEdge(target.Cell, target.Side, World.GetEdge(target.Cell, target.Side) with { Fill = 0, Open = false });
+                GiveAll(entity, Building.Refund(def));
                 break;
             case BuildKind.RemoveObject:
                 World.RemoveObject(World.ObjectAt(target.Cell)!.Id);
@@ -768,7 +799,7 @@ public sealed class Simulation
         }
 
         BuildDef def = Building.Def(World, WorldTable, target)!;
-        bool removing = target.Kind is BuildKind.RemoveObject or BuildKind.RemoveWall;
+        bool removing = target.Kind is BuildKind.RemoveObject or BuildKind.RemoveWall or BuildKind.RemoveFill;
         if (Crafting.Missing(removing ? [] : def.Inputs, def.Tools, Crafting.Counts(entity.Inventory)) is not null)
         {
             return ActionStart.NoItem;

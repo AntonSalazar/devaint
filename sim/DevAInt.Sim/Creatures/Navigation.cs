@@ -1,14 +1,21 @@
 using System;
 using System.Collections.Generic;
 using DevAInt.Sim.Grid;
+using DevAInt.Sim.Motion;
 
 namespace DevAInt.Sim.Creatures;
 
-/// <summary>Поиск пути по клеткам этажа: A* с ходами по диагонали, которые не срезают углы стен.</summary>
+/// <summary>Поиск пути по клеткам: A* с ходами по диагонали, которые не срезают углы стен, и переходами между этажами по лестницам.</summary>
 public sealed class Pathfinder
 {
     /// <summary>Наибольшее число раскрытых клеток за поиск, чтобы далёкая цель не съела тик.</summary>
     public const int MaxNodes = 4000;
+
+    /// <summary>Цена перехода на другой этаж в оценке пути: как длина лестницы.</summary>
+    private const double LevelCost = 3;
+
+    /// <summary>Стороны клетки для переходов по лестницам.</summary>
+    private static readonly Side[] _sides = [Side.North, Side.East, Side.South, Side.West];
 
     /// <summary>Цена хода по диагонали.</summary>
     private static readonly double _diagonal = Math.Sqrt(2);
@@ -32,9 +39,9 @@ public sealed class Pathfinder
     public bool Find(World world, CellPos from, CellPos to, List<CellPos> path)
     {
         path.Clear();
-        if (from == to || from.Z != to.Z)
+        if (from == to)
         {
-            return from == to;
+            return true;
         }
 
         PriorityQueue<CellPos, double> open = _open;
@@ -76,12 +83,16 @@ public sealed class Pathfinder
                     continue;
                 }
 
-                seen[next] = (cell, nextCost);
-                double estimate = Estimate(next, to);
-                open.Enqueue(next, nextCost + estimate);
-                if (estimate < bestEstimate)
+                Visit(cell, next, nextCost, to, ref best, ref bestEstimate);
+            }
+
+            // Лестница: с верха на выход этажом выше и обратно, ход длиной в клетку
+            foreach (Side side in _sides)
+            {
+                if (Stairs.Across(world, cell, side) is CellPos across && !closed.Contains(across)
+                    && (!seen.TryGetValue(across, out (CellPos Parent, double Cost) known) || known.Cost > cost + 1))
                 {
-                    (best, bestEstimate) = (next, estimate);
+                    Visit(cell, across, cost + 1, to, ref best, ref bestEstimate);
                 }
             }
         }
@@ -113,11 +124,23 @@ public sealed class Pathfinder
         return world.CanCross(cell, h) && world.CanCross(cell, v) && world.CanCross(cell.Neighbor(h), v) && world.CanCross(cell.Neighbor(v), h);
     }
 
-    /// <summary>Оценка пути без стен: прямые ходы плюс диагональные.</summary>
+    /// <summary>Оценка пути без стен: прямые ходы плюс диагональные плюс этажи.</summary>
     private static double Estimate(CellPos from, CellPos to)
     {
         int dx = Math.Abs(from.X - to.X);
         int dy = Math.Abs(from.Y - to.Y);
-        return Math.Max(dx, dy) + ((_diagonal - 1) * Math.Min(dx, dy));
+        return Math.Max(dx, dy) + ((_diagonal - 1) * Math.Min(dx, dy)) + (LevelCost * Math.Abs(from.Z - to.Z));
+    }
+
+    /// <summary>Запись хода из cell в next с ценой cost и ближайшей к цели клетки.</summary>
+    private void Visit(CellPos cell, CellPos next, double cost, CellPos to, ref CellPos best, ref double bestEstimate)
+    {
+        _seen[next] = (cell, cost);
+        double estimate = Estimate(next, to);
+        _open.Enqueue(next, cost + estimate);
+        if (estimate < bestEstimate)
+        {
+            (best, bestEstimate) = (next, estimate);
+        }
     }
 }

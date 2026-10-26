@@ -449,6 +449,7 @@ public partial class GameRoot : Node3D
         own.SetFirstPerson(!camera.ShowsOwnBody);
         camera.Follow(own.Position, _client.Replica.World, _controls?.IsAiming() == true, delta);
         _view.UpdateCutaway(camera.CutsWalls ? own.Position : null, camera.Basis.Z);
+        _view.ShowUpTo(camera.HidesUpperFloors ? ViewMath.Level(own.Position.Y) : null);
     }
 
     /// <summary>Следующий режим камеры: новая камера встаёт на свою капсулу сразу.</summary>

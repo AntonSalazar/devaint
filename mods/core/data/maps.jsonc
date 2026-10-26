@@ -3,7 +3,7 @@
   "$schema": "../../../schemas/data.schema.json",
   "maps": [
     {
-      // Комната 6 на 5 с дверью в южной стене и мебелью, вокруг пол двора
+      // Комната 6 на 5 с дверью в южной стене, мебелью и вторым этажом, вокруг пол двора
       "id": "core:starter_room",
       "width": 32,
       "height": 32,
@@ -14,11 +14,19 @@
         { "floor": "core:wood_floor", "x": 2, "y": 2, "w": 10, "h": 10 },
         { "walls": "core:wood_wall", "x": 4, "y": 4, "w": 6, "h": 5 },
         { "door": "core:wood_door", "x": 6, "y": 8, "side": "south" },
+        { "window": "core:wood_window", "x": 9, "y": 6, "side": "east" },
         // Мебель комнаты: стол у северной стены, шкаф с инструментами и гвоздями в северо-восточном углу,
         // ящик с яблоками и брёвнами в юго-восточном
         { "object": "core:table", "x": 4, "y": 4 },
-        { "object": "core:wardrobe", "x": 9, "y": 4, "items": ["core:saw", "core:hammer", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails"] },
+        { "object": "core:wardrobe", "x": 9, "y": 4, "items": ["core:saw", "core:hammer", "core:glass_pane", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails"] },
         { "object": "core:crate", "x": 9, "y": 8, "items": ["core:apple", "core:apple", "core:log", "core:log"] },
+        // Второй этаж над комнатой: лестница вдоль западной стены поднимается на север, наверху над ней проём без пола
+        { "object": "core:wood_stairs", "x": 4, "y": 5 },
+        { "floor": "core:wood_floor", "x": 4, "y": 4, "z": 1, "w": 6, "h": 1 },
+        { "floor": "core:wood_floor", "x": 5, "y": 5, "z": 1, "w": 5, "h": 4 },
+        { "floor": "core:wood_floor", "x": 4, "y": 8, "z": 1 },
+        { "walls": "core:wood_wall", "x": 4, "y": 4, "z": 1, "w": 6, "h": 5 },
+        { "window": "core:wood_window", "x": 7, "y": 8, "z": 1, "side": "south" },
       ],
     },
   ],

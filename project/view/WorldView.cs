@@ -30,6 +30,12 @@ public partial class WorldView : Node3D
     /// <summary>Опущенные сейчас объекты.</summary>
     private HashSet<long> _cutObjects = [];
 
+    /// <summary>Этаж, на котором сейчас срез.</summary>
+    private int _cutLevel;
+
+    /// <summary>Самый верхний видимый этаж, null - видны все.</summary>
+    private int? _top;
+
     /// <summary>Число узлов чанков.</summary>
     public int ChunkCount => _chunks.Count;
 
@@ -60,22 +66,39 @@ public partial class WorldView : Node3D
     /// <summary>Узел сущности или null.</summary>
     public EntityView? Entity(long id) => _entities.GetValueOrDefault(id);
 
-    /// <summary>Срез стен и высоких объектов под ноги своего персонажа feet при взгляде камеры против back; null - персонажа нет, всё целое.</summary>
+    /// <summary>Срез стен и высоких объектов этажа своего персонажа под его ноги feet при взгляде камеры против back; null - персонажа нет, всё целое.</summary>
     public void UpdateCutaway(Vector3? feet, Vector3 back)
     {
+        int level = feet is Vector3 height ? ViewMath.Level(height.Y) : 0;
         HashSet<WallKey> cut = feet is Vector3 at && _replica?.World is World world
-            ? CutawayPlan.Compute(world, at, back, _chunks.Values.SelectMany(chunk => chunk.Walls))
+            ? CutawayPlan.Compute(world, at, back, _chunks.Values.SelectMany(chunk => chunk.Level(level)?.Walls ?? []))
             : [];
         HashSet<long> cutObjects = feet is Vector3 body
-            ? CutawayPlan.ComputeObjects(body, back, _chunks.Values.SelectMany(chunk => chunk.Objects))
+            ? CutawayPlan.ComputeObjects(body, back, _chunks.Values.SelectMany(chunk => chunk.Level(level)?.Objects ?? []))
             : [];
 
         // Данные экземпляров пишутся, только когда план поменялся: персонаж чаще стоит или идёт вдоль комнаты
-        if (!cut.SetEquals(_cut) || !cutObjects.SetEquals(_cutObjects))
+        if (!cut.SetEquals(_cut) || !cutObjects.SetEquals(_cutObjects) || level != _cutLevel)
         {
             _cut = cut;
             _cutObjects = cutObjects;
+            _cutLevel = level;
             ApplyCut();
+        }
+    }
+
+    /// <summary>Видны только этажи не выше top, как в изометрии; null - все. Меняет узлы, только когда граница сменилась.</summary>
+    public void ShowUpTo(int? top)
+    {
+        if (top == _top)
+        {
+            return;
+        }
+
+        _top = top;
+        foreach (ChunkView chunk in _chunks.Values)
+        {
+            chunk.ShowUpTo(top);
         }
     }
 
@@ -86,7 +109,7 @@ public partial class WorldView : Node3D
         {
             if (!entity.Own)
             {
-                CellPos cell = new WorldPos(entity.Position.X, entity.Position.Z, Mathf.RoundToInt(entity.Position.Y / ViewMath.FloorHeight)).Cell;
+                CellPos cell = new WorldPos(entity.Position.X, entity.Position.Z, ViewMath.Level(entity.Position.Y)).Cell;
                 entity.SetSeen(map is null || map.Coverage(cell) >= VisibilityMap.VisibleThreshold);
             }
         }
@@ -99,7 +122,14 @@ public partial class WorldView : Node3D
     public void FaceOwn(MoveInput input) => Entity(_replica!.OwnEntityId)?.SetFacing(new Vector3((float)input.X, 0, (float)input.Y));
 
     /// <summary>Своя капсула идёт к предсказанной позиции.</summary>
-    public void MoveOwn(WorldPos position) => Entity(_replica!.OwnEntityId)?.SetTarget(ViewMath.ToGodot((float)position.X, (float)position.Y, position.Z));
+    public void MoveOwn(WorldPos position) => Entity(_replica!.OwnEntityId)?.SetTarget(Place(position));
+
+    /// <summary>Точка Godot для ног сущности: на лестнице выше пола этажа на долю подъёма.</summary>
+    public Vector3 Place(WorldPos position)
+    {
+        float rise = _replica?.World is World world ? (float)Stairs.Rise(world, position) : 0;
+        return ViewMath.ToGodot((float)position.X, (float)position.Y, position.Z) + (Vector3.Up * rise * ViewMath.FloorHeight);
+    }
 
     /// <summary>Интерполяция всех сущностей на delta секунд и полосы действий; tickFraction - доля пути до следующего тика.</summary>
     public void Advance(double delta, double tickFraction = 0)
@@ -148,8 +178,9 @@ public partial class WorldView : Node3D
         chunk.Init(chunkX, chunkY);
         AddChild(chunk);
         _chunks[(chunkX, chunkY)] = chunk;
+        chunk.ShowUpTo(_top);
         chunk.Rebuild(_replica!.World!, _table!);
-        chunk.ApplyCut(_cut, _cutObjects);
+        chunk.ApplyCut(_cutLevel, _cut, _cutObjects);
     }
 
     /// <summary>Текущий срез во все чанки.</summary>
@@ -157,7 +188,7 @@ public partial class WorldView : Node3D
     {
         foreach (ChunkView chunk in _chunks.Values)
         {
-            chunk.ApplyCut(_cut, _cutObjects);
+            chunk.ApplyCut(_cutLevel, _cut, _cutObjects);
         }
     }
 
@@ -176,7 +207,7 @@ public partial class WorldView : Node3D
         if (Chunk(cell.X / World.ChunkSize, cell.Y / World.ChunkSize) is ChunkView chunk)
         {
             chunk.Rebuild(_replica!.World!, _table!);
-            chunk.ApplyCut(_cut, _cutObjects);
+            chunk.ApplyCut(_cutLevel, _cut, _cutObjects);
         }
     }
 
@@ -190,7 +221,7 @@ public partial class WorldView : Node3D
     private void OnEntitySpawned(ReplicaEntity entity)
     {
         EntityView view = new();
-        view.Init(entity.Id, entity.Id == _replica!.OwnEntityId, ViewMath.ToGodot(entity.X, entity.Y, entity.Z), ColorOf(entity));
+        view.Init(entity.Id, entity.Id == _replica!.OwnEntityId, Place(new WorldPos(entity.X, entity.Y, entity.Z)), ColorOf(entity));
         AddChild(view);
         _entities[entity.Id] = view;
     }
@@ -200,7 +231,7 @@ public partial class WorldView : Node3D
     {
         if (entity.Id != _replica!.OwnEntityId)
         {
-            Entity(entity.Id)?.SetTarget(ViewMath.ToGodot(entity.X, entity.Y, entity.Z));
+            Entity(entity.Id)?.SetTarget(Place(new WorldPos(entity.X, entity.Y, entity.Z)));
         }
     }
 

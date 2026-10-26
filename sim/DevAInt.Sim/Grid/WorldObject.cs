@@ -2,8 +2,8 @@ using DevAInt.Sim.Defs;
 
 namespace DevAInt.Sim.Grid;
 
-/// <summary>Объект мира на клетках: свой id, номер вида, северо-западная клетка, поворот, занятый прямоугольник и вместимость контейнера, 0 - не контейнер.</summary>
-public sealed record WorldObject(long Id, ushort Def, CellPos Cell, int Rotation, int Width, int Depth, bool BlocksMove, bool BlocksSight, double Capacity = 0)
+/// <summary>Объект мира на клетках: свой id, номер вида, северо-западная клетка, поворот, занятый прямоугольник, вместимость контейнера, 0 - не контейнер, и лестница ли он.</summary>
+public sealed record WorldObject(long Id, ushort Def, CellPos Cell, int Rotation, int Width, int Depth, bool BlocksMove, bool BlocksSight, double Capacity = 0, bool IsStairs = false)
 {
     /// <summary>Число поворотов: на 0, 90, 180 и 270 градусов.</summary>
     public const int Rotations = 4;
@@ -15,7 +15,7 @@ public sealed record WorldObject(long Id, ushort Def, CellPos Cell, int Rotation
     public static WorldObject Create(long id, ushort index, ObjectDef def, CellPos cell, int rotation)
     {
         bool turned = rotation % 2 == 1;
-        return new WorldObject(id, index, cell, rotation, turned ? def.H : def.W, turned ? def.W : def.H, def.BlocksMove, def.BlocksSight, def.Container?.Capacity ?? 0);
+        return new WorldObject(id, index, cell, rotation, turned ? def.H : def.W, turned ? def.W : def.H, def.BlocksMove, def.BlocksSight, def.Container?.Capacity ?? 0, def.Stairs);
     }
 
     /// <summary>Занимает ли объект клетку.</summary>

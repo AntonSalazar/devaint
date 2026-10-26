@@ -13,10 +13,10 @@ public class ObjectViewTest : TestCase
     {
         GameFixture game = new();
 
-        List<ObjectInstance> objects = ChunkMesh.BuildObjects(game.Sim.World, game.Sim.WorldTable, 0, 0);
+        List<ObjectInstance> objects = ChunkMesh.BuildObjects(game.Sim.World, game.Sim.WorldTable, 0, 0, 0);
         ObjectInstance table = objects.Find(obj => game.Sim.World.FindObject(obj.Id)!.Def == game.Sim.WorldTable.ObjectIndex("core:table"));
 
-        CheckEqual(3, objects.Count, "three objects in the room");
+        CheckEqual(4, objects.Count, "four objects in the room with the stairs");
         CheckNear(5.0, table.Transform.Origin.X, Tolerance, "table centre x");
         CheckNear(0.4, table.Transform.Origin.Y, Tolerance, "table stands on the floor");
         CheckNear(4.5, table.Transform.Origin.Z, Tolerance, "table centre z");
@@ -31,7 +31,7 @@ public class ObjectViewTest : TestCase
         ushort index = game.Sim.WorldTable.ObjectIndex("core:table");
         game.Sim.World.PlaceObject(WorldObject.Create(100, index, game.Sim.WorldTable.Object(index), new CellPos(2, 9, 0), 1));
 
-        ObjectInstance table = ChunkMesh.BuildObjects(game.Sim.World, game.Sim.WorldTable, 0, 0).Find(obj => obj.Id == 100);
+        ObjectInstance table = ChunkMesh.BuildObjects(game.Sim.World, game.Sim.WorldTable, 0, 0, 0).Find(obj => obj.Id == 100);
 
         CheckNear(1 - ChunkMesh.ObjectGap, table.Transform.Basis.Scale.X, Tolerance, "narrow along x");
         CheckNear(2 - ChunkMesh.ObjectGap, table.Transform.Basis.Scale.Z, Tolerance, "long along z");
@@ -46,21 +46,21 @@ public class ObjectViewTest : TestCase
         view.Init(game.Client.Replica, game.Sim.WorldTable, game.Sim.CreatureTable);
         game.Tick();
         ChunkView chunk = view.Chunk(0, 0)!;
-        int before = chunk.VisibleObjects.Multimesh.InstanceCount;
+        int before = chunk.Level(0)!.VisibleObjects.Multimesh.InstanceCount;
         ushort crate = game.Sim.WorldTable.ObjectIndex("core:crate");
 
         game.Sim.World.PlaceObject(WorldObject.Create(100, crate, game.Sim.WorldTable.Object(crate), new CellPos(3, 3, 0), 0));
         game.Tick();
-        int placed = chunk.Objects.Count;
+        int placed = chunk.Level(0)!.Objects.Count;
         game.Sim.World.RemoveObject(100);
         game.Tick();
 
-        CheckEqual(3, before, "room furniture");
-        CheckEqual(4, placed, "placed crate is drawn");
-        CheckEqual(3, chunk.Objects.Count, "removed crate is gone");
-        Check(chunk.VisibleObjects.MaterialOverride == Cutaway.Material, "objects use the cutaway");
-        CheckEqual(GeometryInstance3D.ShadowCastingSetting.ShadowsOnly, chunk.ShadowObjects.CastShadow, "whole boxes cast shadows");
-        Check(chunk.VisibleObjects.Multimesh == chunk.ShadowObjects.Multimesh, "both share one multimesh");
+        CheckEqual(4, before, "room furniture");
+        CheckEqual(5, placed, "placed crate is drawn");
+        CheckEqual(4, chunk.Level(0)!.Objects.Count, "removed crate is gone");
+        Check(chunk.Level(0)!.VisibleObjects.MaterialOverride == Cutaway.Material, "objects use the cutaway");
+        CheckEqual(GeometryInstance3D.ShadowCastingSetting.ShadowsOnly, chunk.Level(0)!.ShadowObjects.CastShadow, "whole boxes cast shadows");
+        Check(chunk.Level(0)!.VisibleObjects.Multimesh == chunk.Level(0)!.ShadowObjects.Multimesh, "both share one multimesh");
         view.Free();
     }
 

@@ -61,16 +61,24 @@ public partial class ShoulderCamera : MouseLookCamera
             return desired;
         }
 
-        // Стены считаются бесконечно высокими: камера из-за плеча всегда ниже их верха или рядом с ним
+        // Стены считаются бесконечно высокими: камера из-за плеча всегда ниже их верха или рядом с ним.
+        // Стена ищется на отрезке, продлённом на зазор: стена ровно на месте камеры тоже должна её остановить
+        float length = new Vector2(desired.X - pivot.X, desired.Z - pivot.Z).Length();
+        if (length < 1e-4f)
+        {
+            return desired;
+        }
+
+        float reach = length + WallMargin;
+        Vector3 beyond = pivot + ((desired - pivot) * (reach / length));
         WorldPos from = new(pivot.X, pivot.Z, z);
-        WorldPos to = new(desired.X, desired.Z, z);
+        WorldPos to = new(beyond.X, beyond.Z, z);
         if (Sight.Blocked(world, from, to) is not double share)
         {
             return desired;
         }
 
-        float length = new Vector2(desired.X - pivot.X, desired.Z - pivot.Z).Length();
-        float allowed = Mathf.Max(0, ((float)share * length) - WallMargin) / length;
+        float allowed = Mathf.Clamp(((float)share * reach) - WallMargin, 0, length) / length;
         return pivot.Lerp(desired, allowed);
     }
 
@@ -99,7 +107,7 @@ public partial class ShoulderCamera : MouseLookCamera
         Fov = Mathf.Lerp(NormalFov, AimFov, _aim);
         Vector3 pivot = feet + (Vector3.Up * PivotHeight);
         Vector3 desired = pivot + (Basis.X * ShoulderOffset) + (Basis.Z * distance);
-        int z = Mathf.RoundToInt(feet.Y / ViewMath.FloorHeight);
+        int z = ViewMath.Level(feet.Y);
         Position = KeepOutOfWalls(world, pivot, desired, z);
     }
 

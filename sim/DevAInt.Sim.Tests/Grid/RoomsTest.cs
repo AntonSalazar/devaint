@@ -44,6 +44,17 @@ public class RoomsTest
         Assert.Null(Rooms.Find(world, new CellPos(6, 6, 0), maxCells: 10));
     }
 
+    /// <summary>Комната второго этажа с проёмом над лестницей - тоже комната, проём в ней.</summary>
+    [Fact]
+    public void UpperRoomWithStairwell()
+    {
+        HashSet<CellPos>? room = Rooms.Find(Room(doorOpen: false), new CellPos(6, 6, 1));
+
+        Assert.NotNull(room);
+        Assert.Equal(30, room.Count);
+        Assert.Contains(new CellPos(4, 6, 1), room);
+    }
+
     /// <summary>Стартовая комната core.</summary>
     private static World Room(bool doorOpen)
     {

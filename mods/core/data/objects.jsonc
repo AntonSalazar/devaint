@@ -1,6 +1,6 @@
 // Объекты мира: мебель на клетках. w и h - размер в клетках без поворота, height - высота в метрах,
 // blocksMove - мешает ходить, blocksSight - закрывает обзор, container - вместимость в килограммах,
-// build - из чего и сколько секунд строится игроком.
+// build - из чего и сколько секунд строится игроком, stairs - лестница на этаж выше, без поворота на север.
 // Цвет - пока моделей нет.
 {
   "$schema": "../../../schemas/data.schema.json",
@@ -8,6 +8,8 @@
     { "id": "core:crate", "height": 0.6, "color": "#9a7b4f", "container": { "capacity": 20 },
       "build": { "inputs": [ { "item": "core:plank", "count": 4 }, { "item": "core:nails", "count": 4 } ], "tools": ["core:hammer"], "seconds": 8 } },
     { "id": "core:table", "w": 2, "height": 0.8, "color": "#7a5532" },
+    { "id": "core:wood_stairs", "h": 3, "height": 3, "color": "#8a6440", "stairs": true, "blocksMove": false,
+      "build": { "inputs": [ { "item": "core:plank", "count": 6 }, { "item": "core:nails", "count": 6 } ], "tools": ["core:hammer"], "seconds": 15 } },
     { "id": "core:wardrobe", "height": 2, "color": "#5b3a24", "blocksSight": true, "container": { "capacity": 40 } },
   ],
 }

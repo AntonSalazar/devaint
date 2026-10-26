@@ -22,11 +22,11 @@ public class CutawayTest : TestCase
         game.Tick();
         ChunkView chunk = view.Chunk(0, 0)!;
 
-        CheckEqual(GeometryInstance3D.ShadowCastingSetting.Off, chunk.VisibleWalls.CastShadow, "visible walls cast no shadows");
-        CheckEqual(GeometryInstance3D.ShadowCastingSetting.ShadowsOnly, chunk.ShadowWalls.CastShadow, "shadow walls only cast shadows");
-        Check(chunk.VisibleWalls.MaterialOverride == Cutaway.Material, "visible walls use the cutaway");
-        Check(chunk.ShadowWalls.MaterialOverride != Cutaway.Material, "shadow walls do not use the cutaway");
-        Check(chunk.VisibleWalls.Multimesh == chunk.ShadowWalls.Multimesh, "both share one multimesh");
+        CheckEqual(GeometryInstance3D.ShadowCastingSetting.Off, chunk.Level(0)!.VisibleWalls.CastShadow, "visible walls cast no shadows");
+        CheckEqual(GeometryInstance3D.ShadowCastingSetting.ShadowsOnly, chunk.Level(0)!.ShadowWalls.CastShadow, "shadow walls only cast shadows");
+        Check(chunk.Level(0)!.VisibleWalls.MaterialOverride == Cutaway.Material, "visible walls use the cutaway");
+        Check(chunk.Level(0)!.ShadowWalls.MaterialOverride != Cutaway.Material, "shadow walls do not use the cutaway");
+        Check(chunk.Level(0)!.VisibleWalls.Multimesh == chunk.Level(0)!.ShadowWalls.Multimesh, "both share one multimesh");
         view.Free();
     }
 
@@ -69,14 +69,14 @@ public class CutawayTest : TestCase
         view.Init(game.Client.Replica, game.Sim.WorldTable, game.Sim.CreatureTable);
         game.Tick();
         ChunkView chunk = view.Chunk(0, 0)!;
-        int door = chunk.Walls.ToList().FindIndex(wall => wall.IsDoor);
+        int door = chunk.Level(0)!.Walls.ToList().FindIndex(wall => wall.IsDoor);
 
         view.UpdateCutaway(new Vector3(6.5f, 0, 6.5f), Back());
-        bool cut = chunk.IsCut(door);
+        bool cut = chunk.Level(0)!.IsCut(door);
         view.UpdateCutaway(null, Back());
 
         Check(cut, "door is cut from inside");
-        Check(!chunk.IsCut(door), "door is whole without a player");
+        Check(!chunk.Level(0)!.IsCut(door), "door is whole without a player");
         view.Free();
     }
 
@@ -99,7 +99,7 @@ public class CutawayTest : TestCase
     private static HashSet<WallKey> Plan(float x, float y)
     {
         GameFixture game = new();
-        List<WallInstance> walls = ChunkMesh.BuildWalls(game.Sim.World, game.Sim.WorldTable, 0, 0);
+        List<WallInstance> walls = ChunkMesh.BuildWalls(game.Sim.World, game.Sim.WorldTable, 0, 0, 0);
         return CutawayPlan.Compute(game.Sim.World, new Vector3(x, 0, y), Back(), walls);
     }
 
@@ -118,6 +118,6 @@ public class CutawayTest : TestCase
     {
         GameFixture game = new();
         Vector3 feet = new(x, 0, y);
-        return ChunkMesh.BuildWalls(game.Sim.World, game.Sim.WorldTable, 0, 0).Count(wall => Cutaway.Occludes(wall.Transform, feet, Back()));
+        return ChunkMesh.BuildWalls(game.Sim.World, game.Sim.WorldTable, 0, 0, 0).Count(wall => Cutaway.Occludes(wall.Transform, feet, Back()));
     }
 }

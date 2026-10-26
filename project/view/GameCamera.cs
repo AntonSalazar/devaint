@@ -10,6 +10,9 @@ public abstract partial class GameCamera : Camera3D
     /// <summary>Срез стен, закрывающих персонажа: только изометрия.</summary>
     public virtual bool CutsWalls => false;
 
+    /// <summary>Этажи выше своего не рисуются, как в изометрии Project Zomboid: иначе потолок закрыл бы персонажа.</summary>
+    public virtual bool HidesUpperFloors => false;
+
     /// <summary>Мышь захвачена и крутит камеру.</summary>
     public virtual bool CapturesMouse => true;
 

@@ -39,7 +39,7 @@ public class LuaObjectsTest
             """, out Simulation sim);
 
         Assert.Equal("true\nnil cell 2,3,0 is taken by another object\nunknown object core:sofa\ntrue false", output);
-        Assert.Equal(3, sim.World.Objects.Count);
+        Assert.Equal(4, sim.World.Objects.Count);
     }
 
     /// <summary>containers.items, add и remove работают с содержимым ящика; не контейнер - nil, переполнение - nil и причина.</summary>
