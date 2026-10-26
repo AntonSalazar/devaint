@@ -1,6 +1,6 @@
 using Godot;
 
-/// <summary>Общий материал стен со срезом и проверка, закрывает ли кусок стены персонажа.</summary>
+/// <summary>Общий материал стен и объектов со срезом и проверки, закрывают ли кусок стены или объект персонажа.</summary>
 public static class Cutaway
 {
     /// <summary>Путь шейдера среза.</summary>
@@ -15,6 +15,12 @@ public static class Cutaway
     /// <summary>Насколько персонаж должен отойти от плоскости куска, чтобы считаться за ним: в дверном проёме срез не мигает.</summary>
     public const float SideEpsilon = 0.05f;
 
+    /// <summary>Длина луча к камере при проверке объекта: дальше камеры изометрии.</summary>
+    private const float RayLength = 30f;
+
+    /// <summary>Высоты над ногами, от которых идут лучи к камере при проверке объекта: ноги, пояс и голова.</summary>
+    private static readonly float[] _rayHeights = [0.1f, BodyHeight / 2, BodyHeight - 0.1f];
+
     /// <summary>Материал стен, один на все чанки; какие куски опущены, задают данные экземпляров.</summary>
     public static ShaderMaterial Material { get; } = new() { Shader = GD.Load<Shader>(ShaderPath) };
 
@@ -26,6 +32,28 @@ public static class Cutaway
         // бывает позади него, и тогда тело он не закрывает
         Vector3 side = new Vector3(back.Z, 0, -back.X).Normalized() * BodyRadius;
         return Hits(piece, feet, back) || Hits(piece, feet + side, back) || Hits(piece, feet - side, back);
+    }
+
+    /// <summary>Закрывает ли бокс объекта тело от камеры: хоть один луч к камере от ног, пояса или головы, от центра или краёв тела проходит через бокс.</summary>
+    public static bool OccludesBox(Transform3D box, Vector3 feet, Vector3 back)
+    {
+        // Бокс объекта не повёрнут, только растянут: его границы - центр плюс-минус половина масштаба
+        Vector3 size = box.Basis.Scale.Abs();
+        Aabb bounds = new(box.Origin - (size / 2), size);
+        Vector3 side = new Vector3(back.Z, 0, -back.X).Normalized() * BodyRadius;
+        foreach (float height in _rayHeights)
+        {
+            for (int across = -1; across <= 1; across++)
+            {
+                Vector3 from = feet + (side * across) + (Vector3.Up * height);
+                if (bounds.IntersectsSegment(from, from + (back.Normalized() * RayLength)))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Проходит ли луч к камере от точки на полу через кусок стены, считая рост тела над ней.</summary>

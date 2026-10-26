@@ -134,7 +134,7 @@ public sealed record CreatureSpawnDef
     public int Count { get; init; } = 1;
 }
 
-/// <summary>Операция построения: ровно одно из floor, walls, door и прямоугольник или клетка.</summary>
+/// <summary>Операция построения: ровно одно из floor, walls, door, object и прямоугольник или клетка.</summary>
 public sealed record MapOpDef
 {
     /// <summary>Пол на все клетки прямоугольника.</summary>
@@ -145,6 +145,12 @@ public sealed record MapOpDef
 
     /// <summary>Дверь на ребре side клетки x, y.</summary>
     public string? Door { get; init; }
+
+    /// <summary>Объект северо-западной клеткой в x, y с поворотом rotation.</summary>
+    public string? Object { get; init; }
+
+    /// <summary>Поворот объекта: 0..3, по четверти оборота; нечётный меняет ширину и глубину местами.</summary>
+    public int Rotation { get; init; }
 
     /// <summary>Западная клетка прямоугольника.</summary>
     public required int X { get; init; }
@@ -170,10 +176,10 @@ public sealed record MapOpDef
     /// <summary>Проблемы операции на этой карте.</summary>
     internal IEnumerable<string> Validate(MapDef map, DefDatabase defs)
     {
-        int kinds = (Floor is null ? 0 : 1) + (Walls is null ? 0 : 1) + (Door is null ? 0 : 1);
+        int kinds = (Floor is null ? 0 : 1) + (Walls is null ? 0 : 1) + (Door is null ? 0 : 1) + (Object is null ? 0 : 1);
         if (kinds != 1)
         {
-            yield return "needs exactly one of floor, walls, door";
+            yield return "needs exactly one of floor, walls, door, object";
             yield break;
         }
 
@@ -210,6 +216,16 @@ public sealed record MapOpDef
         if (Open && Door is null)
         {
             yield return "open is only for door";
+        }
+
+        if (Object is not null && !defs.TryGet<ObjectDef>(Object, out _))
+        {
+            yield return $"unknown object {Object}";
+        }
+
+        if (Object is null ? Rotation != 0 : Rotation is < 0 or >= WorldObject.Rotations)
+        {
+            yield return Object is null ? "rotation is only for object" : $"rotation {Rotation} must be within 0..{WorldObject.Rotations - 1}";
         }
     }
 }

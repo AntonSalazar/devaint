@@ -22,7 +22,7 @@ public class VisibilityTest : TestCase
         overlay.Free();
     }
 
-    /// <summary>В текстуре стен - биты загораживающих рёбер; открытая дверь не загораживает.</summary>
+    /// <summary>В текстуре стен - биты загораживающих рёбер и объектов; открытая дверь не загораживает.</summary>
     public void TestWallTexels()
     {
         World world = new(64, 64);
@@ -30,6 +30,8 @@ public class VisibilityTest : TestCase
         world.SetEdge(new CellPos(30, 20, 0), Side.West, new Edge(1, false));
         world.SetEdge(new CellPos(31, 20, 0), Side.East, new Edge(1, false));
         world.SetEdge(new CellPos(33, 20, 0), Side.West, new Edge(1, true));
+        world.SetFloor(new CellPos(35, 20, 0), 1);
+        world.PlaceObject(WorldObject.Create(1, 1, new ObjectDef { Id = "test:wardrobe", BlocksSight = true }, new CellPos(35, 20, 0), 0));
         CellPos origin = Origin(30, 30);
 
         byte[] texels = Walls(world, origin);
@@ -37,6 +39,7 @@ public class VisibilityTest : TestCase
         CheckEqual((byte)(VisibilityOverlay.NorthWall | VisibilityOverlay.WestWall), Wall(texels, origin, 30, 20), "north and west walls");
         CheckEqual(VisibilityOverlay.WestWall, Wall(texels, origin, 32, 20), "east wall is the west wall of the neighbour");
         CheckEqual((byte)0, Wall(texels, origin, 33, 20), "open door does not block");
+        CheckEqual(VisibilityOverlay.SightBlock, Wall(texels, origin, 35, 20), "wardrobe blocks sight");
     }
 
     /// <summary>В текстуре памяти 4 на 4 тексела на клетку: увиденная клетка вся, точка края по своему биту, невиденная - 0.</summary>
@@ -74,6 +77,27 @@ public class VisibilityTest : TestCase
             world.SetEdge(cell, random.Next(2) == 0 ? Side.North : Side.East, new Edge(1, random.Next(5) == 0));
         }
 
+        // Шкафы среди стен: объект закрывает обзор так же, как в sim; объекту нужен пол
+        for (int y = 0; y < 64; y++)
+        {
+            for (int x = 0; x < 64; x++)
+            {
+                world.SetFloor(new CellPos(x, y, 0), 1);
+            }
+        }
+
+        ObjectDef wardrobe = new() { Id = "test:wardrobe", BlocksSight = true };
+        int placed = 0;
+        for (int i = 0; i < 60; i++)
+        {
+            WorldObject obj = WorldObject.Create(i + 1, 1, wardrobe, new CellPos(random.Next(10, 50), random.Next(10, 50), 0), 0);
+            if (world.PlaceProblem(obj) is null && obj.Cell != new CellPos(30, 30, 0))
+            {
+                world.PlaceObject(obj);
+                placed++;
+            }
+        }
+
         WorldPos eye = new(30.37, 30.81, 0);
         CellPos origin = Origin(30, 30);
         byte[] texels = Walls(world, origin);
@@ -87,6 +111,7 @@ public class VisibilityTest : TestCase
             }
         }
 
+        Check(placed > 30, $"{placed} wardrobes placed");
         CheckEqual(0, mismatches, "texel ray mismatches");
     }
 
@@ -172,6 +197,12 @@ public class VisibilityTest : TestCase
 
                 cellY += stepY;
                 nextY += deltaY;
+            }
+
+            bool atEnd = cellX == (int)Math.Floor(to.X) && cellY == (int)Math.Floor(to.Y);
+            if (!atEnd && (Wall(texels, origin, cellX, cellY) & VisibilityOverlay.SightBlock) != 0)
+            {
+                return false;
             }
         }
 

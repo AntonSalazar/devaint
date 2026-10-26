@@ -28,7 +28,13 @@ public sealed record WelcomeMessage(long EntityId, int Width, int Height, double
 }
 
 /// <summary>Снимок чанка: все созданные слои этажей целиком.</summary>
-public sealed record ChunkSnapshotMessage(int ChunkX, int ChunkY, IReadOnlyList<ChunkLevelData> Levels) : ServerMessage;
+public sealed record ChunkSnapshotMessage(int ChunkX, int ChunkY, IReadOnlyList<ChunkLevelData> Levels, IReadOnlyList<ObjectData> Objects) : ServerMessage;
+
+/// <summary>Объект поставлен в чанке, который клиент уже знает.</summary>
+public sealed record ObjectPlaceMessage(ObjectData Object) : ServerMessage;
+
+/// <summary>Объект убран.</summary>
+public sealed record ObjectRemoveMessage(long Id) : ServerMessage;
 
 /// <summary>Чанк вышел из зоны клиента, клиент забывает его вместе с сущностями в нём.</summary>
 public sealed record ChunkUnloadMessage(int ChunkX, int ChunkY) : ServerMessage;
@@ -89,6 +95,13 @@ public sealed record StartActionMessage(long ItemId, int Action) : ClientMessage
 
 /// <summary>Просьба прервать своё действие.</summary>
 public sealed record CancelActionMessage : ClientMessage;
+
+/// <summary>Объект в снимке чанка и в сообщении о постановке: id, номер вида в WorldTable, северо-западная клетка и поворот.</summary>
+public sealed record ObjectData(long Id, ushort Def, CellPos Cell, int Rotation)
+{
+    /// <summary>Данные объекта мира.</summary>
+    public static ObjectData From(WorldObject obj) => new(obj.Id, obj.Def, obj.Cell, obj.Rotation);
+}
 
 /// <summary>Один слой этажа чанка в снимке.</summary>
 public sealed record ChunkLevelData(int Z, ushort[] Floors, ushort[] NorthWalls, ushort[] WestWalls, ushort[] Flags);

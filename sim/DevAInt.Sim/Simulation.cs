@@ -65,7 +65,7 @@ public sealed class Simulation
         _hasMap = mapId is not null;
         MapId = mapId;
         MapDef? map = mapId is null ? null : mods.Defs.Get<MapDef>(mapId);
-        World = world ?? (map is null ? new World(1, 1) : MapBuilder.Build(map, WorldTable));
+        World = world ?? (map is null ? new World(1, 1) : MapBuilder.Build(map, WorldTable, log));
         SpawnPoints = map is null ? [new CellPos(0, 0, 0)] : [.. map.Spawn.Points.Select(point => new CellPos(point.X, point.Y, point.Z))];
         SpawnItems = map is null ? [] : [.. map.Spawn.Items.Select(mods.Defs.Get<ItemDef>)];
         SpawnCreature = map?.Spawn.Creature;

@@ -8,10 +8,13 @@ using Side = DevAInt.Sim.Grid.Side;
 /// <summary>Стена или дверь чанка: положение бокса, цвет и вид.</summary>
 public readonly record struct WallInstance(Transform3D Transform, Color Color, bool IsDoor, bool Open, WallKey Key);
 
+/// <summary>Объект мира чанка: положение бокса, цвет, id и высота.</summary>
+public readonly record struct ObjectInstance(Transform3D Transform, Color Color, long Id, float Height);
+
 /// <summary>Ребро клетки, на котором стоит кусок стены: клетка-владелец и северное ли это ребро.</summary>
 public readonly record struct WallKey(CellPos Owner, bool North);
 
-/// <summary>Геометрия чанка из данных мира: квады полов и боксы стен.</summary>
+/// <summary>Геометрия чанка из данных мира: квады полов, боксы стен и объектов.</summary>
 public static class ChunkMesh
 {
     /// <summary>Высота стены.</summary>
@@ -22,6 +25,9 @@ public static class ChunkMesh
 
     /// <summary>Толщина двери: тоньше стены, чтобы на стыке грани стены стояли перед гранями двери, а не в одной плоскости с ними.</summary>
     public const float DoorThickness = 0.06f;
+
+    /// <summary>Зазор между боксом объекта и краем его клеток: соседние объекты не сливаются в один.</summary>
+    public const float ObjectGap = 0.06f;
 
     /// <summary>Длина открытой двери, чтобы она не утыкалась в соседнюю стену.</summary>
     private const float OpenDoorLength = 0.9f;
@@ -61,6 +67,22 @@ public static class ChunkMesh
         }
 
         return walls;
+    }
+
+    /// <summary>Боксы объектов, чья северо-западная клетка лежит в чанке: на всю площадь клеток без зазора и на высоту вида.</summary>
+    public static List<ObjectInstance> BuildObjects(World world, WorldTable table, int chunkX, int chunkY)
+    {
+        List<ObjectInstance> objects = [];
+        foreach (WorldObject obj in world.ChunkObjects(chunkX, chunkY))
+        {
+            ObjectDef def = table.Object(obj.Def);
+            float height = (float)def.Height;
+            Vector3 size = new(obj.Width - ObjectGap, height, obj.Depth - ObjectGap);
+            Vector3 center = ViewMath.ToGodot(obj.Cell.X + (obj.Width / 2f), obj.Cell.Y + (obj.Depth / 2f), obj.Cell.Z) + (Vector3.Up * height / 2);
+            objects.Add(new ObjectInstance(new Transform3D(Basis.Identity.Scaled(size), center), Color.FromHtml(def.Color), obj.Id, height));
+        }
+
+        return objects;
     }
 
     /// <summary>Клетки чанка на всех этажах; insideOnly - только клетки карты, иначе и запас хранения под внешние рёбра.</summary>

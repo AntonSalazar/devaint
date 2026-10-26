@@ -39,6 +39,8 @@ public static class Protocol
         ActionEnded,
         OwnEntity,
         Attack,
+        ObjectPlace,
+        ObjectRemove,
     }
 
     /// <summary>Типы сообщений клиента.</summary>
@@ -169,6 +171,20 @@ public static class Protocol
                     ChunkCodec.Write(writer, level);
                 }
 
+                writer.WriteVarUInt((ulong)snapshot.Objects.Count);
+                foreach (ObjectData obj in snapshot.Objects)
+                {
+                    WriteObject(writer, obj);
+                }
+
+                break;
+            case ObjectPlaceMessage place:
+                writer.WriteByte((byte)ServerType.ObjectPlace);
+                WriteObject(writer, place.Object);
+                break;
+            case ObjectRemoveMessage remove:
+                writer.WriteByte((byte)ServerType.ObjectRemove);
+                writer.WriteVarInt(remove.Id);
                 break;
             case ChunkUnloadMessage unload:
                 writer.WriteByte((byte)ServerType.ChunkUnload);
@@ -279,6 +295,8 @@ public static class Protocol
             ServerType.ActionEnded => new ActionEndedMessage(reader.ReadVarInt(), reader.ReadBool()),
             ServerType.OwnEntity => new OwnEntityMessage(reader.ReadVarInt()),
             ServerType.Attack => new AttackMessage(reader.ReadVarInt(), reader.ReadVarInt(), ReadAttackKind(reader)),
+            ServerType.ObjectPlace => new ObjectPlaceMessage(ReadObject(reader)),
+            ServerType.ObjectRemove => new ObjectRemoveMessage(reader.ReadVarInt()),
             _ => throw new ProtocolException($"unknown server message type {type}"),
         };
     }
@@ -324,7 +342,33 @@ public static class Protocol
             levels.Add(ChunkCodec.Read(reader));
         }
 
-        return new ChunkSnapshotMessage(chunkX, chunkY, levels);
+        int objectCount = reader.ReadCount(MaxList);
+        List<ObjectData> objects = new(objectCount);
+        for (int i = 0; i < objectCount; i++)
+        {
+            objects.Add(ReadObject(reader));
+        }
+
+        return new ChunkSnapshotMessage(chunkX, chunkY, levels, objects);
+    }
+
+    /// <summary>Объект: id, номер вида, клетка и поворот байтом.</summary>
+    private static void WriteObject(PacketWriter writer, ObjectData obj)
+    {
+        writer.WriteVarInt(obj.Id);
+        writer.WriteVarUInt(obj.Def);
+        WriteCell(writer, obj.Cell);
+        writer.WriteByte((byte)obj.Rotation);
+    }
+
+    /// <summary>Объект; поворот вне 0..3 - ProtocolException, вид и клетку проверяет реплика.</summary>
+    private static ObjectData ReadObject(PacketReader reader)
+    {
+        long id = reader.ReadVarInt();
+        ushort def = ReadUShort(reader);
+        CellPos cell = ReadCell(reader);
+        byte rotation = reader.ReadByte();
+        return rotation < WorldObject.Rotations ? new ObjectData(id, def, cell, rotation) : throw new ProtocolException($"object rotation {rotation} is not valid");
     }
 
     /// <summary>Появление сущности с уровнями мудлов.</summary>

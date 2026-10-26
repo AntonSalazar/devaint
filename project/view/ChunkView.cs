@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using DevAInt.Sim.Grid;
 using Godot;
 
-/// <summary>Отображение одного чанка: меш полов и боксы стен; перестраивается целиком при любом изменении.</summary>
+/// <summary>Отображение одного чанка: меш полов, боксы стен и объектов; перестраивается целиком при любом изменении.</summary>
 public partial class ChunkView : Node3D
 {
     /// <summary>Общий материал с цветом из вершин или экземпляров.</summary>
@@ -14,6 +14,9 @@ public partial class ChunkView : Node3D
     /// <summary>Опущенные куски по номерам последнего ApplyCut.</summary>
     private bool[] _cut = [];
 
+    /// <summary>Опущенные объекты по номерам последнего ApplyCut.</summary>
+    private bool[] _cutObjects = [];
+
     /// <summary>Чанк по x.</summary>
     public int ChunkX { get; private set; }
 
@@ -22,6 +25,9 @@ public partial class ChunkView : Node3D
 
     /// <summary>Стены и двери последней постройки.</summary>
     public IReadOnlyList<WallInstance> Walls { get; private set; } = [];
+
+    /// <summary>Объекты последней постройки.</summary>
+    public IReadOnlyList<ObjectInstance> Objects { get; private set; } = [];
 
     /// <summary>Есть ли полы в последней постройке.</summary>
     public bool HasFloors => _floors.Mesh is not null;
@@ -42,6 +48,22 @@ public partial class ChunkView : Node3D
         CastShadow = GeometryInstance3D.ShadowCastingSetting.ShadowsOnly,
     };
 
+    /// <summary>Видимые объекты со срезом, для тестов.</summary>
+    public MultiMeshInstance3D VisibleObjects { get; } = new()
+    {
+        Name = "Objects",
+        MaterialOverride = Cutaway.Material,
+        CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+    };
+
+    /// <summary>Объекты для теней целиком, для тестов.</summary>
+    public MultiMeshInstance3D ShadowObjects { get; } = new()
+    {
+        Name = "ObjectShadows",
+        MaterialOverride = _material,
+        CastShadow = GeometryInstance3D.ShadowCastingSetting.ShadowsOnly,
+    };
+
     /// <summary>Свои данные экземпляра для шейдера среза: красный канал 1 - кусок опущен, 0 - целый.</summary>
     public static Color CutData(bool cut) =>
         // Не Colors.Transparent: в Godot это белый с нулевой прозрачностью, и красный канал у него 1
@@ -55,45 +77,72 @@ public partial class ChunkView : Node3D
         AddChild(_floors);
         AddChild(VisibleWalls);
         AddChild(ShadowWalls);
+        AddChild(VisibleObjects);
+        AddChild(ShadowObjects);
     }
 
-    /// <summary>Перестройка полов и стен по текущему миру реплики.</summary>
+    /// <summary>Перестройка полов, стен и объектов по текущему миру реплики.</summary>
     public void Rebuild(World world, WorldTable table)
     {
         _floors.Mesh = ChunkMesh.BuildFloors(world, table, ChunkX, ChunkY);
         Walls = ChunkMesh.BuildWalls(world, table, ChunkX, ChunkY);
-        MultiMesh multi = new()
-        {
-            TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
-            UseColors = true,
-
-            // Красный канал своих данных - срезан ли кусок; его читает шейдер среза
-            UseCustomData = true,
-            Mesh = new BoxMesh { Size = Vector3.One },
-            InstanceCount = Walls.Count,
-        };
+        Objects = ChunkMesh.BuildObjects(world, table, ChunkX, ChunkY);
+        MultiMesh walls = Boxes(Walls.Count);
         for (int i = 0; i < Walls.Count; i++)
         {
-            multi.SetInstanceTransform(i, Walls[i].Transform);
-            multi.SetInstanceColor(i, Walls[i].Color);
+            walls.SetInstanceTransform(i, Walls[i].Transform);
+            walls.SetInstanceColor(i, Walls[i].Color);
         }
 
-        VisibleWalls.Multimesh = multi;
-        ShadowWalls.Multimesh = multi;
+        MultiMesh objects = Boxes(Objects.Count);
+        for (int i = 0; i < Objects.Count; i++)
+        {
+            objects.SetInstanceTransform(i, Objects[i].Transform);
+            objects.SetInstanceColor(i, Objects[i].Color);
+        }
+
+        VisibleWalls.Multimesh = walls;
+        ShadowWalls.Multimesh = walls;
+        VisibleObjects.Multimesh = objects;
+        ShadowObjects.Multimesh = objects;
     }
 
-    /// <summary>Срез кусков стен на рёбрах из cut, остальные целые.</summary>
-    public void ApplyCut(IReadOnlySet<WallKey> cut)
+    /// <summary>Срез кусков стен на рёбрах из cut и объектов с id из cutObjects, остальные целые.</summary>
+    public void ApplyCut(IReadOnlySet<WallKey> cut, IReadOnlySet<long> cutObjects)
     {
-        MultiMesh multi = VisibleWalls.Multimesh;
         _cut = new bool[Walls.Count];
         for (int i = 0; i < Walls.Count; i++)
         {
             _cut[i] = cut.Contains(Walls[i].Key);
-            multi.SetInstanceCustomData(i, CutData(_cut[i]));
+            VisibleWalls.Multimesh.SetInstanceCustomData(i, CutData(_cut[i]));
+        }
+
+        _cutObjects = new bool[Objects.Count];
+        for (int i = 0; i < Objects.Count; i++)
+        {
+            _cutObjects[i] = cutObjects.Contains(Objects[i].Id);
+            VisibleObjects.Multimesh.SetInstanceCustomData(i, CutData(_cutObjects[i]));
         }
     }
 
     /// <summary>Опущен ли кусок с номером index, для тестов; headless-отрисовка данные экземпляров не хранит.</summary>
     public bool IsCut(int index) => index < _cut.Length && _cut[index];
+
+    /// <summary>Опущен ли объект с номером index, для тестов.</summary>
+    public bool IsObjectCut(int index) => index < _cutObjects.Length && _cutObjects[index];
+
+    /// <summary>Пустой MultiMesh единичных боксов на count экземпляров с цветом и своими данными для среза.</summary>
+    private static MultiMesh Boxes(int count)
+    {
+        return new MultiMesh
+        {
+            TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
+            UseColors = true,
+
+            // Красный канал своих данных - срезан ли бокс; его читает шейдер среза
+            UseCustomData = true,
+            Mesh = new BoxMesh { Size = Vector3.One },
+            InstanceCount = count,
+        };
+    }
 }

@@ -24,7 +24,10 @@ internal static class SaveFile
     }
 
     /// <summary>Данные двоичного файла; чужая метка, версия или повреждённое сжатие - SaveException.</summary>
-    public static byte[] ReadBinary(string path, string magic)
+    public static byte[] ReadBinary(string path, string magic) => ReadBinary(path, magic, out _);
+
+    /// <summary>Данные двоичного файла и его версия формата: текущая или старая, которая ещё читается.</summary>
+    public static byte[] ReadBinary(string path, string magic, out byte format)
     {
         string name = Path.GetFileName(path);
         byte[] bytes = File.ReadAllBytes(path);
@@ -33,9 +36,10 @@ internal static class SaveFile
             throw new SaveException($"{name}: not a {magic} save file");
         }
 
-        if (bytes[MagicLength] != SaveGame.FormatVersion)
+        format = bytes[MagicLength];
+        if (format is < SaveGame.OldestFormat or > SaveGame.FormatVersion)
         {
-            throw new SaveException($"{name}: save format {bytes[MagicLength]} is not supported, expected {SaveGame.FormatVersion}");
+            throw new SaveException($"{name}: save format {format} is not supported, expected {SaveGame.FormatVersion}");
         }
 
         try

@@ -3,7 +3,7 @@
   "$schema": "../../../schemas/data.schema.json",
   "maps": [
     {
-      // Комната 6 на 5 с дверью в южной стене, вокруг пол двора
+      // Комната 6 на 5 с дверью в южной стене и мебелью, вокруг пол двора
       "id": "core:starter_room",
       "width": 32,
       "height": 32,
@@ -14,6 +14,10 @@
         { "floor": "core:wood_floor", "x": 2, "y": 2, "w": 10, "h": 10 },
         { "walls": "core:wood_wall", "x": 4, "y": 4, "w": 6, "h": 5 },
         { "door": "core:wood_door", "x": 6, "y": 8, "side": "south" },
+        // Мебель комнаты: стол у северной стены, шкаф в северо-восточном углу, ящик в юго-восточном
+        { "object": "core:table", "x": 4, "y": 4 },
+        { "object": "core:wardrobe", "x": 9, "y": 4 },
+        { "object": "core:crate", "x": 9, "y": 8 },
       ],
     },
   ],

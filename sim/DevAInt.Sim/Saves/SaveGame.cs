@@ -15,8 +15,14 @@ namespace DevAInt.Sim.Saves;
 /// <summary>Сохранение в папке: meta.json, регионы чанков с сущностями и персонажи игроков отдельными файлами.</summary>
 public sealed partial class SaveGame(string directory)
 {
-    /// <summary>Версия формата файлов сохранения.</summary>
-    public const byte FormatVersion = 2;
+    /// <summary>Версия формата файлов сохранения: в 3 у чанков появились объекты.</summary>
+    public const byte FormatVersion = 3;
+
+    /// <summary>Самый старый формат, который ещё читается: 2, без объектов в регионах.</summary>
+    public const byte OldestFormat = 2;
+
+    /// <summary>Наибольшее число объектов в чанке, защита от мусора.</summary>
+    private const int MaxObjects = World.ChunkSize * World.ChunkSize * World.LevelCount;
 
     /// <summary>Имя файла меты.</summary>
     private const string MetaName = "meta.json";
@@ -60,6 +66,7 @@ public sealed partial class SaveGame(string directory)
         string mapId = sim.MapId ?? throw new InvalidOperationException("a simulation without a map cannot be saved");
         ushort[] floors = ToSaveNumbers(sim.WorldTable.FloorCount, i => sim.WorldTable.Floor(i).Id, _ids.Floors);
         ushort[] walls = ToSaveNumbers(sim.WorldTable.WallCount, i => sim.WorldTable.Wall(i).Id, _ids.Walls);
+        ushort[] objects = ToSaveNumbers(sim.WorldTable.ObjectCount, i => sim.WorldTable.Object(i).Id, _ids.Objects);
         RegisterIds(sim);
 
         // Мета первой и с полной таблицей id: если запись оборвётся дальше, старые и новые файлы
@@ -71,7 +78,7 @@ public sealed partial class SaveGame(string directory)
         HashSet<(int X, int Y)> regions = [.. sim.World.DirtyRegions, .. entities.Keys, .. _entityRegions];
         foreach ((int X, int Y) region in regions)
         {
-            WriteRegion(sim, region, entities.GetValueOrDefault(region) ?? [], floors, walls);
+            WriteRegion(sim, region, entities.GetValueOrDefault(region) ?? [], new SaveNumbers(floors, walls, objects));
         }
 
         foreach (Entity player in sim.Entities.Where(entity => entity.PlayerId is not null))
@@ -98,7 +105,9 @@ public sealed partial class SaveGame(string directory)
         RegionReader regions = new(sim.World, _ids, tables, log);
         foreach (string file in RegionFiles())
         {
-            regions.Read(file, SaveFile.ReadBinary(file, RegionMagic));
+            // Формат у каждого файла свой: запись могла оборваться посреди перехода на новый формат
+            byte[] payload = SaveFile.ReadBinary(file, RegionMagic, out byte format);
+            regions.Read(file, payload, format);
         }
 
         if (regions.Missing.Count > 0)
@@ -114,9 +123,17 @@ public sealed partial class SaveGame(string directory)
         // Мета пишется до файлов, поэтому её счётчики не меньше id в любом файле, в том числе у игроков не в сети
         sim.NextEntityId = Math.Max(sim.NextEntityId, meta.NextEntityId);
         sim.NextItemId = Math.Max(sim.NextItemId, meta.NextItemId);
+        sim.World.NextObjectId = Math.Max(sim.World.NextObjectId, meta.NextObjectId);
 
         sim.World.ClearDirtyRegions();
         sim.World.ClearChanges();
+
+        // Регионы старого формата переписываются при следующей записи все сразу
+        foreach ((int X, int Y) region in regions.OldRegions)
+        {
+            sim.World.MarkRegionDirty(region);
+        }
+
         _entityRegions = [.. regions.Entities.Select(entity => World.RegionOf(entity.Position.Cell))];
         return sim;
     }
@@ -262,6 +279,7 @@ public sealed partial class SaveGame(string directory)
             Tick = sim.Clock.Tick,
             NextEntityId = sim.NextEntityId,
             NextItemId = sim.NextItemId,
+            NextObjectId = sim.World.NextObjectId,
             Mods = [.. sim.Mods],
             Ids = _ids.ToLists(),
         };
@@ -276,8 +294,8 @@ public sealed partial class SaveGame(string directory)
         SaveFile.WriteBinary(PlayerPath(player.PlayerId!), PlayerMagic, writer.ToArray());
     }
 
-    /// <summary>Файл региона: чанки со слоями или сущностями; пустой регион пишется, только если его файл уже есть.</summary>
-    private void WriteRegion(Simulation sim, (int X, int Y) region, List<Entity> entities, ushort[] floors, ushort[] walls)
+    /// <summary>Файл региона: чанки со слоями, объектами или сущностями; пустой регион пишется, только если его файл уже есть.</summary>
+    private void WriteRegion(Simulation sim, (int X, int Y) region, List<Entity> entities, SaveNumbers numbers)
     {
         World world = sim.World;
         List<((int X, int Y) Chunk, List<(int Z, ChunkLevel Level)> Levels, List<Entity> Entities)> chunks = [];
@@ -287,7 +305,7 @@ public sealed partial class SaveGame(string directory)
             {
                 List<(int Z, ChunkLevel Level)> levels = [.. world.ChunkLevels(x, y)];
                 List<Entity> inside = [.. entities.Where(entity => ChunkOf(entity) == (x, y))];
-                if (levels.Count > 0 || inside.Count > 0)
+                if (levels.Count > 0 || inside.Count > 0 || world.ChunkObjects(x, y).Count > 0)
                 {
                     chunks.Add(((x, y), levels, inside));
                 }
@@ -310,10 +328,22 @@ public sealed partial class SaveGame(string directory)
             foreach ((int z, ChunkLevel level) in levels)
             {
                 ChunkLevelData data = ChunkCodec.Copy(z, level);
-                Renumber(data.Floors, floors);
-                Renumber(data.NorthWalls, walls);
-                Renumber(data.WestWalls, walls);
+                Renumber(data.Floors, numbers.Floors);
+                Renumber(data.NorthWalls, numbers.Walls);
+                Renumber(data.WestWalls, numbers.Walls);
                 ChunkCodec.Write(writer, data);
+            }
+
+            IReadOnlyList<WorldObject> objects = world.ChunkObjects(chunk.X, chunk.Y);
+            writer.WriteVarUInt((ulong)objects.Count);
+            foreach (WorldObject obj in objects)
+            {
+                writer.WriteVarInt(obj.Id);
+                writer.WriteVarUInt(numbers.Objects[obj.Def]);
+                writer.WriteVarInt(obj.Cell.X);
+                writer.WriteVarInt(obj.Cell.Y);
+                writer.WriteVarInt(obj.Cell.Z);
+                writer.WriteByte((byte)obj.Rotation);
             }
 
             writer.WriteVarUInt((ulong)inside.Count);
@@ -349,7 +379,8 @@ public sealed partial class SaveGame(string directory)
             throw new SaveException($"{MetaName}: file is empty");
         }
 
-        return meta.Format == FormatVersion ? meta : throw new SaveException($"{MetaName}: save format {meta.Format} is not supported, expected {FormatVersion}");
+        bool known = meta.Format is >= OldestFormat and <= FormatVersion;
+        return known ? meta : throw new SaveException($"{MetaName}: save format {meta.Format} is not supported, expected {FormatVersion}");
     }
 
     /// <summary>Файлы регионов по имени.</summary>
@@ -382,7 +413,10 @@ public sealed partial class SaveGame(string directory)
             : throw new ArgumentException($"player id {playerId} must be 1-64 latin letters, digits, - or _", nameof(playerId));
     }
 
-    /// <summary>Чтение регионов в мир: слои чанков с переводом номеров, сущности и id, которых нет в модах.</summary>
+    /// <summary>Номера сохранения для номеров таблицы мира: полы, стены и объекты.</summary>
+    private sealed record SaveNumbers(ushort[] Floors, ushort[] Walls, ushort[] Objects);
+
+    /// <summary>Чтение регионов в мир: слои чанков с переводом номеров, объекты, если они есть в формате, сущности и id, которых нет в модах.</summary>
     private sealed class RegionReader(World world, SaveIds ids, SaveTables tables, ISimLog log)
     {
         /// <summary>Номера полов сохранения в номера текущих модов, -1 если пола нет в модах.</summary>
@@ -391,23 +425,35 @@ public sealed partial class SaveGame(string directory)
         /// <summary>Номера стен сохранения в номера текущих модов, -1 если стены нет в модах.</summary>
         private readonly int[] _walls = FromSaveNumbers(ids.Walls, id => tables.World.TryWallIndex(id, out ushort index) ? index : -1);
 
+        /// <summary>Номера объектов сохранения в номера текущих модов, -1 если объекта нет в модах.</summary>
+        private readonly int[] _objects = FromSaveNumbers(ids.Objects, id => tables.World.TryObjectIndex(id, out ushort index) ? index : -1);
+
         /// <summary>Id из сохранения, которых нет в модах.</summary>
         public HashSet<string> Missing { get; } = [];
+
+        /// <summary>Регионы старого формата без объектов.</summary>
+        public List<(int X, int Y)> OldRegions { get; } = [];
 
         /// <summary>Сущности регионов.</summary>
         public List<Entity> Entities { get; } = [];
 
-        /// <summary>Один файл региона.</summary>
-        public void Read(string path, byte[] payload)
+        /// <summary>Один файл региона формата format.</summary>
+        public void Read(string path, byte[] payload, byte format)
         {
             Match name = RegionNameRegex().Match(Path.GetFileName(path));
             (int X, int Y) region = (int.Parse(name.Groups[1].Value), int.Parse(name.Groups[2].Value));
+            bool withObjects = format >= FormatVersion;
+            if (!withObjects)
+            {
+                OldRegions.Add(region);
+            }
+
             Decode(path, payload, reader =>
             {
                 int count = reader.ReadCount(World.RegionSize * World.RegionSize);
                 for (int i = 0; i < count; i++)
                 {
-                    ReadChunk(reader, region);
+                    ReadChunk(reader, region, withObjects);
                 }
 
                 return true;
@@ -426,8 +472,8 @@ public sealed partial class SaveGame(string directory)
             return numbers;
         }
 
-        /// <summary>Чанк: координаты внутри региона и мира, слои и сущности.</summary>
-        private void ReadChunk(PacketReader reader, (int X, int Y) region)
+        /// <summary>Чанк: координаты внутри региона и мира, слои, объекты, если они есть в формате, и сущности.</summary>
+        private void ReadChunk(PacketReader reader, (int X, int Y) region, bool withObjects)
         {
             int chunkX = reader.ReadCount(World.MaxSize);
             int chunkY = reader.ReadCount(World.MaxSize);
@@ -441,6 +487,12 @@ public sealed partial class SaveGame(string directory)
             for (int i = 0; i < levels; i++)
             {
                 ReadLevel(ChunkCodec.Read(reader), chunkX, chunkY);
+            }
+
+            int objects = withObjects ? reader.ReadCount(MaxObjects) : 0;
+            for (int i = 0; i < objects; i++)
+            {
+                ReadObject(reader, chunkX, chunkY);
             }
 
             int entities = reader.ReadCount(MaxEntities);
@@ -467,6 +519,26 @@ public sealed partial class SaveGame(string directory)
                 level.Flags[i] = data.Flags[i] <= (ChunkLevel.NorthOpen | ChunkLevel.WestOpen)
                     ? (byte)data.Flags[i]
                     : throw new ProtocolException($"edge flags {data.Flags[i]} are not valid");
+            }
+        }
+
+        /// <summary>Объект чанка: id, номер вида, клетка внутри чанка и поворот.</summary>
+        private void ReadObject(PacketReader reader, int chunkX, int chunkY)
+        {
+            long id = reader.ReadVarInt();
+            ushort number = (ushort)Math.Min(reader.ReadVarUInt(), ushort.MaxValue);
+            CellPos cell = new((int)reader.ReadVarInt(), (int)reader.ReadVarInt(), (int)reader.ReadVarInt());
+            int rotation = reader.ReadByte();
+            bool inside = world.Contains(cell) && cell.X / World.ChunkSize == chunkX && cell.Y / World.ChunkSize == chunkY;
+            if (!inside || rotation >= WorldObject.Rotations || world.FindObject(id) is not null)
+            {
+                throw new ProtocolException($"object {id} at {cell} with rotation {rotation} is not valid");
+            }
+
+            ushort def = Translate(number, _objects, ids.Objects);
+            if (def != 0)
+            {
+                world.AddObject(WorldObject.Create(id, def, tables.World.Object(def), cell, rotation));
             }
         }
 

@@ -12,6 +12,9 @@ public static class CutawayPlan
     /// <summary>Дальше этого расстояния от ног куски стен не проверяются на перекрытие.</summary>
     public const float OccluderRange = 8f;
 
+    /// <summary>Объект ниже этой высоты не режется: он не закрывает персонажа целиком.</summary>
+    public const float CutObjectHeight = 1.2f;
+
     /// <summary>Стороны клетки.</summary>
     private static readonly Side[] _sides = [Side.North, Side.East, Side.South, Side.West];
 
@@ -31,6 +34,22 @@ public static class CutawayPlan
             if (wall.Transform.Origin.DistanceTo(feet) <= OccluderRange && Cutaway.Occludes(wall.Transform, feet, back))
             {
                 AddRun(world, wall.Key, cut);
+            }
+        }
+
+        return cut;
+    }
+
+    /// <summary>Id высоких объектов, которые закрывают персонажа с ногами в feet от камеры, смотрящей против back.</summary>
+    public static HashSet<long> ComputeObjects(Vector3 feet, Vector3 back, IEnumerable<ObjectInstance> objects)
+    {
+        HashSet<long> cut = [];
+        foreach (ObjectInstance obj in objects)
+        {
+            bool near = obj.Transform.Origin.DistanceTo(feet) <= OccluderRange;
+            if (obj.Height >= CutObjectHeight && near && Cutaway.OccludesBox(obj.Transform, feet, back))
+            {
+                cut.Add(obj.Id);
             }
         }
 

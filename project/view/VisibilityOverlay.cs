@@ -22,6 +22,9 @@ public partial class VisibilityOverlay : MeshInstance3D
     /// <summary>Бит текстуры стен: западное ребро клетки загораживает взгляд.</summary>
     public const byte WestWall = 2;
 
+    /// <summary>Бит текстуры стен: объект в клетке закрывает обзор, как шкаф.</summary>
+    public const byte SightBlock = 4;
+
     /// <summary>Материал прохода.</summary>
     private readonly ShaderMaterial _material = new() { Shader = GD.Load<Shader>(ShaderPath) };
 
@@ -46,7 +49,7 @@ public partial class VisibilityOverlay : MeshInstance3D
     /// <summary>Угол окна текстуры в клетках.</summary>
     public CellPos Origin { get; private set; }
 
-    /// <summary>Биты загораживающих рёбер клеток окна с углом origin в texels, байт на клетку.</summary>
+    /// <summary>Биты загораживающих рёбер и объектов клеток окна с углом origin в texels, байт на клетку.</summary>
     public static void FillWalls(byte[] texels, World world, CellPos origin)
     {
         for (int y = 0; y < WindowCells; y++)
@@ -65,6 +68,11 @@ public partial class VisibilityOverlay : MeshInstance3D
                 if (!world.GetEdge(cell, Side.West).IsPassable)
                 {
                     walls |= WestWall;
+                }
+
+                if (world.BlocksSight(cell))
+                {
+                    walls |= SightBlock;
                 }
 
                 texels[(y * WindowCells) + x] = (byte)walls;

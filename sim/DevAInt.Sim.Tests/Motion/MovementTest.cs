@@ -64,10 +64,11 @@ public class MovementTest
     [Fact]
     public void CornerHoldsBothAxes()
     {
-        WorldPos end = Walk(Room(), new WorldPos(5.5, 5.5, 0), new MoveInput(-1, -1), seconds: 5);
+        // Северо-западный угол занят столом, поэтому юго-западный
+        WorldPos end = Walk(Room(), new WorldPos(5.5, 7.5, 0), new MoveInput(-1, 1), seconds: 5);
 
         Assert.Equal(4 + _radius, end.X, Precision);
-        Assert.Equal(4 + _radius, end.Y, Precision);
+        Assert.Equal(9 - _radius, end.Y, Precision);
     }
 
     /// <summary>Итог этапа 5: закрытая дверь не пропускает.</summary>

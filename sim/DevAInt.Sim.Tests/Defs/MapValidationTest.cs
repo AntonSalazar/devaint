@@ -28,8 +28,8 @@ public class MapValidationTest
 
     /// <summary>Неверная операция даёт ошибку с номером операции.</summary>
     [Theory]
-    [InlineData("""{ "x": 0, "y": 0 }""", "build[0]: needs exactly one of floor, walls, door")]
-    [InlineData("""{ "floor": "alpha:floor", "walls": "alpha:wall", "x": 0, "y": 0 }""", "build[0]: needs exactly one of floor, walls, door")]
+    [InlineData("""{ "x": 0, "y": 0 }""", "build[0]: needs exactly one of floor, walls, door, object")]
+    [InlineData("""{ "floor": "alpha:floor", "walls": "alpha:wall", "x": 0, "y": 0 }""", "build[0]: needs exactly one of floor, walls, door, object")]
     [InlineData("""{ "floor": "alpha:floor", "x": 6, "y": 0, "w": 3 }""", "build[0]: rect 6,0 3x1 is outside the map 8x8")]
     [InlineData("""{ "floor": "alpha:floor", "x": 0, "y": 0, "z": 9 }""", "build[0]: z 9 must be within -2..8")]
     [InlineData("""{ "floor": "alpha:nope", "x": 0, "y": 0 }""", "build[0]: unknown floor alpha:nope")]
@@ -37,6 +37,8 @@ public class MapValidationTest
     [InlineData("""{ "door": "alpha:wall", "x": 0, "y": 0, "side": "north" }""", "build[0]: unknown door alpha:wall")]
     [InlineData("""{ "door": "alpha:door", "x": 0, "y": 0 }""", "build[0]: side is required for door and only for door")]
     [InlineData("""{ "floor": "alpha:floor", "x": 0, "y": 0, "open": true }""", "build[0]: open is only for door")]
+    [InlineData("""{ "object": "alpha:nope", "x": 0, "y": 0 }""", "build[0]: unknown object alpha:nope")]
+    [InlineData("""{ "floor": "alpha:floor", "x": 0, "y": 0, "rotation": 1 }""", "build[0]: rotation is only for object")]
     public void BadOpIsError(string op, string message)
     {
         ModError error = Assert.Single(Load(op).Errors);

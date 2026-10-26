@@ -18,5 +18,8 @@
   "core:wood_floor": "Деревянный пол",
   "core:wood_wall": "Деревянная стена",
   "core:wood_door": "Деревянная дверь",
+  "core:crate": "Ящик",
+  "core:table": "Стол",
+  "core:wardrobe": "Шкаф",
   "core:starter_room": "Стартовая комната",
 }

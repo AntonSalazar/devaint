@@ -73,11 +73,11 @@ public static class Movement
         return (x, y);
     }
 
-    /// <summary>Нельзя пройти через ребро: стена, закрытая дверь или с какой-то стороны нет пола.</summary>
+    /// <summary>Нельзя пройти через ребро: стена, закрытая дверь или с какой-то стороны нет пола или стоит объект, который мешает ходить.</summary>
     private static bool IsBlocked(World world, CellPos cell, Side side)
     {
         bool wall = !world.GetEdge(cell, side).IsPassable;
-        return wall || !world.IsWalkable(cell) || !world.IsWalkable(cell.Neighbor(side));
+        return wall || !world.IsFree(cell) || !world.IsFree(cell.Neighbor(side));
     }
 
     /// <summary>Выталкивание центра на радиус от ближайшей точки отрезка, true если было пересечение.</summary>

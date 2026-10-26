@@ -27,6 +27,9 @@ internal sealed record SaveMeta
     /// <summary>Id следующего предмета.</summary>
     public required long NextItemId { get; init; }
 
+    /// <summary>Id следующего объекта мира; в формате 2 объектов не было, там 0.</summary>
+    public long NextObjectId { get; init; }
+
     /// <summary>Моды на момент сохранения, для предупреждений.</summary>
     public required List<ModInfo> Mods { get; init; }
 
@@ -42,6 +45,9 @@ internal sealed record SaveIdLists
 
     /// <summary>Стены, номер в файле на единицу больше места: 0 - стены нет.</summary>
     public List<string> Walls { get; init; } = [];
+
+    /// <summary>Объекты мира, номер в файле на единицу больше места.</summary>
+    public List<string> Objects { get; init; } = [];
 
     /// <summary>Статы.</summary>
     public List<string> Stats { get; init; } = [];

@@ -122,6 +122,8 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
         {
             WorldChangeKind.Floor => new FloorChangeMessage(change.Owner, world.Floor(change.Owner)),
             WorldChangeKind.NorthEdge => new EdgeChangeMessage(change.Owner, true, world.GetOwnedEdge(change.Owner, true)),
+            WorldChangeKind.ObjectPlaced => new ObjectPlaceMessage(ObjectData.From(change.Object!)),
+            WorldChangeKind.ObjectRemoved => new ObjectRemoveMessage(change.Object!.Id),
             _ => new EdgeChangeMessage(change.Owner, false, world.GetOwnedEdge(change.Owner, false)),
         };
     }
@@ -135,7 +137,7 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
             levels.Add(ChunkCodec.Copy(z, level));
         }
 
-        return new ChunkSnapshotMessage(chunk.X, chunk.Y, levels);
+        return new ChunkSnapshotMessage(chunk.X, chunk.Y, levels, [.. world.ChunkObjects(chunk.X, chunk.Y).Select(ObjectData.From)]);
     }
 
     /// <summary>Один ввод из очереди на тик; без ввода сущность идёт по прежнему.</summary>

@@ -3,13 +3,13 @@ using DevAInt.Sim.Grid;
 
 namespace DevAInt.Sim.Creatures;
 
-/// <summary>Видимость между точками: стены и закрытые двери загораживают, отсутствие пола - нет.</summary>
+/// <summary>Видимость между точками: стены, закрытые двери и высокие объекты загораживают, отсутствие пола - нет.</summary>
 public static class Sight
 {
     /// <summary>Свободна ли прямая между точками одного этажа.</summary>
     public static bool Clear(World world, WorldPos from, WorldPos to) => from.Z == to.Z && BlockedAt(world, from, to) < 0;
 
-    /// <summary>Доля пути от from до to, на которой прямая упирается в стену или закрытую дверь; null - путь свободен.</summary>
+    /// <summary>Доля пути от from до to, на которой прямая упирается в стену, закрытую дверь или объект, закрывающий обзор; null - путь свободен.</summary>
     public static double? Blocked(World world, WorldPos from, WorldPos to) => BlockedAt(world, from, to) is double at and >= 0 ? at : null;
 
     /// <summary>Доля пути до первой стены или -1, если путь свободен.</summary>
@@ -32,13 +32,20 @@ public static class Sight
         for (int i = 0; i < steps; i++)
         {
             bool alongX = nextX < nextY;
+            double at = alongX ? nextX : nextY;
             Side side = alongX ? (stepX > 0 ? Side.East : Side.West) : (stepY > 0 ? Side.South : Side.North);
             if (!world.GetEdge(cell, side).IsPassable)
             {
-                return alongX ? nextX : nextY;
+                return at;
             }
 
+            // Объект в конечной клетке виден сам, а закрывает только то, что за ним
             cell = cell.Neighbor(side);
+            if (cell != end && world.BlocksSight(cell))
+            {
+                return at;
+            }
+
             if (alongX)
             {
                 nextX += deltaX;

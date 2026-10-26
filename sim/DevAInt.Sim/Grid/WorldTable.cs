@@ -4,7 +4,7 @@ using DevAInt.Sim.Defs;
 
 namespace DevAInt.Sim.Grid;
 
-/// <summary>Полы и стены по номерам с единицы, 0 - пусто; строится один раз после загрузки модов.</summary>
+/// <summary>Полы, стены и объекты по номерам с единицы, 0 - пусто; строится один раз после загрузки модов.</summary>
 public sealed class WorldTable
 {
     /// <summary>Полы по номерам, номер 0 не используется.</summary>
@@ -13,11 +13,17 @@ public sealed class WorldTable
     /// <summary>Стены по номерам, номер 0 не используется.</summary>
     private readonly List<WallDef?> _walls = [null];
 
+    /// <summary>Объекты по номерам, номер 0 не используется.</summary>
+    private readonly List<ObjectDef?> _objects = [null];
+
     /// <summary>Номер пола по id.</summary>
     private readonly Dictionary<string, ushort> _floorIndex = [];
 
     /// <summary>Номер стены по id.</summary>
     private readonly Dictionary<string, ushort> _wallIndex = [];
+
+    /// <summary>Номер объекта по id.</summary>
+    private readonly Dictionary<string, ushort> _objectIndex = [];
 
     /// <summary>Таблица по проверенным определениям.</summary>
     public WorldTable(DefDatabase defs)
@@ -31,6 +37,11 @@ public sealed class WorldTable
         {
             _wallIndex[wall.Id] = Add(_walls, wall);
         }
+
+        foreach (ObjectDef obj in defs.All<ObjectDef>())
+        {
+            _objectIndex[obj.Id] = Add(_objects, obj);
+        }
     }
 
     /// <summary>Число полов, номера от 1 до FloorCount.</summary>
@@ -39,11 +50,23 @@ public sealed class WorldTable
     /// <summary>Число стен, номера от 1 до WallCount.</summary>
     public int WallCount => _walls.Count - 1;
 
+    /// <summary>Число объектов, номера от 1 до ObjectCount.</summary>
+    public int ObjectCount => _objects.Count - 1;
+
     /// <summary>Пол по номеру.</summary>
     public FloorDef Floor(ushort index) => _floors[index]!;
 
     /// <summary>Стена по номеру.</summary>
     public WallDef Wall(ushort index) => _walls[index]!;
+
+    /// <summary>Объект по номеру.</summary>
+    public ObjectDef Object(ushort index) => _objects[index]!;
+
+    /// <summary>Номер объекта по id, исключение если его нет.</summary>
+    public ushort ObjectIndex(string id) => _objectIndex[id];
+
+    /// <summary>Номер объекта по id, false если его нет.</summary>
+    public bool TryObjectIndex(string id, out ushort index) => _objectIndex.TryGetValue(id, out index);
 
     /// <summary>Номер пола по id, исключение если его нет.</summary>
     public ushort FloorIndex(string id) => _floorIndex[id];

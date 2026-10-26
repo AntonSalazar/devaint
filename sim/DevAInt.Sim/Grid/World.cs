@@ -14,12 +14,18 @@ internal enum WorldChangeKind
 
     /// <summary>Западное ребро клетки.</summary>
     WestEdge,
+
+    /// <summary>Объект поставлен.</summary>
+    ObjectPlaced,
+
+    /// <summary>Объект убран.</summary>
+    ObjectRemoved,
 }
 
-/// <summary>Изменение мира: клетка-владелец и что именно поменялось.</summary>
-internal readonly record struct WorldChange(CellPos Owner, WorldChangeKind Kind);
+/// <summary>Изменение мира: клетка-владелец, что именно поменялось и объект для изменений объектов.</summary>
+internal readonly record struct WorldChange(CellPos Owner, WorldChangeKind Kind, WorldObject? Object = null);
 
-/// <summary>Сетка мира из чанков: полы в клетках, стены и двери на рёбрах.</summary>
+/// <summary>Сетка мира из чанков: полы в клетках, стены и двери на рёбрах, объекты на клетках.</summary>
 public sealed class World
 {
     /// <summary>Сторона чанка в клетках.</summary>
@@ -49,6 +55,9 @@ public sealed class World
     /// <summary>Регионы, где менялись полы или рёбра с последнего сохранения.</summary>
     private readonly HashSet<(int X, int Y)> _dirtyRegions = [];
 
+    /// <summary>Объекты по id.</summary>
+    private readonly Dictionary<long, WorldObject> _objects = [];
+
     /// <summary>Пустой мир размером width на height клеток.</summary>
     public World(int width, int height)
     {
@@ -74,11 +83,17 @@ public sealed class World
     /// <summary>Высота в клетках.</summary>
     public int Height { get; }
 
+    /// <summary>Все объекты мира.</summary>
+    public IReadOnlyCollection<WorldObject> Objects => _objects.Values;
+
     /// <summary>Число чанков по x в хранении, с запасом под внешние рёбра.</summary>
     internal int ChunksX { get; }
 
     /// <summary>Число чанков по y в хранении.</summary>
     internal int ChunksY { get; }
+
+    /// <summary>Id следующего объекта.</summary>
+    internal long NextObjectId { get; set; } = 1;
 
     /// <summary>Изменения полов и рёбер с последней очистки.</summary>
     internal IReadOnlyList<WorldChange> Changes => _changes;
@@ -142,8 +157,110 @@ public sealed class World
         SetOwnedEdge(owner, north, edge);
     }
 
-    /// <summary>Можно ли перейти из клетки в соседнюю: сосед в карте, ребро проходимо, у соседа есть пол.</summary>
-    public bool CanCross(CellPos cell, Side side) => GetEdge(cell, side).IsPassable && IsWalkable(cell.Neighbor(side));
+    /// <summary>Можно ли перейти из клетки в соседнюю: сосед в карте, ребро проходимо, у соседа есть пол и его не занимает объект, который мешает ходить.</summary>
+    public bool CanCross(CellPos cell, Side side) => GetEdge(cell, side).IsPassable && IsFree(cell.Neighbor(side));
+
+    /// <summary>Можно ли стоять на клетке телом: есть пол и объект не мешает ходить.</summary>
+    public bool IsFree(CellPos cell) => IsWalkable(cell) && (ObjectFlags(cell) & ChunkLevel.MoveBlocked) == 0;
+
+    /// <summary>Закрывает ли объект на клетке обзор.</summary>
+    public bool BlocksSight(CellPos cell) => (ObjectFlags(cell) & ChunkLevel.SightBlocked) != 0;
+
+    /// <summary>Объекты, чья северо-западная клетка лежит в чанке.</summary>
+    public IReadOnlyList<WorldObject> ChunkObjects(int chunkX, int chunkY) => _chunks[(chunkY * ChunksX) + chunkX].Objects;
+
+    /// <summary>Объект по id или null.</summary>
+    public WorldObject? FindObject(long id) => _objects.GetValueOrDefault(id);
+
+    /// <summary>Объект, который занимает клетку, или null.</summary>
+    public WorldObject? ObjectAt(CellPos cell)
+    {
+        if ((ObjectFlags(cell) & ChunkLevel.Occupied) == 0)
+        {
+            return null;
+        }
+
+        // Объект лежит в чанке своей северо-западной клетки, а она не дальше MaxSide клеток к западу и северу
+        int chunkX = cell.X / ChunkSize;
+        int chunkY = cell.Y / ChunkSize;
+        for (int y = Math.Max(0, chunkY - 1); y <= chunkY; y++)
+        {
+            for (int x = Math.Max(0, chunkX - 1); x <= chunkX; x++)
+            {
+                foreach (WorldObject obj in _chunks[(y * ChunksX) + x].Objects)
+                {
+                    if (obj.Covers(cell))
+                    {
+                        return obj;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Почему объект нельзя поставить, или null, если можно: все клетки в карте, на полу, свободны от объектов и не разделены стеной.</summary>
+    public string? PlaceProblem(WorldObject obj)
+    {
+        if (obj.Rotation is < 0 or >= WorldObject.Rotations)
+        {
+            return $"rotation {obj.Rotation} must be within 0..{WorldObject.Rotations - 1}";
+        }
+
+        for (int y = obj.Cell.Y; y < obj.Cell.Y + obj.Depth; y++)
+        {
+            for (int x = obj.Cell.X; x < obj.Cell.X + obj.Width; x++)
+            {
+                CellPos cell = new(x, y, obj.Cell.Z);
+                if (!IsWalkable(cell))
+                {
+                    return $"cell {x},{y},{cell.Z} has no floor";
+                }
+
+                if ((ObjectFlags(cell) & ChunkLevel.Occupied) != 0)
+                {
+                    return $"cell {x},{y},{cell.Z} is taken by another object";
+                }
+
+                // Стена или дверь внутри прямоугольника разрезала бы объект
+                bool westInside = x > obj.Cell.X && GetEdge(cell, Side.West).Wall != 0;
+                bool northInside = y > obj.Cell.Y && GetEdge(cell, Side.North).Wall != 0;
+                if (westInside || northInside)
+                {
+                    return $"a wall crosses the object at {x},{y},{cell.Z}";
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Постановка объекта, для которого PlaceProblem вернул null; иначе исключение.</summary>
+    public void PlaceObject(WorldObject obj)
+    {
+        if (PlaceProblem(obj) is string problem)
+        {
+            throw new ArgumentException($"object {obj.Id} cannot be placed: {problem}", nameof(obj));
+        }
+
+        AddObject(obj);
+    }
+
+    /// <summary>Удаление объекта по id, false если его нет.</summary>
+    public bool RemoveObject(long id)
+    {
+        if (!_objects.Remove(id, out WorldObject? obj))
+        {
+            return false;
+        }
+
+        ChunkOf(obj.Cell).Objects.Remove(obj);
+        MarkCells(obj, set: false);
+        _changes.Add(new WorldChange(obj.Cell, WorldChangeKind.ObjectRemoved, obj));
+        _dirtyRegions.Add(RegionOf(obj.Cell));
+        return true;
+    }
 
     /// <summary>Регион сохранения, в котором лежит клетка.</summary>
     internal static (int X, int Y) RegionOf(CellPos cell) => (cell.X / ChunkSize / RegionSize, cell.Y / ChunkSize / RegionSize);
@@ -175,8 +292,22 @@ public sealed class World
         _dirtyRegions.Add(RegionOf(owner));
     }
 
+    /// <summary>Объект без проверок места: из сохранения или снимка чанка, где он уже стоял.</summary>
+    internal void AddObject(WorldObject obj)
+    {
+        _objects.Add(obj.Id, obj);
+        ChunkOf(obj.Cell).Objects.Add(obj);
+        MarkCells(obj, set: true);
+        NextObjectId = Math.Max(NextObjectId, obj.Id + 1);
+        _changes.Add(new WorldChange(obj.Cell, WorldChangeKind.ObjectPlaced, obj));
+        _dirtyRegions.Add(RegionOf(obj.Cell));
+    }
+
     /// <summary>Очистка журнала изменений после рассылки.</summary>
     internal void ClearChanges() => _changes.Clear();
+
+    /// <summary>Регион нужно переписать при следующем сохранении, например после чтения старого формата.</summary>
+    internal void MarkRegionDirty((int X, int Y) region) => _dirtyRegions.Add(region);
 
     /// <summary>Очистка списка изменённых регионов после сохранения или загрузки.</summary>
     internal void ClearDirtyRegions() => _dirtyRegions.Clear();
@@ -197,8 +328,40 @@ public sealed class World
     /// <summary>Слой этажа чанка для заполнения из снимка, создаётся при необходимости.</summary>
     internal ChunkLevel LoadChunkLevel(int chunkX, int chunkY, int z) => _chunks[(chunkY * ChunksX) + chunkX].GetOrCreateLevel(z);
 
-    /// <summary>Очистка чанка: клиент забывает чанк, который вышел из зоны.</summary>
-    internal void UnloadChunk(int chunkX, int chunkY) => _chunks[(chunkY * ChunksX) + chunkX] = new Chunk();
+    /// <summary>Очистка чанка: клиент забывает чанк, который вышел из зоны, вместе с его объектами.</summary>
+    internal void UnloadChunk(int chunkX, int chunkY)
+    {
+        Chunk chunk = _chunks[(chunkY * ChunksX) + chunkX];
+        foreach (WorldObject obj in chunk.Objects)
+        {
+            // Объект у края мог занять клетки соседнего чанка: их флаги снимаются тоже
+            _objects.Remove(obj.Id);
+            MarkCells(obj, set: false);
+        }
+
+        _chunks[(chunkY * ChunksX) + chunkX] = new Chunk();
+    }
+
+    /// <summary>Флаги клеток чанка от объектов соседних чанков, которые на него заходят: после загрузки чанка из снимка.</summary>
+    internal void MarkNeighbourObjects(int chunkX, int chunkY)
+    {
+        // Заходить на чанк могут только объекты из чанков к западу и северу: объект растёт на восток и юг
+        for (int y = Math.Max(0, chunkY - 1); y <= chunkY; y++)
+        {
+            for (int x = Math.Max(0, chunkX - 1); x <= chunkX; x++)
+            {
+                if ((x, y) == (chunkX, chunkY))
+                {
+                    continue;
+                }
+
+                foreach (WorldObject obj in _chunks[(y * ChunksX) + x].Objects)
+                {
+                    MarkCells(obj, set: true);
+                }
+            }
+        }
+    }
 
     /// <summary>Клетка, которая хранит ребро, и true, если это её северное ребро.</summary>
     private static (CellPos Owner, bool North) Owner(CellPos cell, Side side)
@@ -234,6 +397,38 @@ public sealed class World
 
     /// <summary>Есть ли место хранения клетки: карта плюс одна клетка на восток и на юг.</summary>
     private bool InStorage(CellPos cell) => InRange(cell, Width + 1, Height + 1);
+
+    /// <summary>Флаги объекта на клетке, 0 - объекта нет или клетка вне хранения.</summary>
+    private byte ObjectFlags(CellPos cell)
+    {
+        if (!InStorage(cell) || Level(cell) is not ChunkLevel level || level.ObjectFlags is not byte[] flags)
+        {
+            return 0;
+        }
+
+        return flags[LocalIndex(cell)];
+    }
+
+    /// <summary>Установка или снятие флагов объекта на всех его клетках в хранении.</summary>
+    private void MarkCells(WorldObject obj, bool set)
+    {
+        byte flags = (byte)(ChunkLevel.Occupied | (obj.BlocksMove ? ChunkLevel.MoveBlocked : 0) | (obj.BlocksSight ? ChunkLevel.SightBlocked : 0));
+        for (int y = obj.Cell.Y; y < obj.Cell.Y + obj.Depth; y++)
+        {
+            for (int x = obj.Cell.X; x < obj.Cell.X + obj.Width; x++)
+            {
+                CellPos cell = new(x, y, obj.Cell.Z);
+                if (!InStorage(cell))
+                {
+                    continue;
+                }
+
+                ChunkLevel level = GetOrCreateLevel(cell);
+                level.ObjectFlags ??= new byte[ChunkSize * ChunkSize];
+                level.ObjectFlags[LocalIndex(cell)] = set ? flags : (byte)0;
+            }
+        }
+    }
 
     /// <summary>Чанк клетки из хранения.</summary>
     private Chunk ChunkOf(CellPos cell) => _chunks[(cell.Y / ChunkSize * ChunksX) + (cell.X / ChunkSize)];

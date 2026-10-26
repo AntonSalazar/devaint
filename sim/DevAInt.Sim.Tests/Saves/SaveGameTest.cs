@@ -5,6 +5,7 @@ using DevAInt.Sim.Grid;
 using DevAInt.Sim.Items;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Motion;
+using DevAInt.Sim.Net;
 using DevAInt.Sim.Saves;
 using DevAInt.Sim.Tests.Lua;
 using DevAInt.Sim.Tests.Mods;
@@ -105,6 +106,77 @@ public sealed class SaveGameTest : IDisposable
 
         Assert.Equal("save needs ids missing from loaded mods: test:stone", error.Message);
         Assert.Equal(before, Snapshot());
+    }
+
+    /// <summary>Объекты, в том числе на границе регионов, после загрузки те же, клетки заняты, счётчик id не сбит.</summary>
+    [Fact]
+    public void ObjectsSurviveSaveAndLoad()
+    {
+        Simulation original = NewSim();
+        Place(original, "core:table", new CellPos(255, 1, 0), 0);
+        long wardrobe = Place(original, "core:wardrobe", new CellPos(10, 6, 0), 0);
+        Place(original, "core:table", new CellPos(20, 3, 0), 1);
+        original.World.RemoveObject(wardrobe);
+        new SaveGame(SaveDir).Save(original);
+
+        Simulation loaded = new SaveGame(SaveDir).Load(Load("core", "test"), _log);
+
+        Assert.Equal(original.World.Objects.OrderBy(obj => obj.Id), loaded.World.Objects.OrderBy(obj => obj.Id));
+        Assert.False(loaded.World.IsFree(new CellPos(256, 1, 0)), "table across the region border");
+        Assert.False(loaded.World.IsFree(new CellPos(20, 4, 0)), "rotated table");
+        Assert.Equal(original.World.NextObjectId, loaded.World.NextObjectId);
+    }
+
+    /// <summary>Сохранение с объектом, которого нет в модах, не грузится.</summary>
+    [Fact]
+    public void MissingObjectFails()
+    {
+        _mods.Write("test/data/objects.jsonc", """{ "objects": [ { "id": "test:statue" } ] }""");
+        Simulation original = NewSim();
+        Place(original, "test:statue", new CellPos(10, 1, 0), 0);
+        new SaveGame(SaveDir).Save(original);
+        File.Delete(Path.Combine(_mods.Root, "test", "data", "objects.jsonc"));
+
+        SaveException error = Assert.Throws<SaveException>(() => new SaveGame(SaveDir).Load(Load("core", "test"), _log));
+
+        Assert.Equal("save needs ids missing from loaded mods: test:statue", error.Message);
+    }
+
+    /// <summary>Сохранение формата 2 без объектов грузится, а следующая запись переписывает все регионы в формат 3.</summary>
+    [Fact]
+    public void Format2IsUpgraded()
+    {
+        Simulation original = NewSim();
+        original.SpawnPlayer("anna");
+        new SaveGame(SaveDir).Save(original);
+        string meta = Path.Combine(SaveDir, "meta.json");
+        File.WriteAllText(meta, File.ReadAllText(meta).Replace("\"format\": 3", "\"format\": 2"));
+        string[] regions = Directory.GetFiles(Path.Combine(SaveDir, "regions"));
+        foreach (string region in regions)
+        {
+            SaveFile.WriteBinary(region, "DVRG", WithoutObjects(SaveFile.ReadBinary(region, "DVRG")));
+        }
+
+        // В настоящем старом сохранении версия 2 стоит и в каждом двоичном файле, не только в мете
+        foreach (string file in regions.Concat(Directory.GetFiles(Path.Combine(SaveDir, "players"))))
+        {
+            byte[] bytes = File.ReadAllBytes(file);
+            bytes[4] = 2;
+            File.WriteAllBytes(file, bytes);
+        }
+
+        Simulation old = new SaveGame(SaveDir).Load(Load("core", "test"), _log);
+        SaveGame upgrade = new(SaveDir);
+        upgrade.Save(upgrade.Load(Load("core", "test"), _log));
+        SaveGame reload = new(SaveDir);
+        Simulation upgraded = reload.Load(Load("core", "test"), _log);
+
+        Assert.Equal(2, regions.Length);
+        Assert.NotNull(reload.LoadPlayer(upgraded, "anna", _log));
+        AssertSameWorld(original, old);
+        AssertSameWorld(original, upgraded);
+        Assert.Contains("\"format\": 3", File.ReadAllText(meta));
+        Assert.All(regions, file => Assert.Equal(SaveGame.FormatVersion, File.ReadAllBytes(file)[4]));
     }
 
     /// <summary>Значение стата, которого нет в модах, выбрасывается с записью в лог.</summary>
@@ -226,11 +298,11 @@ public sealed class SaveGameTest : IDisposable
     {
         new SaveGame(SaveDir).Save(NewSim());
         string meta = Path.Combine(SaveDir, "meta.json");
-        File.WriteAllText(meta, File.ReadAllText(meta).Replace("\"format\": 2", "\"format\": 1"));
+        File.WriteAllText(meta, File.ReadAllText(meta).Replace("\"format\": 3", "\"format\": 1"));
 
         SaveException error = Assert.Throws<SaveException>(() => new SaveGame(SaveDir).Load(Load("core", "test"), _log));
 
-        Assert.Equal("meta.json: save format 1 is not supported, expected 2", error.Message);
+        Assert.Equal("meta.json: save format 1 is not supported, expected 3", error.Message);
     }
 
     /// <summary>Повреждённые и чужие файлы дают SaveException с именем файла, а не падение.</summary>
@@ -370,6 +442,41 @@ public sealed class SaveGameTest : IDisposable
     {
         Edge edge = sim.World.GetOwnedEdge(owner, north);
         return edge.Wall == 0 ? string.Empty : $"{sim.WorldTable.Wall(edge.Wall).Id} {edge.Open}";
+    }
+
+    /// <summary>Объект вида id в клетке с поворотом прямо в мир sim, его id.</summary>
+    private static long Place(Simulation sim, string id, CellPos cell, int rotation)
+    {
+        ushort index = sim.WorldTable.ObjectIndex(id);
+        WorldObject obj = WorldObject.Create(sim.World.NextObjectId, index, sim.WorldTable.Object(index), cell, rotation);
+        sim.World.PlaceObject(obj);
+        return obj.Id;
+    }
+
+    /// <summary>Регион формата 3 без объектов в байтах формата 2: у каждого чанка убирается счётчик объектов.</summary>
+    private static byte[] WithoutObjects(byte[] payload)
+    {
+        PacketReader reader = new(payload);
+        PacketWriter writer = new();
+        ulong chunks = reader.ReadVarUInt();
+        writer.WriteVarUInt(chunks);
+        for (ulong i = 0; i < chunks; i++)
+        {
+            writer.WriteVarUInt(reader.ReadVarUInt());
+            writer.WriteVarUInt(reader.ReadVarUInt());
+            ulong levels = reader.ReadVarUInt();
+            writer.WriteVarUInt(levels);
+            for (ulong level = 0; level < levels; level++)
+            {
+                ChunkCodec.Write(writer, ChunkCodec.Read(reader));
+            }
+
+            Assert.Equal(0UL, reader.ReadVarUInt());
+            writer.WriteVarUInt(reader.ReadVarUInt());
+        }
+
+        Assert.True(reader.AtEnd, "region has no entities");
+        return writer.ToArray();
     }
 
     /// <summary>Новый sim на полосе.</summary>

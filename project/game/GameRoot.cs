@@ -288,8 +288,9 @@ public partial class GameRoot : Node3D
         _overlay.Visible = false;
         AddChild(_overlay);
 
-        // Открытая или закрытая дверь меняет, что видно, даже если персонаж стоит
+        // Открытая или закрытая дверь и поставленный или убранный шкаф меняют, что видно, даже если персонаж стоит
         _client.Replica.EdgeChanged += (_, _) => _vision.Invalidate();
+        _client.Replica.ObjectChanged += _ => _vision.Invalidate();
         _hud = new Hud();
         _hud.Init(new HudModel(tables.Stats, tables.Items, _client.Replica));
         AddChild(_hud);

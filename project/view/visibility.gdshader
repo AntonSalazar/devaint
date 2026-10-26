@@ -36,6 +36,7 @@ const float SOFT_DISTANCE = 0.3;
 // Биты стен клетки, как в VisibilityOverlay.
 const int NORTH_WALL = 1;
 const int WEST_WALL = 2;
+const int SIGHT_BLOCK = 4;
 
 void vertex() {
 	// Квад 2 на 2 закрывает весь экран: вершины сразу в координатах экрана
@@ -90,6 +91,11 @@ bool clear(vec2 to) {
 
 			cell.y += step_dir.y;
 			next.y += delta.y;
+		}
+		
+		// Объект, который закрывает обзор, сам виден, а закрывает только то, что за ним
+		if (cell != end && wall(cell, SIGHT_BLOCK)) {
+			return false;
 		}
 	}
 

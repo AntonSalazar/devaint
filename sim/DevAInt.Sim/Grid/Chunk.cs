@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace DevAInt.Sim.Grid;
 
 /// <summary>Чанк 32 на 32 клетки на все этажи; слой этажа создаётся, когда на нём что-то появилось.</summary>
@@ -5,6 +7,9 @@ internal sealed class Chunk
 {
     /// <summary>Слои этажей по номеру от нижнего, null - на этаже пусто.</summary>
     private readonly ChunkLevel?[] _levels = new ChunkLevel?[World.LevelCount];
+
+    /// <summary>Объекты, чья северо-западная клетка лежит в этом чанке.</summary>
+    public List<WorldObject> Objects { get; } = [];
 
     /// <summary>Число созданных слоев.</summary>
     public int LevelsCreated { get; private set; }
@@ -35,6 +40,15 @@ internal sealed class ChunkLevel
     /// <summary>Флаг открытой двери на западном ребре.</summary>
     public const byte WestOpen = 2;
 
+    /// <summary>Флаг клетки: её занимает объект.</summary>
+    public const byte Occupied = 1;
+
+    /// <summary>Флаг клетки: объект мешает ходить.</summary>
+    public const byte MoveBlocked = 2;
+
+    /// <summary>Флаг клетки: объект закрывает обзор.</summary>
+    public const byte SightBlocked = 4;
+
     /// <summary>Номера полов, 0 - пола нет.</summary>
     public ushort[] Floors { get; } = new ushort[World.ChunkSize * World.ChunkSize];
 
@@ -46,4 +60,7 @@ internal sealed class ChunkLevel
 
     /// <summary>Флаги рёбер NorthOpen и WestOpen.</summary>
     public byte[] Flags { get; } = new byte[World.ChunkSize * World.ChunkSize];
+
+    /// <summary>Флаги клеток Occupied, MoveBlocked и SightBlocked; создаются при первом объекте на слое.</summary>
+    public byte[]? ObjectFlags { get; set; }
 }

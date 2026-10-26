@@ -1,16 +1,18 @@
 using DevAInt.Sim.Defs;
+using DevAInt.Sim.Logging;
 
 namespace DevAInt.Sim.Grid;
 
 /// <summary>Постройка мира по карте из мода.</summary>
 public static class MapBuilder
 {
-    /// <summary>Новый мир по проверенной карте: операции build по порядку.</summary>
-    public static World Build(MapDef map, WorldTable table)
+    /// <summary>Новый мир по проверенной карте: операции build по порядку; объект, которому нет места, - ошибка в лог, объект пропускается.</summary>
+    public static World Build(MapDef map, WorldTable table, ISimLog? log = null)
     {
         World world = new(map.Width, map.Height);
-        foreach (MapOpDef op in map.Build)
+        for (int i = 0; i < map.Build.Count; i++)
         {
+            MapOpDef op = map.Build[i];
             if (op.Floor is string floor)
             {
                 FillFloor(world, op, table.FloorIndex(floor));
@@ -18,6 +20,19 @@ public static class MapBuilder
             else if (op.Walls is string walls)
             {
                 Outline(world, op, new Edge(table.WallIndex(walls), false));
+            }
+            else if (op.Object is string id)
+            {
+                // Место зависит от прошлых операций, поэтому его проверяет постройка, а не проверка карты при загрузке
+                ushort index = table.ObjectIndex(id);
+                WorldObject obj = WorldObject.Create(world.NextObjectId, index, table.Object(index), new CellPos(op.X, op.Y, op.Z), op.Rotation);
+                if (world.PlaceProblem(obj) is string problem)
+                {
+                    log?.Error($"map {map.Id}: build[{i}]: object {id}: {problem}");
+                    continue;
+                }
+
+                world.PlaceObject(obj);
             }
             else
             {

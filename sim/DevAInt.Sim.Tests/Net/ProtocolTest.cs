@@ -25,6 +25,8 @@ public class ProtocolTest
             new AttackMessage(3, long.MaxValue),
             new AttackMessage(4, 5, Sim.Creatures.AttackKind.Shove),
             new OwnEntityMessage(12),
+            new ObjectPlaceMessage(new ObjectData(long.MaxValue, 65_535, new CellPos(4095, 4095, 8), 1)),
+            new ObjectRemoveMessage(42),
         ];
 
         ServerFrame read = Protocol.ReadServerFrame(Protocol.Write(new ServerFrame(123_456, messages, uint.MaxValue)));
@@ -44,7 +46,7 @@ public class ProtocolTest
         level.Flags[1023] = 3;
         ServerFrame frame = new(1,
         [
-            new ChunkSnapshotMessage(1, 2, [level]),
+            new ChunkSnapshotMessage(1, 2, [level], [new ObjectData(7, 3, new CellPos(40, 70, -1), 3)]),
             new EntitySpawnMessage(9, 1.5f, 2.5f, 0, 2, [0, 3, 1]),
             new EntitySpawnMessage(10, 0.5f, 0.5f, 1, -1, []),
             new OwnStatsMessage([0f, 41.5f, 100f]),
@@ -57,6 +59,7 @@ public class ProtocolTest
         Assert.Equal((1, 2, -1), (snapshot.ChunkX, snapshot.ChunkY, readLevel.Z));
         Assert.Equal(floors, readLevel.Floors);
         Assert.Equal(3, readLevel.Flags[1023]);
+        Assert.Equal(new ObjectData(7, 3, new CellPos(40, 70, -1), 3), Assert.Single(snapshot.Objects));
 
         EntitySpawnMessage spawn = Assert.IsType<EntitySpawnMessage>(read.Messages[1]);
         Assert.Equal((9L, 1.5f, 2.5f, 0, 2), (spawn.Id, spawn.X, spawn.Y, spawn.Z, spawn.Creature));

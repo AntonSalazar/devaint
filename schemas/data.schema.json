@@ -159,6 +159,42 @@
         "additionalProperties": false
       }
     },
+    "objects": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "w": {
+            "type": "integer"
+          },
+          "h": {
+            "type": "integer"
+          },
+          "height": {
+            "type": "number"
+          },
+          "color": {
+            "type": "string"
+          },
+          "blocksMove": {
+            "type": "boolean"
+          },
+          "blocksSight": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
     "maps": {
       "type": [
         "array",
@@ -198,6 +234,15 @@
                     "string",
                     "null"
                   ]
+                },
+                "object": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "rotation": {
+                  "type": "integer"
                 },
                 "x": {
                   "type": "integer"

@@ -97,6 +97,9 @@ public sealed class Replica(ClientTables tables)
     /// <summary>Ребро изменилось: клетка-владелец и true для северного ребра.</summary>
     public event Action<CellPos, bool>? EdgeChanged;
 
+    /// <summary>Объект поставлен или убран в знакомом чанке.</summary>
+    public event Action<WorldObject>? ObjectChanged;
+
     /// <summary>Мир клиента, null до приветствия.</summary>
     public World? World { get; private set; }
 
@@ -263,6 +266,16 @@ public sealed class Replica(ClientTables tables)
                 RequireWorld().SetOwnedEdge(edge.Owner, edge.North, edge.Edge);
                 EdgeChanged?.Invoke(edge.Owner, edge.North);
                 break;
+            case ObjectPlaceMessage place:
+                WorldObject placed = ToObject(RequireWorld(), place.Object);
+                RequireWorld().AddObject(placed);
+                ObjectChanged?.Invoke(placed);
+                break;
+            case ObjectRemoveMessage remove:
+                WorldObject gone = RequireWorld().FindObject(remove.Id) ?? throw new ProtocolException($"object {remove.Id} is unknown");
+                RequireWorld().RemoveObject(remove.Id);
+                ObjectChanged?.Invoke(gone);
+                break;
             default:
                 throw new ProtocolException($"unknown message {message.GetType().Name}");
         }
@@ -291,8 +304,42 @@ public sealed class Replica(ClientTables tables)
             }
         }
 
+        foreach (ObjectData data in snapshot.Objects)
+        {
+            WorldObject obj = ToObject(world, data);
+            if ((obj.Cell.X / World.ChunkSize, obj.Cell.Y / World.ChunkSize) != (snapshot.ChunkX, snapshot.ChunkY))
+            {
+                throw new ProtocolException($"object {obj.Id} at {obj.Cell} is outside chunk {snapshot.ChunkX},{snapshot.ChunkY}");
+            }
+
+            world.AddObject(obj);
+        }
+
+        // Объекты соседей могли заходить на этот чанк: их клетки снова заняты
+        world.MarkNeighbourObjects(snapshot.ChunkX, snapshot.ChunkY);
         _chunks.Add((snapshot.ChunkX, snapshot.ChunkY));
         ChunkLoaded?.Invoke(snapshot.ChunkX, snapshot.ChunkY);
+    }
+
+    /// <summary>Объект мира из данных сервера; неизвестный вид, клетка вне карты или занятый id - ProtocolException.</summary>
+    private WorldObject ToObject(World world, ObjectData data)
+    {
+        if (data.Def < 1 || data.Def > tables.World.ObjectCount)
+        {
+            throw new ProtocolException($"object kind {data.Def} is out of range");
+        }
+
+        if (!world.Contains(data.Cell))
+        {
+            throw new ProtocolException($"object {data.Id} at {data.Cell} is outside the world");
+        }
+
+        if (world.FindObject(data.Id) is not null)
+        {
+            throw new ProtocolException($"object {data.Id} already exists");
+        }
+
+        return WorldObject.Create(data.Id, data.Def, tables.World.Object(data.Def), data.Cell, data.Rotation);
     }
 
     /// <summary>Выгрузка чанка и сущностей, которые в нём стоят.</summary>

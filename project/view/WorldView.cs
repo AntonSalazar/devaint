@@ -27,6 +27,9 @@ public partial class WorldView : Node3D
     /// <summary>Опущенные сейчас куски стен.</summary>
     private HashSet<WallKey> _cut = [];
 
+    /// <summary>Опущенные сейчас объекты.</summary>
+    private HashSet<long> _cutObjects = [];
+
     /// <summary>Число узлов чанков.</summary>
     public int ChunkCount => _chunks.Count;
 
@@ -45,6 +48,7 @@ public partial class WorldView : Node3D
         replica.ChunkUnloaded += OnChunkUnloaded;
         replica.FloorChanged += OnCellChanged;
         replica.EdgeChanged += OnEdgeChanged;
+        replica.ObjectChanged += OnObjectChanged;
         replica.EntitySpawned += OnEntitySpawned;
         replica.EntityMoved += OnEntityMoved;
         replica.EntityRemoved += OnEntityRemoved;
@@ -56,17 +60,21 @@ public partial class WorldView : Node3D
     /// <summary>Узел сущности или null.</summary>
     public EntityView? Entity(long id) => _entities.GetValueOrDefault(id);
 
-    /// <summary>Срез стен под ноги своего персонажа feet при взгляде камеры против back; null - персонажа нет, все стены целые.</summary>
+    /// <summary>Срез стен и высоких объектов под ноги своего персонажа feet при взгляде камеры против back; null - персонажа нет, всё целое.</summary>
     public void UpdateCutaway(Vector3? feet, Vector3 back)
     {
         HashSet<WallKey> cut = feet is Vector3 at && _replica?.World is World world
             ? CutawayPlan.Compute(world, at, back, _chunks.Values.SelectMany(chunk => chunk.Walls))
             : [];
+        HashSet<long> cutObjects = feet is Vector3 body
+            ? CutawayPlan.ComputeObjects(body, back, _chunks.Values.SelectMany(chunk => chunk.Objects))
+            : [];
 
         // Данные экземпляров пишутся, только когда план поменялся: персонаж чаще стоит или идёт вдоль комнаты
-        if (!cut.SetEquals(_cut))
+        if (!cut.SetEquals(_cut) || !cutObjects.SetEquals(_cutObjects))
         {
             _cut = cut;
+            _cutObjects = cutObjects;
             ApplyCut();
         }
     }
@@ -119,6 +127,7 @@ public partial class WorldView : Node3D
         _replica.ChunkUnloaded -= OnChunkUnloaded;
         _replica.FloorChanged -= OnCellChanged;
         _replica.EdgeChanged -= OnEdgeChanged;
+        _replica.ObjectChanged -= OnObjectChanged;
         _replica.EntitySpawned -= OnEntitySpawned;
         _replica.EntityMoved -= OnEntityMoved;
         _replica.EntityRemoved -= OnEntityRemoved;
@@ -140,7 +149,7 @@ public partial class WorldView : Node3D
         AddChild(chunk);
         _chunks[(chunkX, chunkY)] = chunk;
         chunk.Rebuild(_replica!.World!, _table!);
-        chunk.ApplyCut(_cut);
+        chunk.ApplyCut(_cut, _cutObjects);
     }
 
     /// <summary>Текущий срез во все чанки.</summary>
@@ -148,7 +157,7 @@ public partial class WorldView : Node3D
     {
         foreach (ChunkView chunk in _chunks.Values)
         {
-            chunk.ApplyCut(_cut);
+            chunk.ApplyCut(_cut, _cutObjects);
         }
     }
 
@@ -167,9 +176,12 @@ public partial class WorldView : Node3D
         if (Chunk(cell.X / World.ChunkSize, cell.Y / World.ChunkSize) is ChunkView chunk)
         {
             chunk.Rebuild(_replica!.World!, _table!);
-            chunk.ApplyCut(_cut);
+            chunk.ApplyCut(_cut, _cutObjects);
         }
     }
+
+    /// <summary>Объект поставлен или убран: перестройка чанка его северо-западной клетки, где лежит его бокс.</summary>
+    private void OnObjectChanged(WorldObject obj) => OnCellChanged(obj.Cell);
 
     /// <summary>Ребро изменилось: перестройка чанка клетки-владельца.</summary>
     private void OnEdgeChanged(CellPos owner, bool north) => OnCellChanged(owner);
