@@ -28,13 +28,22 @@ public static class GameInput
     /// <summary>Следующий режим камеры.</summary>
     public const string CameraMode = "camera_mode";
 
+    /// <summary>Открыть или закрыть окно инвентаря.</summary>
+    public const string Inventory = "inventory";
+
+    /// <summary>Открыть меню постройки или выйти из режима постановки.</summary>
+    public const string Build = "build";
+
+    /// <summary>Повернуть постройку на четверть оборота.</summary>
+    public const string Rotate = "rotate";
+
     /// <summary>Куда смотрит прицел, если луч не попал в пол рядом: столько метров вперёд по взгляду.</summary>
     public const float AimFallbackDistance = 10f;
 
     /// <summary>Дальше этого по земле точка на полу для прицела не берётся.</summary>
     public const float AimMaxDistance = 30f;
 
-    /// <summary>Регистрация движения WASD и стрелками, зума колёсиком, смены камеры на V и выхода по Esc, если их ещё нет; остальное управление задают моды.</summary>
+    /// <summary>Регистрация движения WASD и стрелками, зума колёсиком, смены камеры на V, инвентаря на Tab, постройки на B и R и выхода по Esc, если их ещё нет; остальное управление задают моды.</summary>
     public static void EnsureActions()
     {
         Add(Up, Key.W, Key.Up);
@@ -43,6 +52,9 @@ public static class GameInput
         Add(Right, Key.D, Key.Right);
         Add(Quit, Key.Escape);
         Add(CameraMode, Key.V);
+        Add(Inventory, Key.Tab);
+        Add(Build, Key.B);
+        Add(Rotate, Key.R);
         AddMouse(ZoomIn, MouseButton.WheelUp);
         AddMouse(ZoomOut, MouseButton.WheelDown);
     }

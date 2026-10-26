@@ -29,6 +29,12 @@ public sealed record ObjectDef : IDef
     /// <summary>Закрывает ли обзор, как шкаф; стол не закрывает.</summary>
     public bool BlocksSight { get; init; }
 
+    /// <summary>Контейнер с вместимостью, null - в объект ничего не положить.</summary>
+    public ContainerDef? Container { get; init; }
+
+    /// <summary>Как объект строится игроком, null - не строится и не разбирается.</summary>
+    public BuildDef? Build { get; init; }
+
     /// <inheritdoc/>
     public IEnumerable<string> Validate(DefDatabase defs)
     {
@@ -45,6 +51,16 @@ public sealed record ObjectDef : IDef
         if (Height <= 0)
         {
             yield return $"height {Height} must be positive";
+        }
+
+        foreach (string problem in Container?.Validate("container") ?? [])
+        {
+            yield return problem;
+        }
+
+        foreach (string problem in Build?.Validate(defs) ?? [])
+        {
+            yield return problem;
         }
     }
 }

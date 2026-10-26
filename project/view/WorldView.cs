@@ -111,7 +111,7 @@ public partial class WorldView : Node3D
 
             // Между тиками прогресс досчитывается по доле времени, чтобы полоса шла плавно
             float? progress = action is null ? null : Mathf.Clamp((float)((_replica.Tick + tickFraction - action.StartTick) / action.DurationTicks), 0f, 1f);
-            entity.SetActionProgress(progress);
+            entity.SetActionProgress(progress, action?.Verb ?? string.Empty, action?.Subject ?? string.Empty);
         }
     }
 

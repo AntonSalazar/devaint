@@ -29,7 +29,13 @@ public partial class EntityView : Node3D
     private static readonly Color _flashColor = new(1f, 0.15f, 0.1f);
 
     /// <summary>Общий материал полос прогресса; значение у каждой полосы своё.</summary>
-    private static readonly ShaderMaterial _barMaterial = new() { Shader = GD.Load<Shader>(ProgressShaderPath) };
+    private static readonly ShaderMaterial _barMaterial = new()
+    {
+        Shader = GD.Load<Shader>(ProgressShaderPath),
+
+        // Полоса без проверки глубины идёт в полупрозрачном проходе: без приоритета затемнение кадра затирает её
+        RenderPriority = VisibilityOverlay.MarksPriority,
+    };
 
     /// <summary>Полоса прогресса действия над головой.</summary>
     private readonly MeshInstance3D _bar = new()
@@ -42,6 +48,24 @@ public partial class EntityView : Node3D
         Visible = false,
     };
 
+    /// <summary>Подпись над полосой: что делается.</summary>
+    private readonly Label3D _caption = new()
+    {
+        Name = "ActionCaption",
+        Position = Vector3.Up * (Height + 0.55f),
+        Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+        NoDepthTest = true,
+        FontSize = 28,
+        PixelSize = 0.004f,
+        OutlineSize = 8,
+
+        // Подпись, как и полоса, идёт после затемнения кадра, иначе оно её затирает
+        RenderPriority = VisibilityOverlay.MarksPriority,
+        OutlineRenderPriority = VisibilityOverlay.MarksPriority - 1,
+        AutoTranslateMode = AutoTranslateModeEnum.Disabled,
+        Visible = false,
+    };
+
     /// <summary>Видимая часть, которая поворачивается по взгляду и делает выпад: тело и нос.</summary>
     private readonly Node3D _visual = new() { Name = "Visual" };
 
@@ -50,6 +74,9 @@ public partial class EntityView : Node3D
 
     /// <summary>Цвет тела вида.</summary>
     private Color _color;
+
+    /// <summary>Id подписи, по которым собран текущий текст подписи.</summary>
+    private (string Verb, string Subject) _label = (string.Empty, string.Empty);
 
     /// <summary>Направление взгляда по земле, единичное.</summary>
     private Vector3 _facing = Vector3.Back;
@@ -81,6 +108,9 @@ public partial class EntityView : Node3D
     /// <summary>Видна ли полоса прогресса.</summary>
     public bool ActionBarVisible => _bar.Visible;
 
+    /// <summary>Текст подписи над полосой, пусто без действия.</summary>
+    public string ActionCaption => _caption.Visible ? _caption.Text : string.Empty;
+
     /// <summary>Своя ли сущность.</summary>
     public bool Own { get; private set; }
 
@@ -104,6 +134,17 @@ public partial class EntityView : Node3D
 
     /// <summary>Вид от первого лица: тело и нос только отбрасывают тень, кольца нет, камера внутри капсулы.</summary>
     public bool FirstPerson { get; private set; }
+
+    /// <summary>Подпись действия на текущем языке: только Verb или Verb и Subject через двоеточие; пусто без Verb.</summary>
+    public static string Caption(string verb, string subject)
+    {
+        if (verb.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        return subject.Length == 0 ? HudModel.Name(verb) : $"{HudModel.Name(verb)}: {HudModel.Name(subject)}";
+    }
 
     /// <summary>Включение и выключение вида от первого лица; повторный вызов с тем же значением ничего не меняет.</summary>
     public void SetFirstPerson(bool on)
@@ -167,6 +208,7 @@ public partial class EntityView : Node3D
         }
 
         AddChild(_bar);
+        AddChild(_caption);
         Position = _from = _to = position;
     }
 
@@ -233,11 +275,20 @@ public partial class EntityView : Node3D
         }
     }
 
-    /// <summary>Полоса прогресса: доля от 0 до 1 или null, чтобы скрыть.</summary>
-    public void SetActionProgress(float? progress)
+    /// <summary>Полоса прогресса и подпись над ней по id verb и subject: доля от 0 до 1 или null, чтобы скрыть.</summary>
+    public void SetActionProgress(float? progress, string verb = "", string subject = "")
     {
         ActionProgress = progress;
         _bar.Visible = progress is not null;
+
+        // Вызывается каждый кадр: текст собирается заново, только когда сменилось действие
+        if ((verb, subject) != _label)
+        {
+            _label = (verb, subject);
+            _caption.Text = Caption(verb, subject);
+        }
+
+        _caption.Visible = progress is not null && _caption.Text.Length > 0;
         if (progress is float value)
         {
             _bar.SetInstanceShaderParameter("progress", value);

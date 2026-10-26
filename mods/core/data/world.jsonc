@@ -1,11 +1,13 @@
-// Полы, стены и двери. Цвет - пока моделей и текстур нет.
+// Полы, стены и двери. Цвет - пока моделей и текстур нет, build - из чего и сколько секунд строится игроком.
 {
   "$schema": "../../../schemas/data.schema.json",
   "floors": [
     { "id": "core:wood_floor", "color": "#8b6b4a" },
   ],
   "walls": [
-    { "id": "core:wood_wall", "kind": "wall", "color": "#c8b89a" },
-    { "id": "core:wood_door", "kind": "door", "color": "#6b3f22" },
+    { "id": "core:wood_wall", "kind": "wall", "color": "#c8b89a",
+      "build": { "inputs": [ { "item": "core:plank", "count": 3 }, { "item": "core:nails", "count": 4 } ], "tools": ["core:hammer"], "seconds": 10 } },
+    { "id": "core:wood_door", "kind": "door", "color": "#6b3f22",
+      "build": { "inputs": [ { "item": "core:plank", "count": 4 }, { "item": "core:nails", "count": 4 } ], "tools": ["core:hammer"], "seconds": 10 } },
   ],
 }

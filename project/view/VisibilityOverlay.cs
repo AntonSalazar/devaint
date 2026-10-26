@@ -16,6 +16,9 @@ public partial class VisibilityOverlay : MeshInstance3D
     /// <summary>Сторона текстуры памяти в текселах: на клетку 4 на 4, как точки памяти.</summary>
     public const int MemoryTexels = WindowCells * SeenCells.PointsPerSide;
 
+    /// <summary>Приоритет отрисовки меток поверх мира, полосы действия и призрака постройки: после затемнения, которое рисует поверх копию кадра.</summary>
+    public const int MarksPriority = 10;
+
     /// <summary>Бит текстуры стен: северное ребро клетки загораживает взгляд.</summary>
     public const byte NorthWall = 1;
 

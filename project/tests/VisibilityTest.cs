@@ -115,6 +115,25 @@ public class VisibilityTest : TestCase
         CheckEqual(0, mismatches, "texel ray mismatches");
     }
 
+    /// <summary>Полоса действия и призрак постройки рисуются после затемнения: иначе оно затирает их копией кадра.</summary>
+    public void TestOverlayDrawsBeforeMarks()
+    {
+        VisibilityOverlay overlay = new();
+        overlay.Init();
+        EntityView entity = new();
+        entity.Init(1, true, Vector3.Zero, Colors.Blue);
+        BuildGhost ghost = new();
+        ghost.Init();
+        int under = overlay.MaterialOverride.RenderPriority;
+
+        Check(entity.GetNode<MeshInstance3D>("ActionBar").MaterialOverride.RenderPriority > under, "action bar is drawn after the overlay");
+        Check(entity.GetNode<Label3D>("ActionCaption").RenderPriority > under, "action caption is drawn after the overlay");
+        Check(ghost.MaterialOverride.RenderPriority > under, "build ghost is drawn after the overlay");
+        overlay.Free();
+        entity.Free();
+        ghost.Free();
+    }
+
     /// <summary>Глаза, взгляд и обзор уходят в параметры шейдера.</summary>
     public void TestLookSetsParameters()
     {

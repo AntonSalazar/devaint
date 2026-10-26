@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using DevAInt.Sim.Defs;
 using DevAInt.Sim.Grid;
+using DevAInt.Sim.Items;
 using DevAInt.Sim.Logging;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Net;
@@ -15,11 +16,20 @@ namespace DevAInt.Sim.Saves;
 /// <summary>Сохранение в папке: meta.json, регионы чанков с сущностями и персонажи игроков отдельными файлами.</summary>
 public sealed partial class SaveGame(string directory)
 {
-    /// <summary>Версия формата файлов сохранения: в 3 у чанков появились объекты.</summary>
-    public const byte FormatVersion = 3;
+    /// <summary>Версия формата файлов сохранения: в 3 у чанков появились объекты, в 4 - содержимое контейнеров, в 5 - вид идущего действия.</summary>
+    public const byte FormatVersion = 5;
 
     /// <summary>Самый старый формат, который ещё читается: 2, без объектов в регионах.</summary>
     public const byte OldestFormat = 2;
+
+    /// <summary>Первый формат с содержимым контейнеров.</summary>
+    private const byte FormatWithContainers = 4;
+
+    /// <summary>Первый формат с объектами в чанках.</summary>
+    private const byte FormatWithObjects = 3;
+
+    /// <summary>Наибольшее число предметов в контейнере и номер id в таблице, защита от мусора.</summary>
+    private const int MaxItems = 1_000_000;
 
     /// <summary>Наибольшее число объектов в чанке, защита от мусора.</summary>
     private const int MaxObjects = World.ChunkSize * World.ChunkSize * World.LevelCount;
@@ -261,6 +271,11 @@ public sealed partial class SaveGame(string directory)
             _ids.Actions.NumberOf(sim.ItemTable.Action(i).Id);
         }
 
+        for (int i = 0; i < sim.ItemTable.RecipeCount; i++)
+        {
+            _ids.Recipes.NumberOf(sim.ItemTable.Recipe(i).Id);
+        }
+
         for (int i = 0; i < sim.CreatureTable.Count; i++)
         {
             _ids.Creatures.NumberOf(sim.CreatureTable.Creature(i).Id);
@@ -290,7 +305,7 @@ public sealed partial class SaveGame(string directory)
     private void WritePlayer(Simulation sim, Entity player)
     {
         PacketWriter writer = new();
-        EntityCodec.Write(writer, player, _ids, sim.StatTable);
+        EntityCodec.Write(writer, player, _ids, sim.StatTable, sim.WorldTable);
         SaveFile.WriteBinary(PlayerPath(player.PlayerId!), PlayerMagic, writer.ToArray());
     }
 
@@ -344,12 +359,21 @@ public sealed partial class SaveGame(string directory)
                 writer.WriteVarInt(obj.Cell.Y);
                 writer.WriteVarInt(obj.Cell.Z);
                 writer.WriteByte((byte)obj.Rotation);
+
+                // Счётчик пишется и у объекта без контейнера: вид мог перестать быть контейнером, а файл читается дальше
+                IReadOnlyList<Item> items = world.Container(obj.Id)?.Items ?? [];
+                writer.WriteVarUInt((ulong)items.Count);
+                foreach (Item item in items)
+                {
+                    writer.WriteVarInt(item.Id);
+                    writer.WriteVarUInt((ulong)_ids.Items.NumberOf(item.Def.Id));
+                }
             }
 
             writer.WriteVarUInt((ulong)inside.Count);
             foreach (Entity entity in inside)
             {
-                EntityCodec.Write(writer, entity, _ids, sim.StatTable);
+                EntityCodec.Write(writer, entity, _ids, sim.StatTable, sim.WorldTable);
             }
         }
 
@@ -398,8 +422,8 @@ public sealed partial class SaveGame(string directory)
     /// <summary>Персонаж из файла игрока.</summary>
     private Entity ReadPlayer(string path, SaveTables tables, ISet<string> missing, ISimLog log)
     {
-        byte[] payload = SaveFile.ReadBinary(path, PlayerMagic);
-        return Decode(path, payload, reader => EntityCodec.Read(reader, _ids, tables, missing, log));
+        byte[] payload = SaveFile.ReadBinary(path, PlayerMagic, out byte format);
+        return Decode(path, payload, reader => EntityCodec.Read(reader, _ids, tables, missing, log, format));
     }
 
     /// <summary>Путь файла региона.</summary>
@@ -442,8 +466,7 @@ public sealed partial class SaveGame(string directory)
         {
             Match name = RegionNameRegex().Match(Path.GetFileName(path));
             (int X, int Y) region = (int.Parse(name.Groups[1].Value), int.Parse(name.Groups[2].Value));
-            bool withObjects = format >= FormatVersion;
-            if (!withObjects)
+            if (format < FormatVersion)
             {
                 OldRegions.Add(region);
             }
@@ -453,7 +476,7 @@ public sealed partial class SaveGame(string directory)
                 int count = reader.ReadCount(World.RegionSize * World.RegionSize);
                 for (int i = 0; i < count; i++)
                 {
-                    ReadChunk(reader, region, withObjects);
+                    ReadChunk(reader, region, format);
                 }
 
                 return true;
@@ -473,7 +496,7 @@ public sealed partial class SaveGame(string directory)
         }
 
         /// <summary>Чанк: координаты внутри региона и мира, слои, объекты, если они есть в формате, и сущности.</summary>
-        private void ReadChunk(PacketReader reader, (int X, int Y) region, bool withObjects)
+        private void ReadChunk(PacketReader reader, (int X, int Y) region, byte format)
         {
             int chunkX = reader.ReadCount(World.MaxSize);
             int chunkY = reader.ReadCount(World.MaxSize);
@@ -489,16 +512,16 @@ public sealed partial class SaveGame(string directory)
                 ReadLevel(ChunkCodec.Read(reader), chunkX, chunkY);
             }
 
-            int objects = withObjects ? reader.ReadCount(MaxObjects) : 0;
+            int objects = format >= FormatWithObjects ? reader.ReadCount(MaxObjects) : 0;
             for (int i = 0; i < objects; i++)
             {
-                ReadObject(reader, chunkX, chunkY);
+                ReadObject(reader, chunkX, chunkY, format);
             }
 
             int entities = reader.ReadCount(MaxEntities);
             for (int i = 0; i < entities; i++)
             {
-                Entities.Add(EntityCodec.Read(reader, ids, tables, Missing, log));
+                Entities.Add(EntityCodec.Read(reader, ids, tables, Missing, log, format));
             }
         }
 
@@ -522,8 +545,8 @@ public sealed partial class SaveGame(string directory)
             }
         }
 
-        /// <summary>Объект чанка: id, номер вида, клетка внутри чанка и поворот.</summary>
-        private void ReadObject(PacketReader reader, int chunkX, int chunkY)
+        /// <summary>Объект чанка: id, номер вида, клетка внутри чанка, поворот и с формата 4 - предметы контейнера.</summary>
+        private void ReadObject(PacketReader reader, int chunkX, int chunkY, byte format)
         {
             long id = reader.ReadVarInt();
             ushort number = (ushort)Math.Min(reader.ReadVarUInt(), ushort.MaxValue);
@@ -539,6 +562,31 @@ public sealed partial class SaveGame(string directory)
             if (def != 0)
             {
                 world.AddObject(WorldObject.Create(id, def, tables.World.Object(def), cell, rotation));
+            }
+
+            int items = format >= FormatWithContainers ? reader.ReadCount(MaxItems) : 0;
+            for (int i = 0; i < items; i++)
+            {
+                ReadContainerItem(reader, id);
+            }
+        }
+
+        /// <summary>Предмет контейнера объекта objectId; предмет без мода попадает в Missing, контейнер, переставший им быть, теряет предмет с записью в лог.</summary>
+        private void ReadContainerItem(PacketReader reader, long objectId)
+        {
+            long itemId = reader.ReadVarInt();
+            string item = ids.Items.IdAt(reader.ReadCount(MaxItems));
+            if (!tables.Items.TryItemIndex(item, out int index))
+            {
+                Missing.Add(item);
+            }
+            else if (world.Container(objectId) is Inventory container)
+            {
+                container.Add(new Item(itemId, tables.Items.Item(index)));
+            }
+            else
+            {
+                log.Info($"save: dropped {item} {itemId}: object {objectId} is not a container any more");
             }
         }
 

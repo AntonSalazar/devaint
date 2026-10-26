@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using DevAInt.Sim.Grid;
+using DevAInt.Sim.Items;
 using DevAInt.Sim.Motion;
 
 namespace DevAInt.Sim.Net;
@@ -83,6 +85,18 @@ public sealed class GameClient
 
     /// <summary>Действие управления нажато или отпущено: номер из ControlTable.</summary>
     public void SendControl(int control, bool pressed) => _connection.Send(Protocol.Write(new ControlMessage(control, pressed)));
+
+    /// <summary>Подписка на содержимое ближних контейнеров; пустой список - отписка от всех.</summary>
+    public void SendWatchContainers(IReadOnlyList<long> objects) => _connection.Send(Protocol.Write(new WatchContainersMessage(objects)));
+
+    /// <summary>Просьба построить или разобрать цель.</summary>
+    public void SendBuild(BuildTarget target) => _connection.Send(Protocol.Write(new BuildMessage(target)));
+
+    /// <summary>Просьба начать крафт по рецепту с номером из ItemTable.</summary>
+    public void SendStartCraft(int recipe) => _connection.Send(Protocol.Write(new StartCraftMessage(recipe)));
+
+    /// <summary>Просьба переложить предмет: from и to - 0 для своего инвентаря или id объекта-контейнера.</summary>
+    public void SendMoveItem(long item, long from, long to) => _connection.Send(Protocol.Write(new MoveItemMessage(item, from, to)));
 
     /// <summary>Просьба прервать своё действие.</summary>
     public void SendCancelAction() => _connection.Send(Protocol.Write(new CancelActionMessage()));

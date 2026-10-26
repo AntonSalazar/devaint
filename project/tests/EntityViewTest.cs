@@ -96,6 +96,23 @@ public class EntityViewTest : TestCase
         own.Free();
     }
 
+    /// <summary>Подпись над полосой: рецепт - одним названием, постройка - действием и тем, что строится; без действия подписи нет.</summary>
+    public void TestActionCaption()
+    {
+        EntityView own = new();
+        own.Init(1, true, Vector3.Zero, Colors.Blue);
+
+        own.SetActionProgress(0.5f, "core:build", "core:crate");
+        string building = own.ActionCaption;
+        own.SetActionProgress(null);
+
+        CheckEqual(HudModel.Name("core:saw_log"), EntityView.Caption("core:saw_log", string.Empty), "recipe alone");
+        CheckEqual($"{HudModel.Name("core:build")}: {HudModel.Name("core:crate")}", building, "build and what");
+        CheckEqual(string.Empty, own.ActionCaption, "hidden without an action");
+        CheckEqual(string.Empty, EntityView.Caption(string.Empty, "core:crate"), "no verb, no caption");
+        own.Free();
+    }
+
     /// <summary>Чужая капсула смотрит по движению, своя - только по SetFacing, короткое направление взгляд не меняет.</summary>
     public void TestFacing()
     {

@@ -2,4 +2,11 @@
 {
   "$schema": "../../schemas/locale.schema.json",
   "ui.you_died": "Вы умерли",
+  "ui.inventory": "Инвентарь",
+  "ui.nearby": "Рядом",
+  "ui.nothing_nearby": "Рядом ничего нет",
+  "ui.crafting": "Крафт",
+  "ui.build": "Постройка",
+  "ui.remove": "Разобрать",
+  "ui.build_hint": "R - повернуть, левая кнопка - построить, правая - отмена",
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using DevAInt.Sim.Creatures;
 using DevAInt.Sim.Grid;
+using DevAInt.Sim.Items;
 using DevAInt.Sim.Mods;
 
 namespace DevAInt.Sim.Net;
@@ -9,6 +10,9 @@ namespace DevAInt.Sim.Net;
 /// <summary>Запись и чтение пакетов: тип сообщения одним байтом, дальше его поля.</summary>
 public static class Protocol
 {
+    /// <summary>Наибольшее число контейнеров в подписке клиента.</summary>
+    public const int MaxWatched = 16;
+
     /// <summary>Наибольшее число сообщений в пакете, защита от мусорных данных.</summary>
     private const int MaxMessages = 100_000;
 
@@ -41,6 +45,8 @@ public static class Protocol
         Attack,
         ObjectPlace,
         ObjectRemove,
+        Container,
+        ContainerClose,
     }
 
     /// <summary>Типы сообщений клиента.</summary>
@@ -51,6 +57,10 @@ public static class Protocol
         CancelAction,
         Hello,
         Control,
+        WatchContainers,
+        MoveItem,
+        StartCraft,
+        Build,
     }
 
     /// <summary>Пакет сервера в байты.</summary>
@@ -117,6 +127,32 @@ public static class Protocol
                 writer.WriteByte((byte)ClientType.Hello);
                 writer.WriteString(hello.PlayerId);
                 break;
+            case WatchContainersMessage watch:
+                writer.WriteByte((byte)ClientType.WatchContainers);
+                writer.WriteVarUInt((ulong)watch.Objects.Count);
+                foreach (long id in watch.Objects)
+                {
+                    writer.WriteVarInt(id);
+                }
+
+                break;
+            case BuildMessage build:
+                writer.WriteByte((byte)ClientType.Build);
+                writer.WriteByte((byte)build.Target.Kind);
+                writer.WriteVarUInt(build.Target.Def);
+                WriteCell(writer, build.Target.Cell);
+                writer.WriteByte((byte)build.Target.Turn);
+                break;
+            case StartCraftMessage craft:
+                writer.WriteByte((byte)ClientType.StartCraft);
+                writer.WriteVarUInt((ulong)craft.Recipe);
+                break;
+            case MoveItemMessage move:
+                writer.WriteByte((byte)ClientType.MoveItem);
+                writer.WriteVarInt(move.Item);
+                writer.WriteVarInt(move.From);
+                writer.WriteVarInt(move.To);
+                break;
             default:
                 throw new ArgumentException($"unknown client message {message.GetType().Name}", nameof(message));
         }
@@ -136,6 +172,10 @@ public static class Protocol
             ClientType.CancelAction => new CancelActionMessage(),
             ClientType.Hello => new HelloMessage(reader.ReadString(MaxText)),
             ClientType.Control => new ControlMessage(reader.ReadCount(MaxList), reader.ReadBool()),
+            ClientType.WatchContainers => ReadWatch(reader),
+            ClientType.MoveItem => new MoveItemMessage(reader.ReadVarInt(), reader.ReadVarInt(), reader.ReadVarInt()),
+            ClientType.StartCraft => new StartCraftMessage(reader.ReadCount(MaxList)),
+            ClientType.Build => ReadBuild(reader),
             _ => throw new ProtocolException($"unknown client message type {type}"),
         };
         RequireEnd(reader);
@@ -239,13 +279,16 @@ public static class Protocol
                 break;
             case OwnInventoryMessage inventory:
                 writer.WriteByte((byte)ServerType.OwnInventory);
-                writer.WriteVarUInt((ulong)inventory.Items.Count);
-                foreach (ItemData item in inventory.Items)
-                {
-                    writer.WriteVarInt(item.Id);
-                    writer.WriteVarUInt((ulong)item.Item);
-                }
-
+                WriteItems(writer, inventory.Items);
+                break;
+            case ContainerMessage container:
+                writer.WriteByte((byte)ServerType.Container);
+                writer.WriteVarInt(container.Object);
+                WriteItems(writer, container.Items);
+                break;
+            case ContainerCloseMessage close:
+                writer.WriteByte((byte)ServerType.ContainerClose);
+                writer.WriteVarInt(close.Object);
                 break;
             case ActionStartedMessage started:
                 writer.WriteByte((byte)ServerType.ActionStarted);
@@ -253,6 +296,8 @@ public static class Protocol
                 writer.WriteVarUInt((ulong)started.Action);
                 writer.WriteVarInt(started.StartTick);
                 writer.WriteVarUInt((ulong)started.DurationTicks);
+                writer.WriteString(started.Verb);
+                writer.WriteString(started.Subject);
                 break;
             case AttackMessage attack:
                 writer.WriteByte((byte)ServerType.Attack);
@@ -290,8 +335,10 @@ public static class Protocol
             ServerType.OwnStats => ReadOwnStats(reader),
             ServerType.FloorChange => new FloorChangeMessage(ReadCell(reader), ReadUShort(reader)),
             ServerType.EdgeChange => new EdgeChangeMessage(ReadCell(reader), reader.ReadBool(), new Edge(ReadUShort(reader), reader.ReadBool())),
-            ServerType.OwnInventory => ReadInventory(reader),
-            ServerType.ActionStarted => new ActionStartedMessage(reader.ReadVarInt(), reader.ReadCount(MaxList), reader.ReadVarInt(), reader.ReadCount(int.MaxValue)),
+            ServerType.OwnInventory => new OwnInventoryMessage(ReadItems(reader)),
+            ServerType.Container => new ContainerMessage(reader.ReadVarInt(), ReadItems(reader)),
+            ServerType.ContainerClose => new ContainerCloseMessage(reader.ReadVarInt()),
+            ServerType.ActionStarted => new ActionStartedMessage(reader.ReadVarInt(), reader.ReadCount(MaxList), reader.ReadVarInt(), reader.ReadCount(int.MaxValue), reader.ReadString(MaxText), reader.ReadString(MaxText)),
             ServerType.ActionEnded => new ActionEndedMessage(reader.ReadVarInt(), reader.ReadBool()),
             ServerType.OwnEntity => new OwnEntityMessage(reader.ReadVarInt()),
             ServerType.Attack => new AttackMessage(reader.ReadVarInt(), reader.ReadVarInt(), ReadAttackKind(reader)),
@@ -399,8 +446,19 @@ public static class Protocol
         return sequence <= uint.MaxValue ? (uint)sequence : throw new ProtocolException("input sequence is too large");
     }
 
-    /// <summary>Свой инвентарь.</summary>
-    private static OwnInventoryMessage ReadInventory(PacketReader reader)
+    /// <summary>Список предметов: число, затем id и номер вида каждого.</summary>
+    private static void WriteItems(PacketWriter writer, IReadOnlyList<ItemData> items)
+    {
+        writer.WriteVarUInt((ulong)items.Count);
+        foreach (ItemData item in items)
+        {
+            writer.WriteVarInt(item.Id);
+            writer.WriteVarUInt((ulong)item.Item);
+        }
+    }
+
+    /// <summary>Список предметов своего инвентаря или контейнера.</summary>
+    private static ItemData[] ReadItems(PacketReader reader)
     {
         int count = reader.ReadCount(MaxList);
         ItemData[] items = new ItemData[count];
@@ -409,7 +467,35 @@ public static class Protocol
             items[i] = new ItemData(reader.ReadVarInt(), reader.ReadCount(MaxList));
         }
 
-        return new OwnInventoryMessage(items);
+        return items;
+    }
+
+    /// <summary>Цель постройки; неизвестный вид или поворот вне 0..3 - ProtocolException, номер вида проверяет сервер.</summary>
+    private static BuildMessage ReadBuild(PacketReader reader)
+    {
+        byte kind = reader.ReadByte();
+        ushort def = ReadUShort(reader);
+        CellPos cell = ReadCell(reader);
+        byte turn = reader.ReadByte();
+        if (!Enum.IsDefined((BuildKind)kind) || turn >= WorldObject.Rotations)
+        {
+            throw new ProtocolException($"build kind {kind} with turn {turn} is not valid");
+        }
+
+        return new BuildMessage(new BuildTarget((BuildKind)kind, def, cell, turn));
+    }
+
+    /// <summary>Подписка на контейнеры, не больше MaxWatched.</summary>
+    private static WatchContainersMessage ReadWatch(PacketReader reader)
+    {
+        int count = reader.ReadCount(MaxWatched);
+        long[] objects = new long[count];
+        for (int i = 0; i < count; i++)
+        {
+            objects[i] = reader.ReadVarInt();
+        }
+
+        return new WatchContainersMessage(objects);
     }
 
     /// <summary>Статы своей сущности.</summary>

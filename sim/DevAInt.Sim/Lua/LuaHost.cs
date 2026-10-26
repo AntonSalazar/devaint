@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using DevAInt.Sim.Grid;
+using DevAInt.Sim.Items;
 using DevAInt.Sim.Logging;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Stats;
@@ -39,16 +40,20 @@ internal sealed class LuaHost
     /// <summary>Лог для ошибок и print.</summary>
     private readonly ISimLog _log;
 
+    /// <summary>Sim, для объектов мира и контейнеров.</summary>
+    private readonly Simulation _sim;
+
     /// <summary>Lua-моды в порядке загрузки.</summary>
     private readonly List<LuaMod> _mods = [];
 
     /// <summary>Id мудлов как Lua-строки, чтобы не создавать их на каждое событие.</summary>
     private readonly DynValue[] _moodleIds;
 
-    /// <summary>Хост с доступом к статам сущностей и списку всех сущностей мира.</summary>
-    public LuaHost(StatTable table, Func<long, StatSet?> entities, Func<IReadOnlyList<Entity>> all, ISimLog log)
+    /// <summary>Хост с доступом к статам сущностей, списку всех сущностей мира и объектам sim.</summary>
+    public LuaHost(StatTable table, Func<long, StatSet?> entities, Func<IReadOnlyList<Entity>> all, Simulation sim, ISimLog log)
     {
         _all = all;
+        _sim = sim;
         _table = table;
         _entities = entities;
         _log = log;
@@ -170,6 +175,18 @@ internal sealed class LuaHost
         return DynValue.Nil;
     }
 
+    /// <summary>Клетка из трёх чисел аргументов начиная с first.</summary>
+    private static CellPos Cell(CallbackArguments args, int first, string function)
+    {
+        int x = (int)Math.Floor(args.AsType(first, function, DataType.Number).Number);
+        int y = (int)Math.Floor(args.AsType(first + 1, function, DataType.Number).Number);
+        int z = (int)args.AsType(first + 2, function, DataType.Number).Number;
+        return new CellPos(x, y, z);
+    }
+
+    /// <summary>Id из числа в аргументе index.</summary>
+    private static long Id(CallbackArguments args, int index, string function) => (long)args.AsType(index, function, DataType.Number).Number;
+
     /// <summary>Таблицы hooks и stats в Lua-состоянии мода.</summary>
     private void Bind(LuaMod mod)
     {
@@ -186,7 +203,107 @@ internal sealed class LuaHost
         Table entities = new(mod.Script);
         entities["near"] = DynValue.NewCallback((context, args) => EntitiesNear(mod, args), "entities.near");
         mod.Script.Globals["entities"] = entities;
+
+        Table objects = new(mod.Script);
+        objects["at"] = DynValue.NewCallback((context, args) => ObjectsAt(mod, args), "objects.at");
+        objects["near"] = DynValue.NewCallback((context, args) => ObjectsNear(mod, args), "objects.near");
+        objects["place"] = DynValue.NewCallback((context, args) => ObjectsPlace(args), "objects.place");
+        objects["remove"] = DynValue.NewCallback((context, args) => DynValue.NewBoolean(_sim.World.RemoveObject(Id(args, 0, "objects.remove"))), "objects.remove");
+        mod.Script.Globals["objects"] = objects;
+
+        Table containers = new(mod.Script);
+        containers["items"] = DynValue.NewCallback((context, args) => ContainerItems(mod, args), "containers.items");
+        containers["add"] = DynValue.NewCallback((context, args) => ContainerAdd(args), "containers.add");
+        containers["remove"] = DynValue.NewCallback((context, args) => ContainerRemove(args), "containers.remove");
+        mod.Script.Globals["containers"] = containers;
     }
+
+    /// <summary>Таблица объекта для Lua: id, вид, клетка, поворот и занятый прямоугольник.</summary>
+    private Table ObjectRow(LuaMod mod, WorldObject obj)
+    {
+        Table row = new(mod.Script);
+        row["id"] = obj.Id;
+        row["object"] = _sim.WorldTable.Object(obj.Def).Id;
+        row["x"] = obj.Cell.X;
+        row["y"] = obj.Cell.Y;
+        row["z"] = obj.Cell.Z;
+        row["rotation"] = obj.Rotation;
+        row["width"] = obj.Width;
+        row["depth"] = obj.Depth;
+        return row;
+    }
+
+    /// <summary>objects.at: объект, который занимает клетку x, y, z, или nil.</summary>
+    private DynValue ObjectsAt(LuaMod mod, CallbackArguments args)
+    {
+        CellPos cell = Cell(args, 0, "objects.at");
+        return _sim.World.ObjectAt(cell) is WorldObject obj ? DynValue.NewTable(ObjectRow(mod, obj)) : DynValue.Nil;
+    }
+
+    /// <summary>objects.near: объекты этажа z, ближайшая точка которых не дальше radius от точки x, y.</summary>
+    private DynValue ObjectsNear(LuaMod mod, CallbackArguments args)
+    {
+        double x = args.AsType(0, "objects.near", DataType.Number).Number;
+        double y = args.AsType(1, "objects.near", DataType.Number).Number;
+        int z = (int)args.AsType(2, "objects.near", DataType.Number).Number;
+        double radius = args.AsType(3, "objects.near", DataType.Number).Number;
+        Table result = new(mod.Script);
+        foreach (WorldObject obj in _sim.World.Objects)
+        {
+            double dx = Math.Clamp(x, obj.Cell.X, obj.Cell.X + obj.Width) - x;
+            double dy = Math.Clamp(y, obj.Cell.Y, obj.Cell.Y + obj.Depth) - y;
+            if (obj.Cell.Z == z && (dx * dx) + (dy * dy) <= radius * radius)
+            {
+                result.Append(DynValue.NewTable(ObjectRow(mod, obj)));
+            }
+        }
+
+        return DynValue.NewTable(result);
+    }
+
+    /// <summary>objects.place: новый объект вида object в клетке x, y, z с поворотом rotation, 0 по умолчанию; id или nil и причина.</summary>
+    private DynValue ObjectsPlace(CallbackArguments args)
+    {
+        string id = args.AsType(0, "objects.place", DataType.String).String;
+        CellPos cell = Cell(args, 1, "objects.place");
+        int rotation = (int)(args.AsType(4, "objects.place", DataType.Number, allowNil: true).CastToNumber() ?? 0);
+        WorldObject? obj = _sim.PlaceObject(id, cell, rotation, out string? problem);
+        return obj is null ? DynValue.NewTuple(DynValue.Nil, DynValue.NewString(problem)) : DynValue.NewNumber(obj.Id);
+    }
+
+    /// <summary>containers.items: предметы контейнера объекта - таблицы id и item, или nil, если объект не контейнер.</summary>
+    private DynValue ContainerItems(LuaMod mod, CallbackArguments args)
+    {
+        if (_sim.World.Container(Id(args, 0, "containers.items")) is not Inventory container)
+        {
+            return DynValue.Nil;
+        }
+
+        Table result = new(mod.Script);
+        foreach (Item item in container.Items)
+        {
+            Table row = new(mod.Script);
+            row["id"] = item.Id;
+            row["item"] = item.Def.Id;
+            result.Append(DynValue.NewTable(row));
+        }
+
+        return DynValue.NewTable(result);
+    }
+
+    /// <summary>containers.add: новый предмет вида item в контейнер объекта; id предмета или nil и причина.</summary>
+    private DynValue ContainerAdd(CallbackArguments args)
+    {
+        long obj = Id(args, 0, "containers.add");
+        string item = args.AsType(1, "containers.add", DataType.String).String;
+        long? id = _sim.AddToContainer(obj, item, out string? problem);
+        return id is long added ? DynValue.NewNumber(added) : DynValue.NewTuple(DynValue.Nil, DynValue.NewString(problem));
+    }
+
+    /// <summary>containers.remove: удаление предмета из контейнера объекта, true если он там был.</summary>
+    private DynValue ContainerRemove(CallbackArguments args) =>
+        DynValue.NewBoolean(_sim.RemoveFromContainer(Id(args, 0, "containers.remove"), Id(args, 1, "containers.remove")));
+
 
     /// <summary>entities.near: сущности этажа z в радиусе от точки x, y - таблицы id, creature, x, y.</summary>
     private DynValue EntitiesNear(LuaMod mod, CallbackArguments args)

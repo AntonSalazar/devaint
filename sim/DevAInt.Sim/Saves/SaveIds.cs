@@ -15,6 +15,7 @@ internal sealed class SaveIds
         Stats = new SaveIdList(lists.Stats, first: 0);
         Items = new SaveIdList(lists.Items, first: 0);
         Actions = new SaveIdList(lists.Actions, first: 0);
+        Recipes = new SaveIdList(lists.Recipes, first: 0);
         Creatures = new SaveIdList(lists.Creatures, first: 1);
     }
 
@@ -36,6 +37,9 @@ internal sealed class SaveIds
     /// <summary>Действия.</summary>
     public SaveIdList Actions { get; }
 
+    /// <summary>Рецепты.</summary>
+    public SaveIdList Recipes { get; }
+
     /// <summary>Виды существ, номера с единицы.</summary>
     public SaveIdList Creatures { get; }
 
@@ -48,6 +52,7 @@ internal sealed class SaveIds
         Stats = [.. Stats.Ids],
         Items = [.. Items.Ids],
         Actions = [.. Actions.Ids],
+        Recipes = [.. Recipes.Ids],
         Creatures = [.. Creatures.Ids],
     };
 }

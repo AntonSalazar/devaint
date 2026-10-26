@@ -18,6 +18,7 @@ internal sealed class DefFile
         ["maps"] = typeof(MapDef),
         ["actions"] = typeof(ActionDef),
         ["items"] = typeof(ItemDef),
+        ["recipes"] = typeof(RecipeDef),
         ["creatures"] = typeof(CreatureDef),
         ["controls"] = typeof(ControlDef),
     };
@@ -46,6 +47,9 @@ internal sealed class DefFile
 
     /// <summary>Предметы.</summary>
     public List<ItemDef?>? Items { get; init; }
+
+    /// <summary>Рецепты крафта.</summary>
+    public List<RecipeDef?>? Recipes { get; init; }
 
     /// <summary>Виды существ.</summary>
     public List<CreatureDef?>? Creatures { get; init; }

@@ -1,18 +1,31 @@
-// Действия и предметы. Что делает предмет, описано в его применении: длительность в секундах симуляции,
-// тратится ли он и как меняются статы.
+// Действия и предметы. Вес - в килограммах. Что делает предмет, описано в его применении: длительность
+// в секундах симуляции, тратится ли он и как меняются статы.
 {
   "$schema": "../../../schemas/data.schema.json",
   "actions": [
     { "id": "core:eat", "interruptOnMove": true },
+    { "id": "core:craft", "interruptOnMove": true },
+    { "id": "core:build", "interruptOnMove": true },
   ],
   "items": [
     {
       "id": "core:apple",
       "color": "#c0392b",
+      "weight": 0.2,
       "uses": [
         { "action": "core:eat", "seconds": 4, "consume": true,
           "stats": [ { "stat": "core:hunger", "add": -25 } ] },
       ],
     },
+    // Материалы и инструменты плотника, как в Project Zomboid: бревно пилится на доски, гвозди и доски идут в постройки
+    { "id": "core:log", "color": "#6b4a2b", "weight": 4 },
+    { "id": "core:plank", "color": "#c49a6c", "weight": 1 },
+    { "id": "core:nails", "color": "#8a8f96", "weight": 0.05 },
+    { "id": "core:saw", "color": "#9aa3ad", "weight": 1 },
+    { "id": "core:hammer", "color": "#5d6670", "weight": 1 },
+  ],
+  "recipes": [
+    { "id": "core:saw_log", "inputs": [ { "item": "core:log" } ], "tools": ["core:saw"],
+      "outputs": [ { "item": "core:plank", "count": 3 } ], "seconds": 6 },
   ],
 }

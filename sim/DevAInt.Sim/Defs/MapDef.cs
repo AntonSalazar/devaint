@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using DevAInt.Sim.Grid;
 
 namespace DevAInt.Sim.Defs;
@@ -152,6 +153,9 @@ public sealed record MapOpDef
     /// <summary>Поворот объекта: 0..3, по четверти оборота; нечётный меняет ширину и глубину местами.</summary>
     public int Rotation { get; init; }
 
+    /// <summary>Предметы, которые лежат в контейнере объекта в новом мире.</summary>
+    public IReadOnlyList<string> Items { get; init; } = [];
+
     /// <summary>Западная клетка прямоугольника.</summary>
     public required int X { get; init; }
 
@@ -218,9 +222,24 @@ public sealed record MapOpDef
             yield return "open is only for door";
         }
 
-        if (Object is not null && !defs.TryGet<ObjectDef>(Object, out _))
+        ObjectDef? obj = null;
+        if (Object is not null && defs.TryGet<ObjectDef>(Object, out ObjectDef? found))
+        {
+            obj = found;
+        }
+        else if (Object is not null)
         {
             yield return $"unknown object {Object}";
+        }
+
+        if (Items.Count > 0 && obj?.Container is null)
+        {
+            yield return Object is null ? "items are only for object" : $"object {Object} is not a container";
+        }
+
+        foreach (string item in Items.Where(item => !defs.TryGet<ItemDef>(item, out _)))
+        {
+            yield return $"unknown item {item}";
         }
 
         if (Object is null ? Rotation != 0 : Rotation is < 0 or >= WorldObject.Rotations)

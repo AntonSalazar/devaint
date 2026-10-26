@@ -24,6 +24,20 @@ public sealed record WallDef : IDef
     /// <summary>Цвет в виде #rrggbb, пока моделей и текстур нет.</summary>
     public string Color { get; init; } = "#a0a0a0";
 
+    /// <summary>Как стена строится игроком, null - не строится и не разбирается.</summary>
+    public BuildDef? Build { get; init; }
+
     /// <inheritdoc/>
-    public IEnumerable<string> Validate(DefDatabase defs) => DefColor.Validate(Color);
+    public IEnumerable<string> Validate(DefDatabase defs)
+    {
+        foreach (string problem in DefColor.Validate(Color))
+        {
+            yield return problem;
+        }
+
+        foreach (string problem in Build?.Validate(defs) ?? [])
+        {
+            yield return problem;
+        }
+    }
 }

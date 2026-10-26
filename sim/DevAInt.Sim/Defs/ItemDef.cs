@@ -12,6 +12,9 @@ public sealed record ItemDef : IDef
     /// <summary>Цвет в виде #rrggbb, пока моделей и иконок нет.</summary>
     public string Color { get; init; } = "#808080";
 
+    /// <summary>Вес в килограммах.</summary>
+    public double Weight { get; init; } = 0.1;
+
     /// <summary>Чем предмет можно применить: действие и его параметры для этого предмета.</summary>
     public IReadOnlyList<ItemUseDef> Uses { get; init; } = [];
 
@@ -21,6 +24,11 @@ public sealed record ItemDef : IDef
         foreach (string problem in DefColor.Validate(Color))
         {
             yield return problem;
+        }
+
+        if (Weight < 0)
+        {
+            yield return $"weight {Weight} must not be negative";
         }
 
         for (int i = 0; i < Uses.Count; i++)

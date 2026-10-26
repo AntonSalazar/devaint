@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using DevAInt.Sim.Creatures;
+using DevAInt.Sim.Defs;
 using DevAInt.Sim.Grid;
 using DevAInt.Sim.Items;
 using DevAInt.Sim.Logging;
@@ -16,6 +17,9 @@ namespace DevAInt.Sim.Net;
 /// <remarks>Сервер над sim и транспортом.</remarks>
 public sealed class GameServer(Simulation sim, IServerTransport transport, ISimLog log, SaveGame? save = null, int subscribeRadius = GameServer.DefaultSubscribeRadius)
 {
+    /// <summary>Глагол подписи разбора, id строки интерфейса.</summary>
+    public const string RemoveVerb = "ui.remove";
+
     /// <summary>Автосохранение раз в 5 минут реального времени.</summary>
     public const int AutosaveTicks = 5 * 60 * GameClock.TicksPerSecond;
 
@@ -216,6 +220,33 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
 
                 _sim.Control(client.EntityId, control.Control, control.Pressed);
                 break;
+            case WatchContainersMessage watch:
+                client.Watching.Clear();
+                client.Watching.UnionWith(watch.Objects);
+                break;
+            case MoveItemMessage move:
+                _sim.MoveItem(client.EntityId, move.Item, move.From, move.To);
+                break;
+            case BuildMessage build:
+                // Номер вида сверяется с таблицей: иначе Building обратился бы за её край
+                BuildTarget target = build.Target;
+                int count = target.Kind == BuildKind.Object ? _sim.WorldTable.ObjectCount : _sim.WorldTable.WallCount;
+                bool placing = target.Kind is BuildKind.Object or BuildKind.Wall;
+                if (placing && (target.Def < 1 || target.Def > count))
+                {
+                    throw new ProtocolException($"build kind {target.Def} is out of range");
+                }
+
+                _sim.StartBuild(client.EntityId, target);
+                break;
+            case StartCraftMessage craft:
+                if (craft.Recipe >= _sim.ItemTable.RecipeCount)
+                {
+                    throw new ProtocolException($"recipe {craft.Recipe} is out of range");
+                }
+
+                _sim.StartCraft(client.EntityId, _sim.ItemTable.Recipe(craft.Recipe).Id);
+                break;
         }
     }
 
@@ -352,6 +383,7 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
             client.InventoryVersion = own.Inventory.Version;
         }
 
+        AddContainerMessages(client, own, messages);
         float[] stats = [.. Enumerable.Range(0, _sim.StatTable.StatCount).Select(stat => (float)own.Stats.Value(stat))];
         if (client.Stats is null || !stats.AsSpan().SequenceEqual(client.Stats))
         {
@@ -360,6 +392,36 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
         }
 
         return new ServerFrame(_sim.Clock.Tick, messages, client.LastInput);
+    }
+
+    /// <summary>Содержимое контейнеров подписки, которые в досягаемости, при подписке и изменении; закрытие тех, что ушли из подписки или досягаемости.</summary>
+    private void AddContainerMessages(ClientSession client, Entity own, List<ServerMessage> messages)
+    {
+        // Список ключей копируется, только когда есть что проверять: обычно клиент ни на что не подписан
+        World world = _sim.World;
+        foreach (long id in client.SentContainers.Count == 0 ? [] : client.SentContainers.Keys.ToList())
+        {
+            bool still = client.Watching.Contains(id) && world.FindObject(id) is WorldObject obj && Reach.CanReach(world, own.Position, obj);
+            if (!still)
+            {
+                messages.Add(new ContainerCloseMessage(id));
+                client.SentContainers.Remove(id);
+            }
+        }
+
+        foreach (long id in client.Watching)
+        {
+            if (world.Container(id) is not Inventory container || !Reach.CanReach(world, own.Position, world.FindObject(id)!))
+            {
+                continue;
+            }
+
+            if (!client.SentContainers.TryGetValue(id, out int version) || version != container.Version)
+            {
+                messages.Add(new ContainerMessage(id, [.. container.Items.Select(item => new ItemData(item.Id, _sim.ItemTable.ItemIndex(item.Def.Id)))]));
+                client.SentContainers[id] = container.Version;
+            }
+        }
     }
 
     /// <summary>Появления, движения, мудлы и исчезновения сущностей относительно того, что клиент уже знает.</summary>
@@ -441,10 +503,27 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
 
         if (entity.Action is ActionState action)
         {
-            messages.Add(new ActionStartedMessage(entity.Id, _sim.ItemTable.ActionIndex(action.Action.Id), action.StartTick, action.DurationTicks));
+            (string verb, string subject) = Label(entity, action);
+            messages.Add(new ActionStartedMessage(entity.Id, _sim.ItemTable.ActionIndex(action.Action.Id), action.StartTick, action.DurationTicks, verb, subject));
         }
 
         known.ActionStart = start;
+    }
+
+    /// <summary>Подпись действия id для перевода: рецепт; действие и предмет; постройка и что строится; ui.remove и что разбирается.</summary>
+    private (string Verb, string Subject) Label(Entity entity, ActionState action)
+    {
+        WorldTable table = _sim.WorldTable;
+        World world = _sim.World;
+        return action switch
+        {
+            { Recipe: RecipeDef recipe } => (recipe.Id, string.Empty),
+            { Build: { Kind: BuildKind.Object } build } => (action.Action.Id, table.Object(build.Def).Id),
+            { Build: { Kind: BuildKind.Wall } build } => (action.Action.Id, table.Wall(build.Def).Id),
+            { Build: { Kind: BuildKind.RemoveObject } build } => (RemoveVerb, world.ObjectAt(build.Cell) is WorldObject obj ? table.Object(obj.Def).Id : string.Empty),
+            { Build: BuildTarget build } => (RemoveVerb, table.Wall(world.GetEdge(build.Cell, build.Side).Wall) is WallDef wall ? wall.Id : string.Empty),
+            _ => (action.Action.Id, entity.Inventory.Find(action.ItemId)?.Def.Id ?? string.Empty),
+        };
     }
 
     /// <summary>Чанки в квадрате радиуса вокруг центра, обрезанные по хранению мира.</summary>
@@ -525,5 +604,11 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
 
         /// <summary>Отправленный номер изменения инвентаря, -1 до первой отправки.</summary>
         public int InventoryVersion { get; set; } = -1;
+
+        /// <summary>Объекты, содержимое которых клиент хочет видеть.</summary>
+        public HashSet<long> Watching { get; } = [];
+
+        /// <summary>Контейнеры, отправленные клиенту, с номером изменения на момент отправки.</summary>
+        public Dictionary<long, int> SentContainers { get; } = [];
     }
 }

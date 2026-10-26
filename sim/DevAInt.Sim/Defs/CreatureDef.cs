@@ -34,6 +34,9 @@ public sealed record CreatureDef : IDef
     /// <summary>Поведение или null, если существом управляет игрок.</summary>
     public BrainDef? Brain { get; init; }
 
+    /// <summary>Вместимость инвентаря, null - без предела.</summary>
+    public ContainerDef? Inventory { get; init; }
+
     /// <summary>Тело для движения.</summary>
     public MoveParams Body => new(Radius, Speed);
 
@@ -74,6 +77,11 @@ public sealed record CreatureDef : IDef
         foreach (string problem in Vision?.Validate() ?? [])
         {
             yield return $"vision: {problem}";
+        }
+
+        foreach (string problem in Inventory?.Validate("inventory") ?? [])
+        {
+            yield return problem;
         }
 
         foreach (string problem in Brain?.Validate(defs) ?? [])

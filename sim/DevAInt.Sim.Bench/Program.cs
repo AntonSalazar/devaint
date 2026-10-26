@@ -144,7 +144,7 @@ internal static class Program
             stats[i] = new StatSet(table);
         }
 
-        LuaHost lua = new(table, id => stats[id], () => [], new ConsoleLog());
+        LuaHost lua = new(table, id => stats[id], () => [], new Simulation(loaded, new ConsoleLog()), new ConsoleLog());
         lua.Load(loaded.Mods);
         MoodleChange change = new(table.MoodleIndex("core:hungry"), 0, 1);
         Measure($"{Entities} stat_threshold hook calls", () =>

@@ -36,6 +36,12 @@ public sealed class ReplicaEntity(long id, float x, float y, int z, int[] moodle
 /// <summary>Действие в реплике: номер действия из ItemTable, тик начала и длительность в тиках.</summary>
 public sealed record ReplicaAction(int Action, long StartTick, int DurationTicks)
 {
+    /// <summary>Что делается, id для перевода: действие, рецепт или ui.remove.</summary>
+    public string Verb { get; init; } = string.Empty;
+
+    /// <summary>Над чем, id для перевода: предмет, объект или стена; пусто, если подпись из одного Verb.</summary>
+    public string Subject { get; init; } = string.Empty;
+
     /// <summary>Доля выполнения от 0 до 1 на тике tick: прогресс считается по тикам, без сообщений каждый тик.</summary>
     public float Progress(long tick) => Math.Clamp((float)(tick - StartTick) / DurationTicks, 0f, 1f);
 }
@@ -51,6 +57,9 @@ public sealed class Replica(ClientTables tables)
 
     /// <summary>Чанки, которые клиент знает.</summary>
     private readonly HashSet<(int X, int Y)> _chunks = [];
+
+    /// <summary>Содержимое контейнеров, которые сервер показывает клиенту, по id объекта.</summary>
+    private readonly Dictionary<long, IReadOnlyList<ItemData>> _containers = [];
 
     /// <summary>Мир пришёл: приветствие получено.</summary>
     public event Action? WorldCreated;
@@ -100,6 +109,9 @@ public sealed class Replica(ClientTables tables)
     /// <summary>Объект поставлен или убран в знакомом чанке.</summary>
     public event Action<WorldObject>? ObjectChanged;
 
+    /// <summary>Содержимое видимых контейнеров изменилось, контейнер появился или закрылся.</summary>
+    public event Action? ContainersChanged;
+
     /// <summary>Мир клиента, null до приветствия.</summary>
     public World? World { get; private set; }
 
@@ -120,6 +132,9 @@ public sealed class Replica(ClientTables tables)
 
     /// <summary>Свои предметы: id и номер определения из ItemTable.</summary>
     public IReadOnlyList<ItemData> Inventory => _inventory;
+
+    /// <summary>Содержимое видимых контейнеров по id объекта.</summary>
+    public IReadOnlyDictionary<long, IReadOnlyList<ItemData>> Containers => _containers;
 
     /// <summary>Сущности, которые клиент сейчас видит.</summary>
     public IReadOnlyCollection<ReplicaEntity> Entities => _entities.Values;
@@ -242,7 +257,7 @@ public sealed class Replica(ClientTables tables)
             case ActionStartedMessage started:
                 RequireIndex(started.Action, tables.Items.ActionCount, "action");
                 ReplicaEntity actor = Existing(started.Entity);
-                actor.Action = new ReplicaAction(started.Action, started.StartTick, Math.Max(1, started.DurationTicks));
+                actor.Action = new ReplicaAction(started.Action, started.StartTick, Math.Max(1, started.DurationTicks)) { Verb = started.Verb, Subject = started.Subject };
                 ActionStarted?.Invoke(actor);
                 break;
             case OwnEntityMessage own:
@@ -270,6 +285,19 @@ public sealed class Replica(ClientTables tables)
                 WorldObject placed = ToObject(RequireWorld(), place.Object);
                 RequireWorld().AddObject(placed);
                 ObjectChanged?.Invoke(placed);
+                break;
+            case ContainerMessage container:
+                foreach (ItemData item in container.Items)
+                {
+                    RequireIndex(item.Item, tables.Items.ItemCount, "item");
+                }
+
+                _containers[container.Object] = container.Items;
+                ContainersChanged?.Invoke();
+                break;
+            case ContainerCloseMessage close:
+                _containers.Remove(close.Object);
+                ContainersChanged?.Invoke();
                 break;
             case ObjectRemoveMessage remove:
                 WorldObject gone = RequireWorld().FindObject(remove.Id) ?? throw new ProtocolException($"object {remove.Id} is unknown");

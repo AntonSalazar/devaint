@@ -142,26 +142,34 @@ public sealed class SaveGameTest : IDisposable
         Assert.Equal("save needs ids missing from loaded mods: test:statue", error.Message);
     }
 
-    /// <summary>Сохранение формата 2 без объектов грузится, а следующая запись переписывает все регионы в формат 3.</summary>
-    [Fact]
-    public void Format2IsUpgraded()
+    /// <summary>Сохранение старого формата грузится, а следующая запись переписывает все регионы в текущий формат.</summary>
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void OldFormatIsUpgraded(byte format)
     {
         Simulation original = NewSim();
         original.SpawnPlayer("anna");
+        if (format >= 3)
+        {
+            Place(original, "core:table", new CellPos(255, 1, 0), 0);
+        }
+
         new SaveGame(SaveDir).Save(original);
         string meta = Path.Combine(SaveDir, "meta.json");
-        File.WriteAllText(meta, File.ReadAllText(meta).Replace("\"format\": 3", "\"format\": 2"));
+        File.WriteAllText(meta, File.ReadAllText(meta).Replace($"\"format\": {SaveGame.FormatVersion}", $"\"format\": {format}"));
         string[] regions = Directory.GetFiles(Path.Combine(SaveDir, "regions"));
         foreach (string region in regions)
         {
-            SaveFile.WriteBinary(region, "DVRG", WithoutObjects(SaveFile.ReadBinary(region, "DVRG")));
+            SaveFile.WriteBinary(region, "DVRG", Downgrade(SaveFile.ReadBinary(region, "DVRG"), format));
         }
 
-        // В настоящем старом сохранении версия 2 стоит и в каждом двоичном файле, не только в мете
+        // В настоящем старом сохранении версия стоит и в каждом двоичном файле, не только в мете
         foreach (string file in regions.Concat(Directory.GetFiles(Path.Combine(SaveDir, "players"))))
         {
             byte[] bytes = File.ReadAllBytes(file);
-            bytes[4] = 2;
+            bytes[4] = format;
             File.WriteAllBytes(file, bytes);
         }
 
@@ -175,7 +183,8 @@ public sealed class SaveGameTest : IDisposable
         Assert.NotNull(reload.LoadPlayer(upgraded, "anna", _log));
         AssertSameWorld(original, old);
         AssertSameWorld(original, upgraded);
-        Assert.Contains("\"format\": 3", File.ReadAllText(meta));
+        Assert.Equal(original.World.Objects.OrderBy(obj => obj.Id), upgraded.World.Objects.OrderBy(obj => obj.Id));
+        Assert.Contains($"\"format\": {SaveGame.FormatVersion}", File.ReadAllText(meta));
         Assert.All(regions, file => Assert.Equal(SaveGame.FormatVersion, File.ReadAllBytes(file)[4]));
     }
 
@@ -298,11 +307,11 @@ public sealed class SaveGameTest : IDisposable
     {
         new SaveGame(SaveDir).Save(NewSim());
         string meta = Path.Combine(SaveDir, "meta.json");
-        File.WriteAllText(meta, File.ReadAllText(meta).Replace("\"format\": 3", "\"format\": 1"));
+        File.WriteAllText(meta, File.ReadAllText(meta).Replace($"\"format\": {SaveGame.FormatVersion}", "\"format\": 1"));
 
         SaveException error = Assert.Throws<SaveException>(() => new SaveGame(SaveDir).Load(Load("core", "test"), _log));
 
-        Assert.Equal("meta.json: save format 1 is not supported, expected 3", error.Message);
+        Assert.Equal($"meta.json: save format 1 is not supported, expected {SaveGame.FormatVersion}", error.Message);
     }
 
     /// <summary>Повреждённые и чужие файлы дают SaveException с именем файла, а не падение.</summary>
@@ -453,8 +462,8 @@ public sealed class SaveGameTest : IDisposable
         return obj.Id;
     }
 
-    /// <summary>Регион формата 3 без объектов в байтах формата 2: у каждого чанка убирается счётчик объектов.</summary>
-    private static byte[] WithoutObjects(byte[] payload)
+    /// <summary>Регион текущего формата без сущностей и предметов в контейнерах в байтах старого формата: в 4 у сущностей нет вида действия, в 3 нет счётчика предметов у объекта, в 2 нет и объектов.</summary>
+    private static byte[] Downgrade(byte[] payload, byte format)
     {
         PacketReader reader = new(payload);
         PacketWriter writer = new();
@@ -471,7 +480,29 @@ public sealed class SaveGameTest : IDisposable
                 ChunkCodec.Write(writer, ChunkCodec.Read(reader));
             }
 
-            Assert.Equal(0UL, reader.ReadVarUInt());
+            ulong objects = reader.ReadVarUInt();
+            Assert.True(format >= 3 || objects == 0, "format 2 has no objects");
+            if (format >= 3)
+            {
+                writer.WriteVarUInt(objects);
+            }
+
+            for (ulong obj = 0; obj < objects; obj++)
+            {
+                writer.WriteVarInt(reader.ReadVarInt());
+                writer.WriteVarUInt(reader.ReadVarUInt());
+                writer.WriteVarInt(reader.ReadVarInt());
+                writer.WriteVarInt(reader.ReadVarInt());
+                writer.WriteVarInt(reader.ReadVarInt());
+                writer.WriteByte(reader.ReadByte());
+                ulong items = reader.ReadVarUInt();
+                Assert.Equal(0UL, items);
+                if (format >= 4)
+                {
+                    writer.WriteVarUInt(items);
+                }
+            }
+
             writer.WriteVarUInt(reader.ReadVarUInt());
         }
 

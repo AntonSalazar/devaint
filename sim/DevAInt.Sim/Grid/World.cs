@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using DevAInt.Sim.Items;
 
 namespace DevAInt.Sim.Grid;
 
@@ -57,6 +58,9 @@ public sealed class World
 
     /// <summary>Объекты по id.</summary>
     private readonly Dictionary<long, WorldObject> _objects = [];
+
+    /// <summary>Содержимое контейнеров по id объекта.</summary>
+    private readonly Dictionary<long, Inventory> _containers = [];
 
     /// <summary>Пустой мир размером width на height клеток.</summary>
     public World(int width, int height)
@@ -172,6 +176,9 @@ public sealed class World
     /// <summary>Объект по id или null.</summary>
     public WorldObject? FindObject(long id) => _objects.GetValueOrDefault(id);
 
+    /// <summary>Содержимое контейнера по id объекта, null - объекта нет или он не контейнер.</summary>
+    public Inventory? Container(long objectId) => _containers.GetValueOrDefault(objectId);
+
     /// <summary>Объект, который занимает клетку, или null.</summary>
     public WorldObject? ObjectAt(CellPos cell)
     {
@@ -255,7 +262,9 @@ public sealed class World
             return false;
         }
 
+        // Предметы контейнера пропадают вместе с ним: выкладывать их на пол пока некуда
         ChunkOf(obj.Cell).Objects.Remove(obj);
+        _containers.Remove(id);
         MarkCells(obj, set: false);
         _changes.Add(new WorldChange(obj.Cell, WorldChangeKind.ObjectRemoved, obj));
         _dirtyRegions.Add(RegionOf(obj.Cell));
@@ -297,6 +306,11 @@ public sealed class World
     {
         _objects.Add(obj.Id, obj);
         ChunkOf(obj.Cell).Objects.Add(obj);
+        if (obj.IsContainer)
+        {
+            _containers.Add(obj.Id, new Inventory());
+        }
+
         MarkCells(obj, set: true);
         NextObjectId = Math.Max(NextObjectId, obj.Id + 1);
         _changes.Add(new WorldChange(obj.Cell, WorldChangeKind.ObjectPlaced, obj));
@@ -336,6 +350,7 @@ public sealed class World
         {
             // Объект у края мог занять клетки соседнего чанка: их флаги снимаются тоже
             _objects.Remove(obj.Id);
+            _containers.Remove(obj.Id);
             MarkCells(obj, set: false);
         }
 

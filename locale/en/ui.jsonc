@@ -2,4 +2,11 @@
 {
   "$schema": "../../schemas/locale.schema.json",
   "ui.you_died": "You died",
+  "ui.inventory": "Inventory",
+  "ui.nearby": "Nearby",
+  "ui.nothing_nearby": "Nothing nearby",
+  "ui.crafting": "Crafting",
+  "ui.build": "Build",
+  "ui.remove": "Remove",
+  "ui.build_hint": "R - rotate, left click - build, right click - cancel",
 }

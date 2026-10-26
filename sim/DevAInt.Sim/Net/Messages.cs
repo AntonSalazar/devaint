@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using DevAInt.Sim.Creatures;
 using DevAInt.Sim.Grid;
+using DevAInt.Sim.Items;
 using DevAInt.Sim.Mods;
 
 namespace DevAInt.Sim.Net;
@@ -69,8 +70,21 @@ public sealed record EdgeChangeMessage(CellPos Owner, bool North, Edge Edge) : S
 /// <summary>Свой инвентарь целиком: id предметов и номера их определений из ItemTable.</summary>
 public sealed record OwnInventoryMessage(IReadOnlyList<ItemData> Items) : ServerMessage;
 
-/// <summary>Сущность начала действие: номер действия из ItemTable, тик начала и длительность в тиках.</summary>
-public sealed record ActionStartedMessage(long Entity, int Action, long StartTick, int DurationTicks) : ServerMessage;
+/// <summary>Содержимое контейнера объекта, на который подписан клиент: при подписке и при каждом изменении.</summary>
+public sealed record ContainerMessage(long Object, IReadOnlyList<ItemData> Items) : ServerMessage
+{
+    /// <inheritdoc/>
+    public bool Equals(ContainerMessage? other) => other is not null && Object == other.Object && Items.SequenceEqual(other.Items);
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => Object.GetHashCode();
+}
+
+/// <summary>Контейнер больше не виден клиенту: отошёл, отписался или объект убран.</summary>
+public sealed record ContainerCloseMessage(long Object) : ServerMessage;
+
+/// <summary>Сущность начала действие: номер действия из ItemTable, тик начала, длительность в тиках и подпись - id что делается и над чем.</summary>
+public sealed record ActionStartedMessage(long Entity, int Action, long StartTick, int DurationTicks, string Verb = "", string Subject = "") : ServerMessage;
 
 /// <summary>Действие сущности закончилось: выполнено или прервано.</summary>
 public sealed record ActionEndedMessage(long Entity, bool Completed) : ServerMessage;
@@ -92,6 +106,25 @@ public sealed record ControlMessage(int Control, bool Pressed) : ClientMessage;
 
 /// <summary>Просьба начать действие предметом: id предмета и номер действия из ItemTable.</summary>
 public sealed record StartActionMessage(long ItemId, int Action) : ClientMessage;
+
+/// <summary>Контейнеры, содержимое которых клиент хочет видеть: ближние, пока открыто окно инвентаря; пустой список - отписка от всех.</summary>
+public sealed record WatchContainersMessage(IReadOnlyList<long> Objects) : ClientMessage
+{
+    /// <inheritdoc/>
+    public bool Equals(WatchContainersMessage? other) => other is not null && Objects.SequenceEqual(other.Objects);
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => Objects.Count;
+}
+
+/// <summary>Просьба построить или разобрать: цель постройки.</summary>
+public sealed record BuildMessage(BuildTarget Target) : ClientMessage;
+
+/// <summary>Просьба начать крафт по рецепту: номер рецепта из ItemTable.</summary>
+public sealed record StartCraftMessage(int Recipe) : ClientMessage;
+
+/// <summary>Просьба переложить предмет: откуда и куда, 0 - свой инвентарь, иначе id объекта-контейнера.</summary>
+public sealed record MoveItemMessage(long Item, long From, long To) : ClientMessage;
 
 /// <summary>Просьба прервать своё действие.</summary>
 public sealed record CancelActionMessage : ClientMessage;

@@ -14,10 +14,11 @@
         { "floor": "core:wood_floor", "x": 2, "y": 2, "w": 10, "h": 10 },
         { "walls": "core:wood_wall", "x": 4, "y": 4, "w": 6, "h": 5 },
         { "door": "core:wood_door", "x": 6, "y": 8, "side": "south" },
-        // Мебель комнаты: стол у северной стены, шкаф в северо-восточном углу, ящик в юго-восточном
+        // Мебель комнаты: стол у северной стены, шкаф с инструментами и гвоздями в северо-восточном углу,
+        // ящик с яблоками и брёвнами в юго-восточном
         { "object": "core:table", "x": 4, "y": 4 },
-        { "object": "core:wardrobe", "x": 9, "y": 4 },
-        { "object": "core:crate", "x": 9, "y": 8 },
+        { "object": "core:wardrobe", "x": 9, "y": 4, "items": ["core:saw", "core:hammer", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails", "core:nails"] },
+        { "object": "core:crate", "x": 9, "y": 8, "items": ["core:apple", "core:apple", "core:log", "core:log"] },
       ],
     },
   ],

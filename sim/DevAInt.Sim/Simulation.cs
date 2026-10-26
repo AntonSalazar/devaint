@@ -17,6 +17,9 @@ namespace DevAInt.Sim;
 /// <summary>Ядро sim: время, мир, сущности со статами, движением и действиями, Lua-моды.</summary>
 public sealed class Simulation
 {
+    /// <summary>Действие, которым идут постройка и разбор.</summary>
+    public const string BuildAction = "core:build";
+
     /// <summary>Движение короче этого не прерывает действия: стик геймпада в покое чуть дрожит.</summary>
     private const double MoveThreshold = 0.01;
 
@@ -73,13 +76,14 @@ public sealed class Simulation
         // Постройка карты - не изменения для клиентов: они получат мир снимками чанков
         World.ClearChanges();
         Clock = clock ?? new GameClock();
-        _lua = new LuaHost(StatTable, FindStats, () => _order, log);
+        _lua = new LuaHost(StatTable, FindStats, () => _order, this, log);
         ScriptErrors = _lua.Load(mods.Mods);
 
-        // Существа карты появляются только в новом мире: в сохранённом они уже есть
+        // Существа и предметы контейнеров карты появляются только в новом мире: в сохранённом они уже есть
         if (world is null && map is not null)
         {
             SpawnMapCreatures(map, log);
+            FillMapContainers(map, mods.Defs);
         }
     }
 
@@ -180,6 +184,109 @@ public sealed class Simulation
         return item.Id;
     }
 
+    /// <summary>Новый объект вида objectId в клетке cell с поворотом rotation; null и причина в problem, если вида нет или места нет.</summary>
+    public WorldObject? PlaceObject(string objectId, CellPos cell, int rotation, out string? problem)
+    {
+        if (!WorldTable.TryObjectIndex(objectId, out ushort index))
+        {
+            problem = $"unknown object {objectId}";
+            return null;
+        }
+
+        WorldObject obj = WorldObject.Create(World.NextObjectId, index, WorldTable.Object(index), cell, rotation);
+        problem = World.Contains(cell) ? World.PlaceProblem(obj) : $"cell {cell.X},{cell.Y},{cell.Z} is outside the world";
+        if (problem is not null)
+        {
+            return null;
+        }
+
+        World.PlaceObject(obj);
+        return obj;
+    }
+
+    /// <summary>Новый предмет вида itemId в контейнер объекта; null и причина в problem, если вида нет, объект не контейнер или места нет.</summary>
+    public long? AddToContainer(long objectId, string itemId, out string? problem)
+    {
+        if (!ItemTable.TryItemIndex(itemId, out int index))
+        {
+            problem = $"unknown item {itemId}";
+            return null;
+        }
+
+        ItemDef def = ItemTable.Item(index);
+        if (World.Container(objectId) is not Inventory container)
+        {
+            problem = $"object {objectId} is not a container";
+            return null;
+        }
+
+        if (container.Weight + def.Weight > World.FindObject(objectId)!.Capacity + 1e-9)
+        {
+            problem = $"object {objectId} is full";
+            return null;
+        }
+
+        Item item = new(NextItemId++, def);
+        container.Add(item);
+        MarkContainerDirty(objectId);
+        problem = null;
+        return item.Id;
+    }
+
+    /// <summary>Удаление предмета из контейнера объекта, false если предмета там нет.</summary>
+    public bool RemoveFromContainer(long objectId, long itemId)
+    {
+        if (World.Container(objectId)?.Remove(itemId) != true)
+        {
+            return false;
+        }
+
+        MarkContainerDirty(objectId);
+        return true;
+    }
+
+    /// <summary>Перекладывание предмета между своим инвентарём, 0, и контейнерами объектов по id: оба места в досягаемости, у цели хватает вместимости.</summary>
+    public ItemMove MoveItem(long entityId, long itemId, long from, long to)
+    {
+        Entity entity = _entities[entityId];
+        if (from == to)
+        {
+            return ItemMove.SamePlace;
+        }
+
+        if (Place(entity, from, out Inventory? source, out _) is ItemMove sourceProblem)
+        {
+            return sourceProblem;
+        }
+
+        if (Place(entity, to, out Inventory? target, out double capacity) is ItemMove targetProblem)
+        {
+            return targetProblem;
+        }
+
+        if (source!.Find(itemId) is not Item item)
+        {
+            return ItemMove.NoItem;
+        }
+
+        if (entity.Action?.ItemId == itemId)
+        {
+            return ItemMove.InUse;
+        }
+
+        // Малый запас на сумму дробных весов: десять яблок по 0.2 ровно влезают в 2 кг
+        if (target!.Weight + item.Def.Weight > capacity + 1e-9)
+        {
+            return ItemMove.Full;
+        }
+
+        source.Remove(itemId);
+        target.Add(item);
+        MarkContainerDirty(from);
+        MarkContainerDirty(to);
+        return ItemMove.Moved;
+    }
+
     /// <summary>Попытка начать действие предметом; действие идёт с текущего тика.</summary>
     public ActionStart StartAction(long entityId, long itemId, string actionId)
     {
@@ -203,6 +310,56 @@ public sealed class Simulation
         // Длительность в тиках по секундам симуляции: ускорение времени ускоряет и действия
         int ticks = Math.Max(1, (int)Math.Ceiling(use.Seconds / Clock.SecondsPerTick));
         entity.Action = new ActionState(ItemTable.Action(ItemTable.ActionIndex(actionId)), use, itemId, Clock.Tick, ticks);
+        return ActionStart.Started;
+    }
+
+    /// <summary>Попытка начать крафт по рецепту: входы и инструменты в своём инвентаре, результат влезает по весу.</summary>
+    public ActionStart StartCraft(long entityId, string recipeId)
+    {
+        Entity entity = _entities[entityId];
+        if (entity.Action is not null)
+        {
+            return ActionStart.Busy;
+        }
+
+        if (!ItemTable.TryRecipeIndex(recipeId, out int index))
+        {
+            return ActionStart.NoUse;
+        }
+
+        RecipeDef recipe = ItemTable.Recipe(index);
+        if (CraftProblem(entity, recipe) is ActionStart problem)
+        {
+            return problem;
+        }
+
+        int ticks = Math.Max(1, (int)Math.Ceiling(recipe.Seconds / Clock.SecondsPerTick));
+        entity.Action = new ActionState(ItemTable.Action(ItemTable.ActionIndex(recipe.Action)), null, 0, Clock.Tick, ticks) { Recipe = recipe };
+        return ActionStart.Started;
+    }
+
+    /// <summary>Попытка начать постройку или разбор: место по правилам Building, материалы и инструменты в своём инвентаре, возврат разбора влезает по весу.</summary>
+    public ActionStart StartBuild(long entityId, BuildTarget target)
+    {
+        Entity entity = _entities[entityId];
+        if (entity.Action is not null)
+        {
+            return ActionStart.Busy;
+        }
+
+        if (!ItemTable.TryActionIndex(BuildAction, out int action))
+        {
+            return ActionStart.NoUse;
+        }
+
+        if (BuildProblem(entity, target) is ActionStart problem)
+        {
+            return problem;
+        }
+
+        BuildDef def = Building.Def(World, WorldTable, target)!;
+        int ticks = Math.Max(1, (int)Math.Ceiling(def.Seconds / Clock.SecondsPerTick));
+        entity.Action = new ActionState(ItemTable.Action(action), null, 0, Clock.Tick, ticks) { Build = target };
         return ActionStart.Started;
     }
 
@@ -355,6 +512,54 @@ public sealed class Simulation
 
     /// <summary>Точка появления игрока: ответ хука choose_spawn или случайная точка карты.</summary>
     private CellPos ChooseSpawn(string playerId) => _lua.ChooseSpawn(playerId, SpawnPoints) is int chosen ? SpawnPoints[chosen] : SpawnPoints[_random.Next(SpawnPoints.Count)];
+
+    /// <summary>Стартовые предметы в контейнеры объектов карты, которые встали на место.</summary>
+    private void FillMapContainers(MapDef map, DefDatabase defs)
+    {
+        foreach (MapOpDef op in map.Build.Where(op => op.Object is not null && op.Items.Count > 0))
+        {
+            // Объект без места пропущен постройкой, тогда в клетке другой объект или ничего
+            WorldObject? obj = World.ObjectAt(new CellPos(op.X, op.Y, op.Z));
+            if (obj is null || obj.Cell != new CellPos(op.X, op.Y, op.Z) || World.Container(obj.Id) is not Inventory container)
+            {
+                continue;
+            }
+
+            foreach (string item in op.Items)
+            {
+                container.Add(new Item(NextItemId++, defs.Get<ItemDef>(item)));
+            }
+        }
+    }
+
+    /// <summary>Инвентарь места: своё, 0, или контейнер объекта в досягаемости; null - место годится, иначе причина отказа.</summary>
+    private ItemMove? Place(Entity entity, long place, out Inventory? inventory, out double capacity)
+    {
+        if (place == 0)
+        {
+            inventory = entity.Inventory;
+            capacity = entity.Creature?.Inventory?.Capacity ?? double.PositiveInfinity;
+            return null;
+        }
+
+        inventory = World.Container(place);
+        capacity = World.FindObject(place)?.Capacity ?? 0;
+        if (inventory is null)
+        {
+            return ItemMove.NoContainer;
+        }
+
+        return Reach.CanReach(World, entity.Position, World.FindObject(place)!) ? null : ItemMove.OutOfReach;
+    }
+
+    /// <summary>Регион контейнера нужно переписать при сохранении; своё место, 0, лежит в сущности.</summary>
+    private void MarkContainerDirty(long place)
+    {
+        if (place != 0 && World.FindObject(place) is WorldObject obj)
+        {
+            World.MarkRegionDirty(World.RegionOf(obj.Cell));
+        }
+    }
 
     /// <summary>Существа карты в центрах своих клеток; клетка без пола - ошибка в лог, существа пропускаются.</summary>
     private void SpawnMapCreatures(MapDef map, ISimLog log)
@@ -512,7 +717,85 @@ public sealed class Simulation
             return;
         }
 
-        foreach (StatChangeDef change in action.Use.Stats)
+        entity.Action = null;
+        entity.LastActionEnd = action switch
+        {
+            { Recipe: RecipeDef recipe } => CompleteRecipe(entity, recipe),
+            { Build: BuildTarget target } => CompleteBuild(entity, target),
+            _ => CompleteUse(entity, action),
+        };
+    }
+
+    /// <summary>Окончание постройки или разбора: всё проверяется заново, потом материалы тратятся или возвращаются и мир меняется.</summary>
+    private ActionEnd CompleteBuild(Entity entity, BuildTarget target)
+    {
+        if (BuildProblem(entity, target) is not null)
+        {
+            return ActionEnd.Interrupted;
+        }
+
+        BuildDef def = Building.Def(World, WorldTable, target)!;
+        switch (target.Kind)
+        {
+            case BuildKind.Object:
+                Crafting.Take(entity.Inventory, def.Inputs);
+                World.PlaceObject(WorldObject.Create(World.NextObjectId, target.Def, WorldTable.Object(target.Def), target.Cell, target.Turn));
+                break;
+            case BuildKind.Wall:
+                Crafting.Take(entity.Inventory, def.Inputs);
+                World.SetEdge(target.Cell, target.Side, new Edge(target.Def, false));
+                break;
+            case BuildKind.RemoveObject:
+                World.RemoveObject(World.ObjectAt(target.Cell)!.Id);
+                GiveAll(entity, Building.Refund(def));
+                break;
+            default:
+                World.SetEdge(target.Cell, target.Side, Edge.None);
+                GiveAll(entity, Building.Refund(def));
+                break;
+        }
+
+        return ActionEnd.Completed;
+    }
+
+    /// <summary>Почему постройку или разбор нельзя начать или закончить: место, материалы и инструменты, вес возврата; null - можно.</summary>
+    private ActionStart? BuildProblem(Entity entity, BuildTarget target)
+    {
+        IEnumerable<(WorldPos Position, double Radius)> bodies = _order.Select(other => (other.Position, other.Body.Radius));
+        if (Building.Problem(World, WorldTable, target, entity.Position, bodies) is not null)
+        {
+            return ActionStart.BadPlace;
+        }
+
+        BuildDef def = Building.Def(World, WorldTable, target)!;
+        bool removing = target.Kind is BuildKind.RemoveObject or BuildKind.RemoveWall;
+        if (Crafting.Missing(removing ? [] : def.Inputs, def.Tools, Crafting.Counts(entity.Inventory)) is not null)
+        {
+            return ActionStart.NoItem;
+        }
+
+        double capacity = entity.Creature?.Inventory?.Capacity ?? double.PositiveInfinity;
+        bool fits = !removing || entity.Inventory.Weight + Crafting.Weight(Building.Refund(def), ItemTable) <= capacity + 1e-9;
+        return fits ? null : ActionStart.Full;
+    }
+
+    /// <summary>Новые предметы по списку в инвентарь сущности.</summary>
+    private void GiveAll(Entity entity, IReadOnlyList<ItemCountDef> items)
+    {
+        foreach (ItemCountDef entry in items)
+        {
+            ItemDef def = ItemTable.Item(ItemTable.ItemIndex(entry.Item));
+            for (int i = 0; i < entry.Count; i++)
+            {
+                entity.Inventory.Add(new Item(NextItemId++, def));
+            }
+        }
+    }
+
+    /// <summary>Окончание применения предмета: статы и трата предмета.</summary>
+    private ActionEnd CompleteUse(Entity entity, ActionState action)
+    {
+        foreach (StatChangeDef change in action.Use!.Stats)
         {
             int stat = StatTable.StatIndex(change.Stat);
             entity.Stats.SetValue(stat, entity.Stats.Value(stat) + change.Add);
@@ -523,8 +806,41 @@ public sealed class Simulation
             entity.Inventory.Remove(action.ItemId);
         }
 
-        entity.Action = null;
-        entity.LastActionEnd = ActionEnd.Completed;
+        return ActionEnd.Completed;
+    }
+
+    /// <summary>Окончание крафта: входы тратятся, выходы появляются; если за время крафта материалы ушли или место кончилось - прервано.</summary>
+    private ActionEnd CompleteRecipe(Entity entity, RecipeDef recipe)
+    {
+        if (CraftProblem(entity, recipe) is not null)
+        {
+            return ActionEnd.Interrupted;
+        }
+
+        Crafting.Take(entity.Inventory, recipe.Inputs);
+        foreach (ItemCountDef output in recipe.Outputs)
+        {
+            ItemDef def = ItemTable.Item(ItemTable.ItemIndex(output.Item));
+            for (int i = 0; i < output.Count; i++)
+            {
+                entity.Inventory.Add(new Item(NextItemId++, def));
+            }
+        }
+
+        return ActionEnd.Completed;
+    }
+
+    /// <summary>Почему крафт по рецепту нельзя начать или закончить: нет материалов или результат не влезет; null - можно.</summary>
+    private ActionStart? CraftProblem(Entity entity, RecipeDef recipe)
+    {
+        if (Crafting.Missing(recipe.Inputs, recipe.Tools, Crafting.Counts(entity.Inventory)) is not null)
+        {
+            return ActionStart.NoItem;
+        }
+
+        double capacity = entity.Creature?.Inventory?.Capacity ?? double.PositiveInfinity;
+        double after = entity.Inventory.Weight - Crafting.Weight(recipe.Inputs, ItemTable) + Crafting.Weight(recipe.Outputs, ItemTable);
+        return after > capacity + 1e-9 ? ActionStart.Full : null;
     }
 
     /// <summary>Статы сущности или null.</summary>
