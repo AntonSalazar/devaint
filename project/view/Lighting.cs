@@ -6,10 +6,16 @@ public static class Lighting
     /// <summary>Дальность теней солнца: камера в 20 м от персонажа плюс глубина кадра.</summary>
     public const float ShadowDistance = 30f;
 
+    /// <summary>С какой глубины в метрах начинается туман: дальше камеры изометрии, её кадр он не трогает.</summary>
+    public const float FogBegin = 60f;
+
+    /// <summary>Глубина, где туман закрывает всё: дальность камер из-за плеча и от первого лица.</summary>
+    public const float FogEnd = ShoulderCamera.FarDistance;
+
     /// <summary>Цвет фона за картой, им же залито неизведанное.</summary>
     public static readonly Color Background = new(0.08f, 0.09f, 0.11f);
 
-    /// <summary>Окружение: тёмный фон и мягкий рассеянный свет.</summary>
+    /// <summary>Окружение: тёмный фон, мягкий рассеянный свет и туман по глубине, который прячет край присланного мира.</summary>
     public static WorldEnvironment CreateEnvironment()
     {
         return new WorldEnvironment
@@ -22,6 +28,13 @@ public static class Lighting
                 AmbientLightSource = Environment.AmbientSource.Color,
                 AmbientLightColor = new Color(0.75f, 0.78f, 0.85f),
                 AmbientLightEnergy = 0.6f,
+                FogEnabled = true,
+                FogMode = Environment.FogModeEnum.Depth,
+                FogLightColor = Background,
+                FogDensity = 1f,
+                FogSunScatter = 0f,
+                FogDepthBegin = FogBegin,
+                FogDepthEnd = FogEnd,
             },
         };
     }

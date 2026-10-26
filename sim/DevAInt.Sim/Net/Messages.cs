@@ -78,8 +78,8 @@ public abstract record ClientMessage;
 /// <summary>Первое сообщение клиента: кто играет; по id сервер возвращает сохранённого персонажа.</summary>
 public sealed record HelloMessage(string PlayerId) : ClientMessage;
 
-/// <summary>Ввод движения: номер по порядку, направление и точка под курсором на земле.</summary>
-public sealed record InputMessage(uint Sequence, float X, float Y, float AimX = 0, float AimY = 0) : ClientMessage;
+/// <summary>Ввод движения: номер по порядку, направление, точка под курсором на земле и смотреть ли на неё без прицела.</summary>
+public sealed record InputMessage(uint Sequence, float X, float Y, float AimX = 0, float AimY = 0, bool FaceAim = false) : ClientMessage;
 
 /// <summary>Действие управления нажато или отпущено: номер из ControlTable.</summary>
 public sealed record ControlMessage(int Control, bool Pressed) : ClientMessage;

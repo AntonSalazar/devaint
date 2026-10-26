@@ -77,6 +77,25 @@ public class EntityViewTest : TestCase
         other.Free();
     }
 
+    /// <summary>От первого лица своя капсула только отбрасывает тень и теряет кольцо; обратно - всё как было.</summary>
+    public void TestFirstPerson()
+    {
+        EntityView own = new();
+        own.Init(1, true, Vector3.Zero, Colors.Blue);
+        GeometryInstance3D body = own.GetNode<GeometryInstance3D>("Visual/Body");
+
+        own.SetFirstPerson(true);
+        GeometryInstance3D.ShadowCastingSetting hidden = body.CastShadow;
+        bool ringHidden = !own.GetNode<Node3D>("Ring").Visible;
+        own.SetFirstPerson(false);
+
+        CheckEqual(GeometryInstance3D.ShadowCastingSetting.ShadowsOnly, hidden, "body only casts a shadow");
+        Check(ringHidden, "ring is hidden");
+        CheckEqual(GeometryInstance3D.ShadowCastingSetting.On, body.CastShadow, "body is back");
+        Check(own.GetNode<Node3D>("Ring").Visible, "ring is back");
+        own.Free();
+    }
+
     /// <summary>Чужая капсула смотрит по движению, своя - только по SetFacing, короткое направление взгляд не меняет.</summary>
     public void TestFacing()
     {

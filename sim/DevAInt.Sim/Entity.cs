@@ -26,6 +26,9 @@ public sealed class Entity(long id, StatSet stats, WorldPos position, CreatureDe
     /// <summary>Целится ли: взгляд идёт за точкой прицела, а не за движением.</summary>
     public bool Aiming { get; internal set; }
 
+    /// <summary>Смотрит ли на точку прицела без зажатого прицела: так просит вид от первого лица.</summary>
+    public bool FacesAim { get; internal set; }
+
     /// <summary>Точка под курсором игрока на земле, null пока клиент её не прислал.</summary>
     public WorldPos? AimPoint { get; internal set; }
 

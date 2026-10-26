@@ -34,6 +34,26 @@ public class ControlTest
         Assert.False(own.Aiming);
     }
 
+    /// <summary>Вид от первого лица просит смотреть на точку прицела: взгляд идёт за ней без зажатого прицела, но удар всё так же требует прицела.</summary>
+    [Fact]
+    public void FaceAimTurnsWithoutAiming()
+    {
+        NetRun run = new();
+        GameClient client = run.Connect();
+        run.Tick(1, client);
+        Entity own = run.Sim.Entity(client.Replica.OwnEntityId);
+
+        client.SendInput(new MoveInput(0, 1), new WorldPos(own.Position.X + 3, own.Position.Y, 0), faceAim: true);
+        run.Tick(1, client);
+        (double facedX, _) = own.Facing;
+        client.SendInput(new MoveInput(0, 1), new WorldPos(own.Position.X + 3, own.Position.Y, 0));
+        run.Tick(1, client);
+
+        Assert.Equal(1, facedX, 2);
+        Assert.Equal((0.0, 1.0), own.Facing);
+        Assert.False(own.Aiming);
+    }
+
     /// <summary>Удар без прицела не проходит, с прицелом проходит.</summary>
     [Fact]
     public void AttackNeedsAim()

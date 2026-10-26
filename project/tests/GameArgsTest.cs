@@ -13,6 +13,13 @@ public class GameArgsTest : TestCase
         CheckEqual(1.0, GameArgs.TimeScale(["--time-scale", "Infinity"]), "infinite");
     }
 
+    /// <summary>Режим камеры из --camera, без аргумента - null.</summary>
+    public void TestCamera()
+    {
+        CheckEqual("first", GameArgs.Camera(["--camera", "first"]), "first person");
+        CheckEqual(null, GameArgs.Camera([]), "default");
+    }
+
     /// <summary>Порт из --port N в пределах 1..65535, иначе порт по умолчанию.</summary>
     public void TestPort()
     {

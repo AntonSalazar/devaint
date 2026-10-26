@@ -88,6 +88,20 @@ public class GameInputTest : TestCase
         camera.Free();
     }
 
+    /// <summary>Прицел: луч вниз - точка на полу; луч вверх, назад или на пол слишком далеко - точка в 10 м вперёд по взгляду.</summary>
+    public void TestAimPoint()
+    {
+        Vector3 eye = new(0, 1.6f, 0);
+
+        Vector3 down = GameInput.AimPoint(eye, new Vector3(0, -1.6f, 2).Normalized(), 0);
+        Vector3 up = GameInput.AimPoint(eye, new Vector3(0, 1, 1).Normalized(), 0);
+        Vector3 far = GameInput.AimPoint(eye, new Vector3(0, -0.01f, 1).Normalized(), 0);
+
+        CheckEqual(new Vector3(0, 0, 2), Round(down), "floor point");
+        CheckEqual(new Vector3(0, 0, GameInput.AimFallbackDistance), Round(up), "above the horizon");
+        CheckEqual(new Vector3(0, 0, GameInput.AimFallbackDistance), Round(far), "floor too far");
+    }
+
     /// <summary>Действия регистрируются один раз с клавишами WASD и стрелками.</summary>
     public void TestActionsAreRegistered()
     {
@@ -101,4 +115,7 @@ public class GameInputTest : TestCase
         }
 
     }
+
+    /// <summary>Вектор, округлённый до тысячных.</summary>
+    private static Vector3 Round(Vector3 vector) => new(Mathf.Snapped(vector.X, 1e-3f), Mathf.Snapped(vector.Y, 1e-3f), Mathf.Snapped(vector.Z, 1e-3f));
 }

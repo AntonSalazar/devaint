@@ -25,7 +25,16 @@ public static class GameInput
     /// <summary>Выйти из игры.</summary>
     public const string Quit = "quit";
 
-    /// <summary>Регистрация движения WASD и стрелками, зума колёсиком и выхода по Esc, если их ещё нет; остальное управление задают моды.</summary>
+    /// <summary>Следующий режим камеры.</summary>
+    public const string CameraMode = "camera_mode";
+
+    /// <summary>Куда смотрит прицел, если луч не попал в пол рядом: столько метров вперёд по взгляду.</summary>
+    public const float AimFallbackDistance = 10f;
+
+    /// <summary>Дальше этого по земле точка на полу для прицела не берётся.</summary>
+    public const float AimMaxDistance = 30f;
+
+    /// <summary>Регистрация движения WASD и стрелками, зума колёсиком, смены камеры на V и выхода по Esc, если их ещё нет; остальное управление задают моды.</summary>
     public static void EnsureActions()
     {
         Add(Up, Key.W, Key.Up);
@@ -33,6 +42,7 @@ public static class GameInput
         Add(Left, Key.A, Key.Left);
         Add(Right, Key.D, Key.Right);
         Add(Quit, Key.Escape);
+        Add(CameraMode, Key.V);
         AddMouse(ZoomIn, MouseButton.WheelUp);
         AddMouse(ZoomOut, MouseButton.WheelDown);
     }
@@ -76,6 +86,23 @@ public static class GameInput
 
         float distance = (height - origin.Y) / direction.Y;
         return origin + (direction * distance);
+    }
+
+    /// <summary>Точка прицела на полу высоты height по лучу камеры; если пол дальше AimMaxDistance или луч смотрит выше горизонта - точка в AimFallbackDistance вперёд по взгляду.</summary>
+    public static Vector3 AimPoint(Vector3 origin, Vector3 direction, float height)
+    {
+        // Луч назад от камеры попадает в пол за спиной: такая точка тоже не годится
+        if (direction.Y < 0 && GroundPoint(origin, direction, height) is Vector3 ground)
+        {
+            Vector3 along = ground - origin;
+            if (new Vector2(along.X, along.Z).Length() <= AimMaxDistance)
+            {
+                return ground;
+            }
+        }
+
+        Vector3 ahead = origin + (Flat(direction) * AimFallbackDistance);
+        return new Vector3(ahead.X, height, ahead.Z);
     }
 
     /// <summary>Вектор по земле единичной длины, ноль если он смотрит строго вверх или вниз.</summary>

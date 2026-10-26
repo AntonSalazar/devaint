@@ -1,7 +1,8 @@
+using DevAInt.Sim.Grid;
 using Godot;
 
-/// <summary>Ортографическая изометрическая камера, которая следует за точкой.</summary>
-public partial class IsoCamera : Camera3D
+/// <summary>Ортографическая изометрическая камера, которая следует за точкой; с туманом войны и срезом стен.</summary>
+public partial class IsoCamera : GameCamera
 {
     /// <summary>Наклон изометрии: угол, под которым видна диагональ куба.</summary>
     public const float Pitch = 35.264f;
@@ -30,6 +31,15 @@ public partial class IsoCamera : Camera3D
     /// <summary>Точка, на которую смотрит камера сейчас.</summary>
     private Vector3 _focus;
 
+    /// <summary>Затемнение по видимости и туман войны.</summary>
+    public override bool UsesFog => true;
+
+    /// <summary>Стены, закрывающие персонажа, срезаются.</summary>
+    public override bool CutsWalls => true;
+
+    /// <summary>Мышь свободна: прицел идёт за курсором.</summary>
+    public override bool CapturesMouse => false;
+
     /// <summary>Настройка проекции и углов; вызывается сразу после создания.</summary>
     public void Init(Vector3 focus)
     {
@@ -42,7 +52,7 @@ public partial class IsoCamera : Camera3D
     }
 
     /// <summary>Зум на steps щелчков: плюс - приближение, минус - отдаление, в пределах MinSize и MaxSize.</summary>
-    public void Zoom(int steps) => Size = Mathf.Clamp(Size / Mathf.Pow(ZoomStep, steps), MinSize, MaxSize);
+    public override void Zoom(int steps) => Size = Mathf.Clamp(Size / Mathf.Pow(ZoomStep, steps), MinSize, MaxSize);
 
     /// <summary>Мгновенный перенос на точку.</summary>
     public void SnapTo(Vector3 focus)
@@ -50,6 +60,15 @@ public partial class IsoCamera : Camera3D
         _focus = focus;
         Position = _focus + (Basis.Z * Distance);
     }
+
+    /// <summary>Мгновенный перенос на ноги; взгляд изометрии не меняет.</summary>
+    public override void Place(Vector3 feet, Vector3 facing) => SnapTo(feet);
+
+    /// <summary>Плавное следование за ногами; стены и прицел изометрии не мешают.</summary>
+    public override void Follow(Vector3 feet, World? world, bool aiming, double delta) => Follow(feet, delta);
+
+    /// <summary>Прицел идёт через курсор мыши.</summary>
+    public override Vector2 AimScreenPoint(Vector2 mouse, Vector2 screen) => mouse;
 
     /// <summary>Плавное следование за точкой за delta секунд.</summary>
     public void Follow(Vector3 target, double delta)

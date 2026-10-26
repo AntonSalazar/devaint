@@ -63,12 +63,12 @@ public sealed class GameClient
         }
     }
 
-    /// <summary>Отправка ввода движения с новым номером и точкой под курсором; своя сущность сразу двигается по предсказанию.</summary>
-    public void SendInput(MoveInput input, WorldPos? aim = null)
+    /// <summary>Отправка ввода движения с новым номером, точкой под курсором и просьбой смотреть на неё; своя сущность сразу двигается по предсказанию.</summary>
+    public void SendInput(MoveInput input, WorldPos? aim = null, bool faceAim = false)
     {
         _inputSequence++;
         WorldPos point = aim ?? default;
-        _connection.Send(Protocol.Write(new InputMessage(_inputSequence, (float)input.X, (float)input.Y, (float)point.X, (float)point.Y)));
+        _connection.Send(Protocol.Write(new InputMessage(_inputSequence, (float)input.X, (float)input.Y, (float)point.X, (float)point.Y, faceAim)));
 
         // Предсказание идёт по тому же числу во float, которое получит сервер
         MoveInput sent = new((float)input.X, (float)input.Y);

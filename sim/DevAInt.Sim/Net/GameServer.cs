@@ -148,6 +148,7 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
             Entity entity = _sim.Entity(client.EntityId);
             entity.Input = new MoveInput(input.X, input.Y);
             entity.AimPoint = new WorldPos(input.AimX, input.AimY, entity.Position.Z);
+            entity.FacesAim = input.FaceAim;
             client.LastInput = input.Sequence;
         }
     }

@@ -102,6 +102,29 @@ public partial class EntityView : Node3D
     /// <summary>Насколько существо проявлено: 0 - скрыто, 1 - видно целиком.</summary>
     public float Shown { get; private set; } = 1;
 
+    /// <summary>Вид от первого лица: тело и нос только отбрасывают тень, кольца нет, камера внутри капсулы.</summary>
+    public bool FirstPerson { get; private set; }
+
+    /// <summary>Включение и выключение вида от первого лица; повторный вызов с тем же значением ничего не меняет.</summary>
+    public void SetFirstPerson(bool on)
+    {
+        if (on == FirstPerson)
+        {
+            return;
+        }
+
+        FirstPerson = on;
+        foreach (Node child in _visual.GetChildren())
+        {
+            ((GeometryInstance3D)child).CastShadow = on ? GeometryInstance3D.ShadowCastingSetting.ShadowsOnly : GeometryInstance3D.ShadowCastingSetting.On;
+        }
+
+        if (GetNodeOrNull<Node3D>("Ring") is Node3D ring)
+        {
+            ring.Visible = !on;
+        }
+    }
+
     /// <summary>Видно ли существо своему персонажу: оно плавно появляется или исчезает.</summary>
     public void SetSeen(bool seen) => _shownTarget = seen ? 1 : 0;
 

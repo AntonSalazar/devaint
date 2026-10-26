@@ -111,6 +111,20 @@ public class NavigationTest
         Assert.False(Sight.Clear(world, inside, outside with { Z = 1 }));
     }
 
+    /// <summary>Доля пути до стены: ровно на ребре клетки; свободный путь и путь вдоль стены - null.</summary>
+    [Fact]
+    public void BlockedGivesShareOfPath()
+    {
+        World world = Room(doorOpen: false);
+        WorldPos inside = WorldPos.CenterOf(Cell(5, 4));
+        WorldPos outside = WorldPos.CenterOf(Cell(5, 8));
+
+        // Стена комнаты на южном ребре клетки 5, 6: от y 4.5 до y 7 - 2.5 из 4 м пути
+        Assert.Equal(2.5 / 4, Sight.Blocked(world, inside, outside)!.Value, 6);
+        Assert.Null(Sight.Blocked(world, WorldPos.CenterOf(Cell(1, 8)), outside));
+        Assert.Null(Sight.Blocked(world, inside, WorldPos.CenterOf(Cell(5, 5))));
+    }
+
     /// <summary>Каждый шаг пути - сосед, через которого можно пройти.</summary>
     private static void AssertSteps(World world, CellPos from, List<CellPos> path)
     {

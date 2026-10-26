@@ -48,6 +48,9 @@ public static class GameArgs
     /// <summary>Язык из --lang CODE, по умолчанию английский.</summary>
     public static string Language(string[] args) => Value(args, "--lang") ?? GameLocale.DefaultLanguage;
 
+    /// <summary>Режим камеры при запуске из --camera iso|shoulder|first, null - изометрия.</summary>
+    public static string? Camera(string[] args) => Value(args, "--camera");
+
     /// <summary>Значение после имени аргумента или null.</summary>
     private static string? Value(string[] args, string name)
     {

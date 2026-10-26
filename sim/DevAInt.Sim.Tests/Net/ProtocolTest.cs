@@ -70,7 +70,7 @@ public class ProtocolTest
     [Fact]
     public void ClientMessagesRoundTrip()
     {
-        ClientMessage[] messages = [new InputMessage(uint.MaxValue, -0.5f, 1f), new StartActionMessage(123_456_789, 3), new CancelActionMessage(), new ControlMessage(7, true), new InputMessage(3, 1, 0, 12.5f, -4f), new HelloMessage("anna")];
+        ClientMessage[] messages = [new InputMessage(uint.MaxValue, -0.5f, 1f), new StartActionMessage(123_456_789, 3), new CancelActionMessage(), new ControlMessage(7, true), new InputMessage(3, 1, 0, 12.5f, -4f), new InputMessage(4, 0, 1, 2f, 3f, FaceAim: true), new HelloMessage("anna")];
 
         foreach (ClientMessage message in messages)
         {

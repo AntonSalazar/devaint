@@ -42,8 +42,11 @@ public partial class GameRoot : Node3D
     /// <summary>Вид мира.</summary>
     private WorldView? _view;
 
-    /// <summary>Камера.</summary>
-    private IsoCamera? _camera;
+    /// <summary>Камеры и текущий режим.</summary>
+    private CameraRig? _cameras;
+
+    /// <summary>Режим камеры при запуске из аргументов.</summary>
+    private string? _startCamera;
 
     /// <summary>HUD своего персонажа.</summary>
     private Hud? _hud;
@@ -143,10 +146,11 @@ public partial class GameRoot : Node3D
         _controls = new GameControls(tables.Controls, _log);
         _controls.Register();
         _autoWalk = args.Contains("--autowalk");
+        _startCamera = GameArgs.Camera(args);
         BuildScene(tables, world);
     }
 
-    /// <summary>Ввод, который не съел интерфейс: зум колёсиком и выход по Esc.</summary>
+    /// <summary>Ввод, который не съел интерфейс: зум колёсиком, поворот камеры мышью, смена камеры и выход по Esc.</summary>
     public override void _UnhandledInput(InputEvent input)
     {
         if (input.IsActionPressed(GameInput.Quit))
@@ -155,17 +159,34 @@ public partial class GameRoot : Node3D
             return;
         }
 
+        if (_cameras is null)
+        {
+            return;
+        }
+
+        if (input.IsActionPressed(GameInput.CameraMode))
+        {
+            SwitchCamera();
+            return;
+        }
+
+        if (input is InputEventMouseMotion motion && _cameras.Camera.CapturesMouse)
+        {
+            _cameras.Camera.Turn(motion.Relative);
+            return;
+        }
+
         int steps = GameInput.ZoomSteps(input);
         if (steps != 0)
         {
-            _camera?.Zoom(steps);
+            _cameras.Camera.Zoom(steps);
         }
     }
 
     /// <summary>Кадр: сеть, тики по накопленному времени, интерполяция и камера.</summary>
     public override void _Process(double delta)
     {
-        if (_client is null || _view is null || _camera is null || _hud is null)
+        if (_client is null || _view is null || _cameras is null || _hud is null)
         {
             return;
         }
@@ -179,9 +200,9 @@ public partial class GameRoot : Node3D
 
         for (int ticks = _timer.Advance(delta); ticks > 0; ticks--)
         {
-            MoveInput input = ReadInput(_camera);
+            MoveInput input = ReadInput(_cameras.Camera);
             WorldPos? aim = CursorPoint();
-            _client.SendInput(input, aim);
+            _client.SendInput(input, aim, _cameras.Camera.FacesAim);
             FaceOwn(input, aim);
             _server?.Tick();
             if (!UpdateClient(_client))
@@ -258,9 +279,10 @@ public partial class GameRoot : Node3D
         // После смерти своя сущность новая и стоит в точке появления: камера встаёт на неё сразу, без полёта
         _client.Replica.OwnEntityChanged += () => _cameraPlaced = false;
         AddChild(_view);
-        _camera = new IsoCamera();
-        _camera.Init(Vector3.Zero);
-        AddChild(_camera);
+        _cameras = new CameraRig();
+        _cameras.Init(_startCamera);
+        AddChild(_cameras);
+        ApplyCameraMode();
         _overlay = new VisibilityOverlay();
         _overlay.Init();
         _overlay.Visible = false;
@@ -288,13 +310,16 @@ public partial class GameRoot : Node3D
             return;
         }
 
+        // Память тумана копится во всех режимах камеры, чтобы при возврате в изометрию разведанное осталось
         if (_vision.Update(world, eye, (own.Facing.X, own.Facing.Z), vision))
         {
             _overlay!.Refresh(world, _vision.Seen, _vision.Map.Center);
         }
 
-        _overlay!.Visible = true;
-        _view.UpdateVisibility(_vision.Map);
+        // Из-за плеча и от первого лица видно то, что видит камера: стены закрывают сами
+        bool fog = _cameras!.Camera.UsesFog;
+        _overlay!.Visible = fog;
+        _view.UpdateVisibility(fog ? _vision.Map : null);
     }
 
     /// <summary>Глаза для затемнения каждый кадр по плавному положению и взгляду своей капсулы.</summary>
@@ -344,39 +369,65 @@ public partial class GameRoot : Node3D
     /// <summary>Камера и срез стен идут за своей капсулой; при первом появлении камера встаёт на неё сразу.</summary>
     private void FollowOwn(double delta)
     {
+        GameCamera camera = _cameras!.Camera;
         if (_view!.Entity(_client!.Replica.OwnEntityId) is not EntityView own)
         {
-            _view.UpdateCutaway(null, _camera!.Basis.Z);
+            _view.UpdateCutaway(null, camera.Basis.Z);
             return;
         }
 
         if (!_cameraPlaced)
         {
-            _camera!.SnapTo(own.Position);
+            camera.Place(own.Position, own.Facing);
             _cameraPlaced = true;
         }
 
-        _camera!.Follow(own.Position, delta);
-        _view.UpdateCutaway(own.Position, _camera.Basis.Z);
+        // После смерти своя капсула новая: вид от первого лица ставится и ей
+        own.SetFirstPerson(!camera.ShowsOwnBody);
+        camera.Follow(own.Position, _client.Replica.World, _controls?.IsAiming() == true, delta);
+        _view.UpdateCutaway(camera.CutsWalls ? own.Position : null, camera.Basis.Z);
     }
 
-    /// <summary>Точка под курсором на земле своего этажа в координатах sim; null без своей сущности.</summary>
+    /// <summary>Следующий режим камеры: новая камера встаёт на свою капсулу сразу.</summary>
+    private void SwitchCamera()
+    {
+        EntityView? own = _view?.Entity(_client!.Replica.OwnEntityId);
+        _cameras!.Next(own?.Position ?? Vector3.Zero, own?.Facing ?? Vector3.Back);
+        ApplyCameraMode();
+    }
+
+    /// <summary>Мышь захватывается в режимах, где она крутит камеру; в изометрии она свободна для курсора.</summary>
+    private void ApplyCameraMode()
+    {
+        // Без окна захватывать нечего, а в тестах мышь трогать нельзя
+        if (DisplayServer.GetName() != "headless")
+        {
+            Input.MouseMode = _cameras!.Camera.CapturesMouse ? Input.MouseModeEnum.Captured : Input.MouseModeEnum.Visible;
+        }
+
+        _log.Info($"camera {_cameras!.Mode}");
+    }
+
+    /// <summary>Точка прицела на земле своего этажа в координатах sim: под курсором в изометрии, по центру кадра в остальных режимах; null без своей сущности.</summary>
     private WorldPos? CursorPoint()
     {
-        if (_client?.OwnPosition is not WorldPos own || _camera is null)
+        if (_client?.OwnPosition is not WorldPos own || _cameras is null)
         {
             return null;
         }
 
-        Vector2 mouse = GetViewport().GetMousePosition();
-        Vector3? point = GameInput.GroundPoint(_camera.ProjectRayOrigin(mouse), _camera.ProjectRayNormal(mouse), own.Z * ViewMath.FloorHeight);
-        return point is Vector3 ground ? new WorldPos(ground.X, ground.Z, own.Z) : null;
+        GameCamera camera = _cameras.Camera;
+        Viewport viewport = GetViewport();
+        Vector2 screen = camera.AimScreenPoint(viewport.GetMousePosition(), viewport.GetVisibleRect().Size);
+        Vector3 point = GameInput.AimPoint(camera.ProjectRayOrigin(screen), camera.ProjectRayNormal(screen), own.Z * ViewMath.FloorHeight);
+        return new WorldPos(point.X, point.Z, own.Z);
     }
 
-    /// <summary>Взгляд своей капсулы: на курсор при прицеле, иначе по вводу движения.</summary>
+    /// <summary>Взгляд своей капсулы: на точку прицела при прицеле и от первого лица, иначе по вводу движения.</summary>
     private void FaceOwn(MoveInput input, WorldPos? aim)
     {
-        if (_controls?.IsAiming() == true && aim is WorldPos point && _client?.OwnPosition is WorldPos own)
+        bool facesAim = _controls?.IsAiming() == true || _cameras!.Camera.FacesAim;
+        if (facesAim && aim is WorldPos point && _client?.OwnPosition is WorldPos own)
         {
             _view!.FaceOwn(new MoveInput(point.X - own.X, point.Y - own.Y));
             return;
@@ -386,7 +437,7 @@ public partial class GameRoot : Node3D
     }
 
     /// <summary>Ввод с клавиатуры или автоходьба по кругу.</summary>
-    private MoveInput ReadInput(IsoCamera camera)
+    private MoveInput ReadInput(GameCamera camera)
     {
         if (_autoWalk)
         {

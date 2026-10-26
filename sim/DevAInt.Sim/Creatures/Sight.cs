@@ -7,14 +7,17 @@ namespace DevAInt.Sim.Creatures;
 public static class Sight
 {
     /// <summary>Свободна ли прямая между точками одного этажа.</summary>
-    public static bool Clear(World world, WorldPos from, WorldPos to)
-    {
-        if (from.Z != to.Z)
-        {
-            return false;
-        }
+    public static bool Clear(World world, WorldPos from, WorldPos to) => from.Z == to.Z && BlockedAt(world, from, to) < 0;
 
-        // Проход по клеткам вдоль прямой: каждое пересечённое ребро проверяется на стену
+    /// <summary>Доля пути от from до to, на которой прямая упирается в стену или закрытую дверь; null - путь свободен.</summary>
+    public static double? Blocked(World world, WorldPos from, WorldPos to) => BlockedAt(world, from, to) is double at and >= 0 ? at : null;
+
+    /// <summary>Доля пути до первой стены или -1, если путь свободен.</summary>
+    private static double BlockedAt(World world, WorldPos from, WorldPos to)
+    {
+        // Без double? в результате: Clear зовут тысячи раз на расчёт видимости, и обёртка стоила 4% времени
+        // Проход по клеткам вдоль прямой: каждое пересечённое ребро проверяется на стену.
+        // nextX и nextY - доли пути до следующего пересечения ребра по x и по y
         CellPos cell = from.Cell;
         CellPos end = to.Cell;
         double dx = to.X - from.X;
@@ -28,14 +31,15 @@ public static class Sight
         int steps = Math.Abs(end.X - cell.X) + Math.Abs(end.Y - cell.Y);
         for (int i = 0; i < steps; i++)
         {
-            Side side = nextX < nextY ? (stepX > 0 ? Side.East : Side.West) : (stepY > 0 ? Side.South : Side.North);
+            bool alongX = nextX < nextY;
+            Side side = alongX ? (stepX > 0 ? Side.East : Side.West) : (stepY > 0 ? Side.South : Side.North);
             if (!world.GetEdge(cell, side).IsPassable)
             {
-                return false;
+                return alongX ? nextX : nextY;
             }
 
             cell = cell.Neighbor(side);
-            if (nextX < nextY)
+            if (alongX)
             {
                 nextX += deltaX;
             }
@@ -45,6 +49,6 @@ public static class Sight
             }
         }
 
-        return true;
+        return -1;
     }
 }

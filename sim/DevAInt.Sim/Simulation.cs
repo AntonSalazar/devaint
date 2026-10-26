@@ -329,10 +329,10 @@ public sealed class Simulation
         }
     }
 
-    /// <summary>Взгляд за точкой прицела, если сущность целится, иначе по направлению движения.</summary>
+    /// <summary>Взгляд за точкой прицела, если сущность целится или просит смотреть на неё, иначе по направлению движения.</summary>
     private static void UpdateFacing(Entity entity)
     {
-        if (entity.Aiming && entity.AimPoint is WorldPos aim)
+        if ((entity.Aiming || entity.FacesAim) && entity.AimPoint is WorldPos aim)
         {
             double dx = aim.X - entity.Position.X;
             double dy = aim.Y - entity.Position.Y;

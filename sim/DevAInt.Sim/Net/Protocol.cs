@@ -96,6 +96,7 @@ public static class Protocol
                 writer.WriteFloat(input.Y);
                 writer.WriteFloat(input.AimX);
                 writer.WriteFloat(input.AimY);
+                writer.WriteBool(input.FaceAim);
                 break;
             case StartActionMessage start:
                 writer.WriteByte((byte)ClientType.StartAction);
@@ -345,7 +346,7 @@ public static class Protocol
     }
 
     /// <summary>Ввод движения после байта типа.</summary>
-    private static InputMessage ReadInput(PacketReader reader) => new(ReadSequence(reader), reader.ReadFloat(), reader.ReadFloat(), reader.ReadFloat(), reader.ReadFloat());
+    private static InputMessage ReadInput(PacketReader reader) => new(ReadSequence(reader), reader.ReadFloat(), reader.ReadFloat(), reader.ReadFloat(), reader.ReadFloat(), reader.ReadBool());
 
     /// <summary>Номер ввода, который должен поместиться в uint.</summary>
     private static uint ReadSequence(PacketReader reader)
