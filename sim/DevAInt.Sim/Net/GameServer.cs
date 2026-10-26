@@ -244,6 +244,14 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
 
                 _sim.StartBuild(client.EntityId, target);
                 break;
+            case UiActionMessage ui:
+                if (ui.Action >= _sim.UiTable.ActionCount)
+                {
+                    throw new ProtocolException($"ui action {ui.Action} is out of range");
+                }
+
+                _sim.UiAction(client.EntityId, ui.Action);
+                break;
             case StartCraftMessage craft:
                 if (craft.Recipe >= _sim.ItemTable.RecipeCount)
                 {
@@ -389,6 +397,7 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
         }
 
         AddContainerMessages(client, own, messages);
+        AddUiMessages(client, own, messages);
         float[] stats = [.. Enumerable.Range(0, _sim.StatTable.StatCount).Select(stat => (float)own.Stats.Value(stat))];
         if (client.Stats is null || !stats.AsSpan().SequenceEqual(client.Stats))
         {
@@ -427,6 +436,40 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
                 client.SentContainers[id] = container.Version;
             }
         }
+    }
+
+    /// <summary>Значения интерфейса, которые сменились с прошлой отправки: общие, поверх них свои у игрока.</summary>
+    private void AddUiMessages(ClientSession client, Entity own, List<ServerMessage> messages)
+    {
+        // Номера изменений совпали - значения те же, сравнивать нечего: так почти каждый тик.
+        // Своя сущность сменилась после смерти - номер новой сравнивается с номером прежней, поэтому хранится и id
+        if (client.UiGlobalVersion == _sim.GlobalUiVersion && client.UiOwnEntity == own.Id && client.UiOwnVersion == own.UiVersion)
+        {
+            return;
+        }
+
+        Dictionary<string, string> current = new(_sim.GlobalUi);
+        foreach ((string key, string value) in own.UiValues)
+        {
+            current[key] = value;
+        }
+
+        foreach (string key in client.SentUi.Keys.Where(key => !current.ContainsKey(key)).Order(StringComparer.Ordinal).ToList())
+        {
+            messages.Add(new UiValueMessage(key, null));
+            client.SentUi.Remove(key);
+        }
+
+        foreach ((string key, string value) in current.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            if (!client.SentUi.TryGetValue(key, out string? sent) || sent != value)
+            {
+                messages.Add(new UiValueMessage(key, value));
+                client.SentUi[key] = value;
+            }
+        }
+
+        (client.UiGlobalVersion, client.UiOwnEntity, client.UiOwnVersion) = (_sim.GlobalUiVersion, own.Id, own.UiVersion);
     }
 
     /// <summary>Появления, движения, мудлы и исчезновения сущностей относительно того, что клиент уже знает.</summary>
@@ -617,5 +660,17 @@ public sealed class GameServer(Simulation sim, IServerTransport transport, ISimL
 
         /// <summary>Контейнеры, отправленные клиенту, с номером изменения на момент отправки.</summary>
         public Dictionary<long, int> SentContainers { get; } = [];
+
+        /// <summary>Значения интерфейса, отправленные клиенту.</summary>
+        public Dictionary<string, string> SentUi { get; } = [];
+
+        /// <summary>Отправленный номер изменения общих значений интерфейса, -1 до первой отправки.</summary>
+        public int UiGlobalVersion { get; set; } = -1;
+
+        /// <summary>Сущность, чьи значения интерфейса отправлены.</summary>
+        public long UiOwnEntity { get; set; }
+
+        /// <summary>Отправленный номер изменения своих значений интерфейса.</summary>
+        public int UiOwnVersion { get; set; }
     }
 }

@@ -1,0 +1,15 @@
+// Радар в правом верхнем углу: сколько зомби рядом; число и дальность присылает scripts/radar.lua.
+{
+  "$schema": "../../../schemas/data.schema.json",
+  "ui": [
+    {
+      "id": "zombies:radar",
+      "anchor": "topRight",
+      "title": "zombies:radar",
+      "rows": [
+        { "text": "zombies:radar_nearby" },
+        { "button": "zombies:radar_range", "action": "zombies:radar_range" },
+      ],
+    },
+  ],
+}

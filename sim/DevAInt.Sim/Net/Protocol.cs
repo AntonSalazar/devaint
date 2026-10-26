@@ -14,6 +14,12 @@ public static class Protocol
     /// <summary>Наибольшее число контейнеров в подписке клиента.</summary>
     public const int MaxWatched = 16;
 
+    /// <summary>Наибольшая длина строки в байтах: id, версия, хеш мода, ключ значения интерфейса.</summary>
+    public const int MaxText = 256;
+
+    /// <summary>Наибольшая длина значения интерфейса в байтах.</summary>
+    public const int MaxUiValue = 1024;
+
     /// <summary>Наибольшее число сообщений в пакете, защита от мусорных данных.</summary>
     private const int MaxMessages = 100_000;
 
@@ -22,9 +28,6 @@ public static class Protocol
 
     /// <summary>Наибольшее число модов в приветствии.</summary>
     private const int MaxMods = 1000;
-
-    /// <summary>Наибольшая длина строки в байтах: id, версия, хеш мода.</summary>
-    private const int MaxText = 256;
 
     /// <summary>Типы сообщений сервера.</summary>
     private enum ServerType : byte
@@ -48,6 +51,7 @@ public static class Protocol
         ObjectRemove,
         Container,
         ContainerClose,
+        UiValue,
     }
 
     /// <summary>Типы сообщений клиента.</summary>
@@ -62,6 +66,7 @@ public static class Protocol
         MoveItem,
         StartCraft,
         Build,
+        UiAction,
     }
 
     /// <summary>Пакет сервера в байты.</summary>
@@ -148,6 +153,10 @@ public static class Protocol
                 writer.WriteByte((byte)ClientType.StartCraft);
                 writer.WriteVarUInt((ulong)craft.Recipe);
                 break;
+            case UiActionMessage ui:
+                writer.WriteByte((byte)ClientType.UiAction);
+                writer.WriteVarUInt((ulong)ui.Action);
+                break;
             case MoveItemMessage move:
                 writer.WriteByte((byte)ClientType.MoveItem);
                 writer.WriteVarInt(move.Item);
@@ -177,6 +186,7 @@ public static class Protocol
             ClientType.MoveItem => new MoveItemMessage(reader.ReadVarInt(), reader.ReadVarInt(), reader.ReadVarInt()),
             ClientType.StartCraft => new StartCraftMessage(reader.ReadCount(MaxList)),
             ClientType.Build => ReadBuild(reader),
+            ClientType.UiAction => new UiActionMessage(reader.ReadCount(MaxList)),
             _ => throw new ProtocolException($"unknown client message type {type}"),
         };
         RequireEnd(reader);
@@ -312,6 +322,12 @@ public static class Protocol
                 writer.WriteByte((byte)ServerType.OwnEntity);
                 writer.WriteVarInt(own.EntityId);
                 break;
+            case UiValueMessage ui:
+                writer.WriteByte((byte)ServerType.UiValue);
+                writer.WriteString(ui.Key);
+                writer.WriteBool(ui.Value is not null);
+                writer.WriteString(ui.Value ?? string.Empty);
+                break;
             case ActionEndedMessage ended:
                 writer.WriteByte((byte)ServerType.ActionEnded);
                 writer.WriteVarInt(ended.Entity);
@@ -347,8 +363,18 @@ public static class Protocol
             ServerType.Attack => new AttackMessage(reader.ReadVarInt(), reader.ReadVarInt(), ReadAttackKind(reader)),
             ServerType.ObjectPlace => new ObjectPlaceMessage(ReadObject(reader)),
             ServerType.ObjectRemove => new ObjectRemoveMessage(reader.ReadVarInt()),
+            ServerType.UiValue => ReadUiValue(reader),
             _ => throw new ProtocolException($"unknown server message type {type}"),
         };
+    }
+
+    /// <summary>Значение интерфейса: ключ, есть ли значение и само значение.</summary>
+    private static UiValueMessage ReadUiValue(PacketReader reader)
+    {
+        string key = reader.ReadString(MaxText);
+        bool present = reader.ReadBool();
+        string value = reader.ReadString(MaxUiValue);
+        return new UiValueMessage(key, present ? value : null);
     }
 
     /// <summary>Вид удара из байта; неизвестный - ProtocolException.</summary>

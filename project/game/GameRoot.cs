@@ -338,7 +338,8 @@ public partial class GameRoot : Node3D
         _client.Replica.EdgeChanged += (_, _) => _vision.Invalidate();
         _client.Replica.ObjectChanged += _ => _vision.Invalidate();
         _hud = new Hud();
-        _hud.Init(new HudModel(tables.Stats, tables.Items, _client.Replica));
+        _hud.Init(new HudModel(tables, _client.Replica));
+        _hud.ActionPressed += _client.SendUiAction;
         AddChild(_hud);
         _inventory = new InventoryWindow();
         _inventory.Init(tables.Items);

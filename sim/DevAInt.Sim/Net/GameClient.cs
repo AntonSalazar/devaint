@@ -95,6 +95,9 @@ public sealed class GameClient
     /// <summary>Просьба начать крафт по рецепту с номером из ItemTable.</summary>
     public void SendStartCraft(int recipe) => _connection.Send(Protocol.Write(new StartCraftMessage(recipe)));
 
+    /// <summary>Нажата кнопка панели интерфейса с номером действия из UiTable.</summary>
+    public void SendUiAction(int action) => _connection.Send(Protocol.Write(new UiActionMessage(action)));
+
     /// <summary>Просьба переложить предмет: from и to - 0 для своего инвентаря или id объекта-контейнера.</summary>
     public void SendMoveItem(long item, long from, long to) => _connection.Send(Protocol.Write(new MoveItemMessage(item, from, to)));
 

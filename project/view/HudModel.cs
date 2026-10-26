@@ -6,11 +6,12 @@ using DevAInt.Sim.Defs;
 using DevAInt.Sim.Items;
 using DevAInt.Sim.Net;
 using DevAInt.Sim.Stats;
+using DevAInt.Sim.Ui;
 
 /// <summary>Полоса стата в HUD: имя, значение и доля от min до max.</summary>
 public readonly record struct StatBar(string Name, float Value, float Fraction);
 
-/// <summary>Что показывает HUD своего персонажа: полосы статов, мудлы, предметы и надпись о смерти; данные только из реплики.</summary>
+/// <summary>Что показывает HUD своего персонажа: панели модов с полосами статов, мудлами, предметами и текстами, надпись о смерти; данные только из реплики.</summary>
 public sealed class HudModel
 {
     /// <summary>Сколько секунд видна надпись о смерти.</summary>
@@ -25,6 +26,9 @@ public sealed class HudModel
     /// <summary>Предметы по номерам.</summary>
     private readonly ItemTable _items;
 
+    /// <summary>Панели модов и действия кнопок.</summary>
+    private readonly UiTable _ui;
+
     /// <summary>Реплика своего клиента.</summary>
     private readonly Replica _replica;
 
@@ -32,16 +36,20 @@ public sealed class HudModel
     private double _deathLeft;
 
     /// <summary>Модель по таблицам и реплике; смена своей сущности значит, что прежняя умерла.</summary>
-    public HudModel(StatTable table, ItemTable items, Replica replica)
+    public HudModel(ClientTables tables, Replica replica)
     {
-        _table = table;
-        _items = items;
+        _table = tables.Stats;
+        _items = tables.Items;
+        _ui = tables.Ui;
         _replica = replica;
         _replica.OwnEntityChanged += () => _deathLeft = DeathMessageSeconds;
     }
 
     /// <summary>Видна ли надпись о смерти.</summary>
     public bool DeathVisible => _deathLeft > 0;
+
+    /// <summary>Панели всех модов.</summary>
+    public IReadOnlyList<UiPanelDef> Panels => _ui.Panels;
 
     /// <summary>Имя из id до появления локализации: core:low_power - low power.</summary>
     public static string ShortName(string id) => id[(id.IndexOf(':') + 1)..].Replace('_', ' ');
@@ -52,20 +60,24 @@ public sealed class HudModel
     /// <summary>Ход времени надписи о смерти на delta секунд.</summary>
     public void Advance(double delta) => _deathLeft = Math.Max(0, _deathLeft - delta);
 
-    /// <summary>Полосы всех статов по номерам.</summary>
-    public IReadOnlyList<StatBar> Bars()
+    /// <summary>Полоса стата id своей сущности.</summary>
+    public StatBar Bar(string id)
     {
-        List<StatBar> bars = new(_table.StatCount);
-        for (int i = 0; i < _table.StatCount; i++)
-        {
-            StatDef stat = _table.Stat(i);
-            float value = _replica.OwnStats[i];
-            float fraction = (float)Math.Clamp((value - stat.Min) / (stat.Max - stat.Min), 0, 1);
-            bars.Add(new StatBar(Name(stat.Id), value, fraction));
-        }
-
-        return bars;
+        int index = _table.StatIndex(id);
+        StatDef stat = _table.Stat(index);
+        float value = _replica.OwnStats[index];
+        float fraction = (float)Math.Clamp((value - stat.Min) / (stat.Max - stat.Min), 0, 1);
+        return new StatBar(Name(stat.Id), value, fraction);
     }
+
+    /// <summary>Видна ли панель по значениям от Lua.</summary>
+    public bool Visible(UiPanelDef panel) => UiPanels.Visible(panel, _replica.UiValues);
+
+    /// <summary>Текст ключа key на текущем языке со значениями от Lua вместо {ключ}.</summary>
+    public string Text(string key) => UiPanels.Format(Name(key), _replica.UiValues);
+
+    /// <summary>Номер действия кнопки для сервера.</summary>
+    public int ActionIndex(string action) => _ui.TryActionIndex(action, out int index) ? index : throw new ArgumentException($"unknown ui action {action}", nameof(action));
 
     /// <summary>Действующие мудлы своей сущности вида hungry II; пусто, пока сущности нет.</summary>
     public IReadOnlyList<string> Moodles()

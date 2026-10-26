@@ -2,4 +2,7 @@
 {
   "$schema": "../../../../schemas/locale.schema.json",
   "zombies:zombie": "Zombie",
+  "zombies:radar": "Radar",
+  "zombies:radar_nearby": "Zombies within {zombies:range} m: {zombies:nearby}",
+  "zombies:radar_range": "Change range",
 }

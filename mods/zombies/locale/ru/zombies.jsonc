@@ -2,4 +2,7 @@
 {
   "$schema": "../../../../schemas/locale.schema.json",
   "zombies:zombie": "Зомби",
+  "zombies:radar": "Радар",
+  "zombies:radar_nearby": "Зомби в {zombies:range} м: {zombies:nearby}",
+  "zombies:radar_range": "Сменить дальность",
 }

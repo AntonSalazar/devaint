@@ -894,6 +894,86 @@
         "additionalProperties": false
       }
     },
+    "ui": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "anchor": {
+            "enum": [
+              "topLeft",
+              "topRight",
+              "bottomLeft",
+              "bottomRight"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "visibleWhen": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "stat": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "moodles": {
+                  "type": "boolean"
+                },
+                "items": {
+                  "type": "boolean"
+                },
+                "text": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "button": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "action": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "separator": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
     "patches": {
       "type": [
         "array",

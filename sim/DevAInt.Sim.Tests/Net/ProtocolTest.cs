@@ -31,6 +31,9 @@ public class ProtocolTest
             new ObjectRemoveMessage(42),
             new ContainerMessage(7, [new ItemData(1, 0), new ItemData(long.MaxValue, 3)]),
             new ContainerCloseMessage(7),
+            new UiValueMessage("zombies:nearby", "3"),
+            new UiValueMessage("zombies:nearby", string.Empty),
+            new UiValueMessage("show:zombies:radar", null),
         ];
 
         ServerFrame read = Protocol.ReadServerFrame(Protocol.Write(new ServerFrame(123_456, messages, uint.MaxValue)));
@@ -80,7 +83,7 @@ public class ProtocolTest
     [Fact]
     public void ClientMessagesRoundTrip()
     {
-        ClientMessage[] messages = [new InputMessage(uint.MaxValue, -0.5f, 1f), new StartActionMessage(123_456_789, 3), new CancelActionMessage(), new ControlMessage(7, true), new InputMessage(3, 1, 0, 12.5f, -4f), new InputMessage(4, 0, 1, 2f, 3f, FaceAim: true), new WatchContainersMessage([3, 9]), new WatchContainersMessage([]), new MoveItemMessage(5, 0, 12), new StartCraftMessage(3), new BuildMessage(new BuildTarget(BuildKind.Wall, 2, new CellPos(5, 6, 0), 3)), new HelloMessage("anna")];
+        ClientMessage[] messages = [new InputMessage(uint.MaxValue, -0.5f, 1f), new StartActionMessage(123_456_789, 3), new CancelActionMessage(), new ControlMessage(7, true), new InputMessage(3, 1, 0, 12.5f, -4f), new InputMessage(4, 0, 1, 2f, 3f, FaceAim: true), new WatchContainersMessage([3, 9]), new WatchContainersMessage([]), new MoveItemMessage(5, 0, 12), new StartCraftMessage(3), new BuildMessage(new BuildTarget(BuildKind.Wall, 2, new CellPos(5, 6, 0), 3)), new HelloMessage("anna"), new UiActionMessage(4)];
 
         foreach (ClientMessage message in messages)
         {

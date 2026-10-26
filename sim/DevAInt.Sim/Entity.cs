@@ -76,4 +76,10 @@ public sealed class Entity(long id, StatSet stats, WorldPos position, CreatureDe
 
     /// <summary>Память поведения, null у существ без поведения.</summary>
     internal BrainState? Brain { get; set; }
+
+    /// <summary>Значения интерфейса этого игрока от Lua по ключу.</summary>
+    internal Dictionary<string, string> UiValues { get; } = [];
+
+    /// <summary>Номер изменения значений интерфейса игрока: по нему сервер понимает, что пора отправить.</summary>
+    internal int UiVersion { get; set; }
 }

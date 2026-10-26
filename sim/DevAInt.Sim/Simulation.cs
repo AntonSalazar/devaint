@@ -11,6 +11,7 @@ using DevAInt.Sim.Lua;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Motion;
 using DevAInt.Sim.Stats;
+using DevAInt.Sim.Ui;
 
 namespace DevAInt.Sim;
 
@@ -64,6 +65,7 @@ public sealed class Simulation
         ItemTable = new ItemTable(mods.Defs);
         CreatureTable = new CreatureTable(mods.Defs);
         ControlTable = new ControlTable(mods.Defs);
+        UiTable = new UiTable(mods.Defs);
         Mods = [.. mods.Mods.Select(mod => mod.Info)];
         _hasMap = mapId is not null;
         MapId = mapId;
@@ -108,6 +110,9 @@ public sealed class Simulation
     /// <summary>Действия управления по номерам.</summary>
     public ControlTable ControlTable { get; }
 
+    /// <summary>Панели интерфейса модов и действия кнопок по номерам.</summary>
+    public UiTable UiTable { get; }
+
     /// <summary>Вид существа игроков с карты, null - сущность без вида.</summary>
     public string? SpawnCreature { get; }
 
@@ -143,6 +148,12 @@ public sealed class Simulation
 
     /// <summary>Id следующего предмета.</summary>
     internal long NextItemId { get; set; } = 1;
+
+    /// <summary>Значения интерфейса для всех игроков от Lua по ключу.</summary>
+    internal Dictionary<string, string> GlobalUi { get; } = [];
+
+    /// <summary>Номер изменения общих значений интерфейса.</summary>
+    internal int GlobalUiVersion { get; private set; }
 
     /// <summary>Новая сущность вида creatureId или без вида со статами на начальных значениях; на карте позиция должна быть на полу.</summary>
     public long CreateEntity(WorldPos? at = null, string? creatureId = null)
@@ -337,6 +348,34 @@ public sealed class Simulation
         entity.Action = new ActionState(ItemTable.Action(ItemTable.ActionIndex(recipe.Action)), null, 0, Clock.Tick, ticks) { Recipe = recipe };
         return ActionStart.Started;
     }
+
+    /// <summary>Значение интерфейса key для игрока entity или для всех при null; value null убирает значение.</summary>
+    public void SetUiValue(long? entityId, string key, string? value)
+    {
+        Dictionary<string, string> values = entityId is long id ? _entities[id].UiValues : GlobalUi;
+        bool changed = value is null ? values.Remove(key) : !values.TryGetValue(key, out string? old) || old != value;
+        if (!changed)
+        {
+            return;
+        }
+
+        if (value is not null)
+        {
+            values[key] = value;
+        }
+
+        if (entityId is long owner)
+        {
+            _entities[owner].UiVersion++;
+        }
+        else
+        {
+            GlobalUiVersion++;
+        }
+    }
+
+    /// <summary>Кнопка интерфейса нажата игроком сущности: хук ui_action у модов с id действия.</summary>
+    public void UiAction(long entityId, int action) => _lua.RaiseUiAction(entityId, UiTable.Action(action));
 
     /// <summary>Открыть или закрыть ближнюю створку впереди на расстоянии руки; закрыть дверь нельзя, если в проёме кто-то стоит; true - створка сдвинулась.</summary>
     public bool Interact(long entityId)

@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using DevAInt.Sim.Locale;
 using DevAInt.Sim.Mods;
+using DevAInt.Sim.Net;
 
 /// <summary>Тесты <see cref="GameLocale"/>: переводы в TranslationServer, откат на английский, перевод HUD.</summary>
 public class GameLocaleTest : TestCase
@@ -54,13 +55,13 @@ public class GameLocaleTest : TestCase
         GameFixture game = new();
         LocaleTable table = GameLocale.Load(game.Loaded, new ListLog());
         GameLocale.Apply(table, "ru");
-        HudModel model = new(game.Sim.StatTable, game.Sim.ItemTable, game.Client.Replica);
+        HudModel model = new(ClientTables.From(game.Sim), game.Client.Replica);
         Hud hud = new();
         hud.Init(model);
         game.Tick();
         hud.Refresh();
 
-        Check(model.Bars().Any(bar => bar.Name == table.Get("ru", "core:health")), "health bar in russian");
+        Check(model.Bar("core:health").Name == table.Get("ru", "core:health"), "health bar in russian");
         CheckEqual($"{table.Get("ru", "core:apple")} x3", model.Items().Single(), "items in russian");
         CheckEqual(table.Get("ru", "ui.you_died"), hud.DeathText, "death text");
         Check(hud.DeathText != "You died", "death text is translated");

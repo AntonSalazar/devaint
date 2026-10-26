@@ -2,13 +2,13 @@ using DevAInt.Sim;
 using DevAInt.Sim.Mods;
 using DevAInt.Sim.Net;
 
-/// <summary>Сервер и клиент в одном процессе на моде core и стартовой комнате, как в игре.</summary>
+/// <summary>Сервер и клиент в одном процессе на модах и стартовой комнате, как в игре.</summary>
 public sealed class GameFixture
 {
-    /// <summary>Загрузка core, запуск сервера и подключение клиента.</summary>
-    public GameFixture()
+    /// <summary>Загрузка модов mods, по умолчанию только core, запуск сервера и подключение клиента.</summary>
+    public GameFixture(params string[] mods)
     {
-        ModLoadResult loaded = ModLoader.Load(ModsPath.Find(), ["core"]);
+        ModLoadResult loaded = ModLoader.Load(ModsPath.Find(), mods.Length > 0 ? mods : ["core"]);
         Loaded = loaded;
         Sim = new Simulation(loaded, new GodotLog(), GameRoot.MapId);
         LoopbackTransport transport = new();

@@ -61,6 +61,9 @@ public sealed class Replica(ClientTables tables)
     /// <summary>Содержимое контейнеров, которые сервер показывает клиенту, по id объекта.</summary>
     private readonly Dictionary<long, IReadOnlyList<ItemData>> _containers = [];
 
+    /// <summary>Значения интерфейса от Lua по ключу.</summary>
+    private readonly Dictionary<string, string> _uiValues = [];
+
     /// <summary>Мир пришёл: приветствие получено.</summary>
     public event Action? WorldCreated;
 
@@ -111,6 +114,12 @@ public sealed class Replica(ClientTables tables)
 
     /// <summary>Содержимое видимых контейнеров изменилось, контейнер появился или закрылся.</summary>
     public event Action? ContainersChanged;
+
+    /// <summary>Значение интерфейса от Lua сменилось: ключ.</summary>
+    public event Action<string>? UiValueChanged;
+
+    /// <summary>Значения интерфейса от Lua по ключу: общие и свои.</summary>
+    public IReadOnlyDictionary<string, string> UiValues => _uiValues;
 
     /// <summary>Мир клиента, null до приветствия.</summary>
     public World? World { get; private set; }
@@ -298,6 +307,18 @@ public sealed class Replica(ClientTables tables)
             case ContainerCloseMessage close:
                 _containers.Remove(close.Object);
                 ContainersChanged?.Invoke();
+                break;
+            case UiValueMessage ui:
+                if (ui.Value is null)
+                {
+                    _uiValues.Remove(ui.Key);
+                }
+                else
+                {
+                    _uiValues[ui.Key] = ui.Value;
+                }
+
+                UiValueChanged?.Invoke(ui.Key);
                 break;
             case ObjectRemoveMessage remove:
                 WorldObject gone = RequireWorld().FindObject(remove.Id) ?? throw new ProtocolException($"object {remove.Id} is unknown");

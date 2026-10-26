@@ -89,6 +89,9 @@ public sealed record ActionStartedMessage(long Entity, int Action, long StartTic
 /// <summary>Действие сущности закончилось: выполнено или прервано.</summary>
 public sealed record ActionEndedMessage(long Entity, bool Completed) : ServerMessage;
 
+/// <summary>Значение интерфейса от Lua сменилось: ключ и новое значение, null - значение убрано.</summary>
+public sealed record UiValueMessage(string Key, string? Value) : ServerMessage;
+
 /// <summary>Пакет сервера за тик: номер тика, сообщения по порядку и номер последнего применённого ввода клиента.</summary>
 public sealed record ServerFrame(long Tick, IReadOnlyList<ServerMessage> Messages, uint LastInput = 0);
 
@@ -125,6 +128,9 @@ public sealed record StartCraftMessage(int Recipe) : ClientMessage;
 
 /// <summary>Просьба переложить предмет: откуда и куда, 0 - свой инвентарь, иначе id объекта-контейнера.</summary>
 public sealed record MoveItemMessage(long Item, long From, long To) : ClientMessage;
+
+/// <summary>Нажата кнопка панели интерфейса: номер действия из UiTable.</summary>
+public sealed record UiActionMessage(int Action) : ClientMessage;
 
 /// <summary>Просьба прервать своё действие.</summary>
 public sealed record CancelActionMessage : ClientMessage;

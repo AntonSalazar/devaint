@@ -5,7 +5,9 @@ using DevAInt.Sim.Grid;
 using DevAInt.Sim.Items;
 using DevAInt.Sim.Logging;
 using DevAInt.Sim.Mods;
+using DevAInt.Sim.Net;
 using DevAInt.Sim.Stats;
+using DevAInt.Sim.Ui;
 using MoonSharp.Interpreter;
 
 namespace DevAInt.Sim.Lua;
@@ -25,8 +27,11 @@ internal sealed class LuaHost
     /// <summary>Имя хука выбора точки появления: id игрока и точки, ответ - номер точки с единицы.</summary>
     public const string ChooseSpawnHook = "choose_spawn";
 
+    /// <summary>Имя хука кнопки интерфейса: сущность и id действия кнопки.</summary>
+    public const string UiActionHook = "ui_action";
+
     /// <summary>Известные хуки.</summary>
-    private static readonly HashSet<string> _hooks = [TickHook, StatThresholdHook, ControlHook, ChooseSpawnHook];
+    private static readonly HashSet<string> _hooks = [TickHook, StatThresholdHook, ControlHook, ChooseSpawnHook, UiActionHook];
 
     /// <summary>Таблица статов для перевода id в номера.</summary>
     private readonly StatTable _table;
@@ -110,6 +115,17 @@ internal sealed class LuaHost
         }
     }
 
+    /// <summary>Хук ui_action у всех модов: каждый мод сам смотрит, его ли это кнопка.</summary>
+    public void RaiseUiAction(long entity, string action)
+    {
+        DynValue id = DynValue.NewNumber(entity);
+        DynValue name = DynValue.NewString(action);
+        foreach (LuaMod mod in _mods)
+        {
+            mod.Raise(UiActionHook, id, name, DynValue.Nil, DynValue.Nil);
+        }
+    }
+
     /// <summary>Хук control у всех модов: каждый мод сам смотрит, его ли это действие.</summary>
     public void RaiseControl(long entity, string control, double x, double y)
     {
@@ -187,6 +203,18 @@ internal sealed class LuaHost
     /// <summary>Id из числа в аргументе index.</summary>
     private static long Id(CallbackArguments args, int index, string function) => (long)args.AsType(index, function, DataType.Number).Number;
 
+    /// <summary>Таблица сущности для Lua: id, creature, x, y, z.</summary>
+    private static DynValue EntityRow(LuaMod mod, Entity entity)
+    {
+        Table row = new(mod.Script);
+        row["id"] = entity.Id;
+        row["creature"] = entity.Creature is null ? DynValue.Nil : DynValue.NewString(entity.Creature.Id);
+        row["x"] = entity.Position.X;
+        row["y"] = entity.Position.Y;
+        row["z"] = entity.Position.Z;
+        return DynValue.NewTable(row);
+    }
+
     /// <summary>Таблицы hooks и stats в Lua-состоянии мода.</summary>
     private void Bind(LuaMod mod)
     {
@@ -202,6 +230,7 @@ internal sealed class LuaHost
 
         Table entities = new(mod.Script);
         entities["near"] = DynValue.NewCallback((context, args) => EntitiesNear(mod, args), "entities.near");
+        entities["players"] = DynValue.NewCallback((context, args) => EntitiesPlayers(mod), "entities.players");
         mod.Script.Globals["entities"] = entities;
 
         Table objects = new(mod.Script);
@@ -211,11 +240,77 @@ internal sealed class LuaHost
         objects["remove"] = DynValue.NewCallback((context, args) => DynValue.NewBoolean(_sim.World.RemoveObject(Id(args, 0, "objects.remove"))), "objects.remove");
         mod.Script.Globals["objects"] = objects;
 
+        Table ui = new(mod.Script);
+        ui["set"] = DynValue.NewCallback((context, args) => UiSet(args), "ui.set");
+        ui["show"] = DynValue.NewCallback((context, args) => UiShow(args), "ui.show");
+        mod.Script.Globals["ui"] = ui;
+
         Table containers = new(mod.Script);
         containers["items"] = DynValue.NewCallback((context, args) => ContainerItems(mod, args), "containers.items");
         containers["add"] = DynValue.NewCallback((context, args) => ContainerAdd(args), "containers.add");
         containers["remove"] = DynValue.NewCallback((context, args) => ContainerRemove(args), "containers.remove");
         mod.Script.Globals["containers"] = containers;
+    }
+
+    /// <summary>entities.players: сущности игроков в мире - таблицы id, creature, x, y, z.</summary>
+    private DynValue EntitiesPlayers(LuaMod mod)
+    {
+        Table result = new(mod.Script);
+        foreach (Entity entity in _all())
+        {
+            if (entity.PlayerId is not null)
+            {
+                result.Append(EntityRow(mod, entity));
+            }
+        }
+
+        return DynValue.NewTable(result);
+    }
+
+    /// <summary>ui.set: значение интерфейса key игрока entity или всех при nil; число, строка или логическое, nil убирает.</summary>
+    private DynValue UiSet(CallbackArguments args)
+    {
+        long? entity = UiEntity(args, "ui.set");
+        string key = args.AsType(1, "ui.set", DataType.String).String;
+        DynValue raw = args[2];
+        string? value = raw.Type switch
+        {
+            DataType.Nil or DataType.Void => null,
+            DataType.Number => raw.Number.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+            DataType.Boolean => raw.Boolean ? "true" : "false",
+            DataType.String => raw.String,
+            _ => throw new ScriptRuntimeException($"ui.set: value must be a number, a string or a boolean, got {raw.Type.ToLuaTypeString()}"),
+        };
+        // Длины проверяются здесь: иначе мод сломал бы пакет, который клиент отвергнет
+        if (System.Text.Encoding.UTF8.GetByteCount(key) > Protocol.MaxText || (value is not null && System.Text.Encoding.UTF8.GetByteCount(value) > Protocol.MaxUiValue))
+        {
+            throw new ScriptRuntimeException($"ui.set: key must be at most {Protocol.MaxText} bytes and value at most {Protocol.MaxUiValue} bytes");
+        }
+
+        _sim.SetUiValue(entity, key, value);
+        return DynValue.Nil;
+    }
+
+    /// <summary>ui.show: показать или спрятать панель игроку entity или всем при nil.</summary>
+    private DynValue UiShow(CallbackArguments args)
+    {
+        long? entity = UiEntity(args, "ui.show");
+        string panel = args.AsType(1, "ui.show", DataType.String).String;
+        bool shown = args.AsType(2, "ui.show", DataType.Boolean).Boolean;
+        _sim.SetUiValue(entity, UiPanels.ShowKey(panel), shown ? "true" : "false");
+        return DynValue.Nil;
+    }
+
+    /// <summary>Сущность из первого аргумента: число - игрок, nil - все; неизвестная сущность - ошибка Lua.</summary>
+    private long? UiEntity(CallbackArguments args, string function)
+    {
+        if (args[0].IsNil())
+        {
+            return null;
+        }
+
+        long id = (long)args.AsType(0, function, DataType.Number).Number;
+        return _entities(id) is null ? throw new ScriptRuntimeException($"unknown entity {id}") : id;
     }
 
     /// <summary>Таблица объекта для Lua: id, вид, клетка, поворот и занятый прямоугольник.</summary>
@@ -304,8 +399,7 @@ internal sealed class LuaHost
     private DynValue ContainerRemove(CallbackArguments args) =>
         DynValue.NewBoolean(_sim.RemoveFromContainer(Id(args, 0, "containers.remove"), Id(args, 1, "containers.remove")));
 
-
-    /// <summary>entities.near: сущности этажа z в радиусе от точки x, y - таблицы id, creature, x, y.</summary>
+    /// <summary>entities.near: сущности этажа z в радиусе от точки x, y - таблицы id, creature, x, y, z.</summary>
     private DynValue EntitiesNear(LuaMod mod, CallbackArguments args)
     {
         double x = args.AsType(0, "entities.near", DataType.Number).Number;
@@ -322,12 +416,7 @@ internal sealed class LuaHost
                 continue;
             }
 
-            Table row = new(mod.Script);
-            row["id"] = entity.Id;
-            row["creature"] = entity.Creature is null ? DynValue.Nil : DynValue.NewString(entity.Creature.Id);
-            row["x"] = entity.Position.X;
-            row["y"] = entity.Position.Y;
-            result.Append(DynValue.NewTable(row));
+            result.Append(EntityRow(mod, entity));
         }
 
         return DynValue.NewTable(result);

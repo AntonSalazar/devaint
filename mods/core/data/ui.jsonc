@@ -1,0 +1,19 @@
+// Панель состояния core в левом верхнем углу: полосы статов, мудлы и предметы. Мод может заменить её патчем.
+{
+  "$schema": "../../../schemas/data.schema.json",
+  "ui": [
+    {
+      "id": "core:status",
+      "anchor": "topLeft",
+      "rows": [
+        { "stat": "core:hunger" },
+        { "stat": "core:thirst" },
+        { "stat": "core:fatigue" },
+        { "stat": "core:health" },
+        { "moodles": true },
+        { "separator": true },
+        { "items": true },
+      ],
+    },
+  ],
+}

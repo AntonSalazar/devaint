@@ -23,6 +23,7 @@ internal sealed class DefFile
         ["recipes"] = typeof(RecipeDef),
         ["creatures"] = typeof(CreatureDef),
         ["controls"] = typeof(ControlDef),
+        ["ui"] = typeof(UiPanelDef),
     };
 
     /// <summary>Путь к JSON Schema для редактора, загрузчик его пропускает.</summary>
@@ -64,6 +65,9 @@ internal sealed class DefFile
 
     /// <summary>Действия управления.</summary>
     public List<ControlDef?>? Controls { get; init; }
+
+    /// <summary>Панели интерфейса.</summary>
+    public List<UiPanelDef?>? Ui { get; init; }
 
     /// <summary>Патчи определений этого и других модов.</summary>
     public List<PatchDef?>? Patches { get; init; }
