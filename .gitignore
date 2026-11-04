@@ -1,20 +1,11 @@
-# Godot 4+ specific ignores
-.godot/
+# Rust
+target/
+**/*.rs.bk
 
 # Build folder
 builds/
 
-# .NET / C#
-bin/
-obj/
-*.user
-
-# TexturePacker ignores
-*.tpsheet
-*.tpsheet.import
-*.depren
-
-# Local settings, e.g. DEVAINT_SERVER_HOST
+# Local settings
 .env
 
 # Game saves
@@ -22,4 +13,3 @@ saves/
 
 # Other
 *.DS_Store
-
